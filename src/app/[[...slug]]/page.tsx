@@ -17,7 +17,7 @@ export default async function Page({
   params: Promise<{ slug?: string[] }>;
 }) {
   const { slug } = await params;
-  if (!slug || slug.length === 0) redirect('/gioi-thieu/lo-trinh-hoc/');
+  if (!slug || slug.length === 0) redirect('/gioi-thieu/container-fundamentals/');
   const page = source.getPage(slug);
   if (!page) notFound();
 
