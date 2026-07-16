@@ -1,8 +1,9 @@
 {
-  "title": "01. Bắt đầu",
+  "title": "Bắt đầu",
   "pages": [
     "lo-trinh-hoc",
     "container-fundamentals",
+    "docker-vs-containerd",
     "kubernetes-la-gi",
     "cai-dat-moi-truong",
     "kubectl-co-ban",

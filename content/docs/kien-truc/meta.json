@@ -1,5 +1,5 @@
 {
-  "title": "02. Kiến trúc Kubernetes",
+  "title": "Kiến trúc Kubernetes",
   "pages": [
     "tong-quan-cluster",
     "cluster-components",
