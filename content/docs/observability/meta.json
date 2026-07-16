@@ -1,0 +1,15 @@
+{
+  "title": "09. Observability",
+  "pages": [
+    "events",
+    "container-logs",
+    "metrics-server",
+    "resource-monitoring",
+    "prometheus",
+    "grafana",
+    "alertmanager",
+    "distributed-tracing",
+    "audit-logs",
+    "sli-slo-alerting"
+  ]
+}

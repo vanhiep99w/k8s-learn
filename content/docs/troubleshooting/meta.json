@@ -1,0 +1,16 @@
+{
+  "title": "12. Troubleshooting",
+  "pages": [
+    "troubleshooting-methodology",
+    "kubectl-debug-toolkit",
+    "pod-troubleshooting",
+    "deployment-troubleshooting",
+    "service-troubleshooting",
+    "dns-troubleshooting",
+    "network-policy-troubleshooting",
+    "storage-troubleshooting",
+    "node-troubleshooting",
+    "control-plane-troubleshooting",
+    "performance-troubleshooting"
+  ]
+}

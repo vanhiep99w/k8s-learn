@@ -1,0 +1,15 @@
+{
+  "title": "02. Kiến trúc Kubernetes",
+  "pages": [
+    "tong-quan-cluster",
+    "cluster-components",
+    "control-plane",
+    "worker-node",
+    "kube-apiserver",
+    "etcd",
+    "kube-scheduler",
+    "controller-manager",
+    "kubelet-container-runtime",
+    "declarative-reconciliation"
+  ]
+}

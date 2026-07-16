@@ -1,0 +1,20 @@
+{
+  "title": "11. Cluster Administration",
+  "pages": [
+    "cluster-options",
+    "kubeadm-bootstrap",
+    "managed-kubernetes",
+    "high-availability-control-plane",
+    "node-management",
+    "drain-cordon-uncordon",
+    "cluster-upgrade",
+    "certificate-management",
+    "etcd-backup-restore",
+    "cluster-dns",
+    "cluster-networking",
+    "capacity-management",
+    "node-autoscaling",
+    "multi-cluster",
+    "api-deprecations"
+  ]
+}

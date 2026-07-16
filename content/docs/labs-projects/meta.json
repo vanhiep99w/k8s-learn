@@ -1,0 +1,17 @@
+{
+  "title": "15. Labs và Projects",
+  "pages": [
+    "lab-namespaces-kubectl",
+    "lab-config-application",
+    "lab-deployment-service-ingress",
+    "lab-stateful-application",
+    "lab-network-policy",
+    "lab-rbac-security",
+    "lab-observability",
+    "lab-autoscaling",
+    "lab-helm-kustomize",
+    "lab-gitops",
+    "lab-troubleshooting",
+    "capstone-production-platform"
+  ]
+}

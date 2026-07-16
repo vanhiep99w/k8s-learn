@@ -1,0 +1,21 @@
+{
+  "title": "08. Security",
+  "pages": [
+    "security-model",
+    "authentication",
+    "authorization",
+    "rbac",
+    "service-accounts",
+    "kubeconfig-contexts",
+    "security-context",
+    "linux-capabilities-seccomp",
+    "pod-security-admission",
+    "admission-controllers",
+    "secret-security",
+    "encryption-at-rest",
+    "pki-tls-certificates",
+    "network-security",
+    "image-supply-chain",
+    "runtime-security"
+  ]
+}

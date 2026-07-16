@@ -1,0 +1,17 @@
+{
+  "title": "05. Networking",
+  "pages": [
+    "networking-model",
+    "pod-networking",
+    "cni",
+    "service",
+    "service-types",
+    "endpoints-endpointslices",
+    "dns-coredns",
+    "ingress",
+    "gateway-api",
+    "network-policy",
+    "kube-proxy",
+    "network-troubleshooting"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "pages": [
+    "index",
+    "gioi-thieu",
+    "kien-truc",
+    "workloads",
+    "cau-hinh",
+    "networking",
+    "storage",
+    "scheduling",
+    "security",
+    "observability",
+    "delivery",
+    "cluster-administration",
+    "troubleshooting",
+    "ecosystem",
+    "production",
+    "labs-projects",
+    "certifications"
+  ]
+}

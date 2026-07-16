@@ -1,0 +1,19 @@
+{
+  "title": "03. Workloads",
+  "pages": [
+    "pod",
+    "pod-lifecycle",
+    "init-containers",
+    "multi-container-pods",
+    "labels-annotations-selectors",
+    "namespaces",
+    "replicaset",
+    "deployment",
+    "deployment-strategies",
+    "statefulset",
+    "daemonset",
+    "job",
+    "cronjob",
+    "workload-cleanup"
+  ]
+}

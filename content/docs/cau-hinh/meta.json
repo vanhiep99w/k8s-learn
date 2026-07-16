@@ -1,0 +1,15 @@
+{
+  "title": "04. Cấu hình ứng dụng",
+  "pages": [
+    "commands-arguments",
+    "environment-variables",
+    "configmap",
+    "secret",
+    "resource-requests-limits",
+    "health-probes",
+    "quality-of-service",
+    "downward-api",
+    "resource-quota-limitrange",
+    "pod-disruption-budget"
+  ]
+}

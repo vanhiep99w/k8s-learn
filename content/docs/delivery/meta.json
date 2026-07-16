@@ -1,0 +1,18 @@
+{
+  "title": "10. Application Delivery",
+  "pages": [
+    "manifest-management",
+    "environment-strategy",
+    "kustomize",
+    "helm",
+    "rollout-rollback",
+    "blue-green-canary",
+    "horizontal-pod-autoscaler",
+    "vertical-pod-autoscaler",
+    "cluster-autoscaler",
+    "disruptions-availability",
+    "cicd-kubernetes",
+    "gitops",
+    "argocd-flux"
+  ]
+}

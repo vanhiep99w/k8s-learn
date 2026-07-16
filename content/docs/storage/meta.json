@@ -1,0 +1,16 @@
+{
+  "title": "06. Storage",
+  "pages": [
+    "volumes",
+    "ephemeral-volumes",
+    "persistent-volume",
+    "persistent-volume-claim",
+    "storage-class",
+    "dynamic-provisioning",
+    "access-modes-volume-modes",
+    "stateful-storage",
+    "csi",
+    "volume-snapshots",
+    "storage-backup-restore"
+  ]
+}

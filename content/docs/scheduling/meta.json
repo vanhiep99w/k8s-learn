@@ -1,0 +1,15 @@
+{
+  "title": "07. Scheduling",
+  "pages": [
+    "scheduling-framework",
+    "node-selector",
+    "pod-affinity-anti-affinity",
+    "taints-tolerations",
+    "topology-spread",
+    "priority-classes",
+    "preemption",
+    "static-pods",
+    "extended-resources-device-plugins",
+    "scheduling-best-practices"
+  ]
+}

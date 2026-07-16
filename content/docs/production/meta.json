@@ -1,0 +1,16 @@
+{
+  "title": "14. Production",
+  "pages": [
+    "production-readiness",
+    "high-availability",
+    "multi-tenancy",
+    "disaster-recovery",
+    "cost-optimization",
+    "security-hardening",
+    "observability-baseline",
+    "change-management",
+    "workload-identity",
+    "platform-engineering",
+    "upgrade-strategy"
+  ]
+}

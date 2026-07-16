@@ -1,0 +1,17 @@
+{
+  "title": "13. Ecosystem",
+  "pages": [
+    "custom-resources",
+    "operators",
+    "ingress-controllers",
+    "gateway-controllers",
+    "cert-manager",
+    "external-dns",
+    "service-mesh",
+    "policy-engines",
+    "external-secrets",
+    "velero",
+    "keda",
+    "observability-stacks"
+  ]
+}
