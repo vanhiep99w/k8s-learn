@@ -121,70 +121,259 @@ nginx@sha256:<digest>
 
 ### 2.4 Container lifecycle
 
-Một Container tồn tại khi process chính còn chạy.
+Cách dễ nhất để hiểu vòng đời Container là: **Container chạy chừng nào process chính của nó còn chạy**. Process chính được khai báo bởi `ENTRYPOINT` hoặc `CMD` trong image và thường có PID 1 bên trong Container.
+
+Ví dụ, nếu command chính là `nginx`, Container chạy trong lúc `nginx` còn chạy. Nếu `nginx` dừng hoặc gặp lỗi, Container chuyển sang trạng thái `exited`; filesystem tạm của Container vẫn còn cho đến khi Container bị xóa.
 
 ```text
-created → running → exited
-              │
-              └→ paused / restarted tùy runtime và policy bên ngoài
+Image
+  │ create
+  ▼
+created ── start ──▶ running ── process chính kết thúc ──▶ exited
+                       │                                      │
+                       │ pause / unpause                      │ start / restart
+                       ▼                                      └──────────────▶ running
+                    paused
+                                                              │ remove
+                                                              ▼
+                                                            removed
 ```
 
-Container không phải VM để đăng nhập và khởi động nhiều daemon tùy ý. Thiết kế phổ biến là một process chính có trách nhiệm rõ ràng; các process hỗ trợ chỉ đi cùng khi thực sự có cùng lifecycle.
+| Trạng thái | Điều gì đang xảy ra? |
+|------------|----------------------|
+| `created` | Runtime đã chuẩn bị Container nhưng chưa khởi động process chính. |
+| `running` | Process chính đang chạy; Container có thể có thêm các process con. |
+| `paused` | Các process tạm thời bị đóng băng, chưa bị kết thúc. |
+| `exited` | Process chính đã kết thúc; Container không còn chạy nhưng log, metadata và writable layer vẫn có thể được kiểm tra. |
+| `removed` | Container và writable layer của nó đã bị xóa; image gốc không bị xóa. |
+
+`docker run` thực chất gộp hai bước `docker create` và `docker start`. Có thể quan sát việc process kết thúc kéo theo Container dừng bằng ví dụ sau:
+
+```bash
+docker run --name lifecycle-demo alpine:3.20 \
+  sh -c 'echo "bat dau"; sleep 5; echo "ket thuc"'
+
+docker ps                 # Không còn thấy Container đang chạy
+docker ps -a              # Thấy lifecycle-demo ở trạng thái Exited
+docker logs lifecycle-demo
+docker rm lifecycle-demo
+```
+
+> [!IMPORTANT]
+> Chạy với `-d` chỉ đưa Container xuống background, không làm nó sống mãi. Nếu process chính kết thúc thì Container vẫn dừng. Docker restart policy hoặc Kubernetes có thể khởi động lại workload, nhưng đó là hành động của lớp quản lý bên ngoài.
+
+Container không nhất thiết chỉ có đúng một process. Nguyên tắc “một process chính” có nghĩa là Container nên có một nhiệm vụ và một lifecycle rõ ràng. Các process hỗ trợ chỉ nên chạy cùng khi chúng phải được khởi động, dừng và scale như một đơn vị.
 
 ---
 
 ## 3. Container hoạt động như thế nào
 
-### 3.1 Linux namespaces
+Container không phải là một “máy tính nhỏ” nằm bên trong host. Về bản chất, Container vẫn là **process bình thường chạy trên host**, nhưng Linux kernel đặt thêm các quy tắc xung quanh process đó.
 
-Namespaces tạo góc nhìn cô lập cho process:
+Có thể nhớ bốn mảnh ghép như sau:
 
-| Namespace | Cô lập |
-|-----------|--------|
-| PID | Process ID và process tree |
-| Network | Interface, route, port và firewall rule |
-| Mount | Mount points và filesystem view |
-| UTS | Hostname và domain name |
-| IPC | Shared memory và message queue |
-| User | User ID và group ID |
+```text
+Process của ứng dụng
+│
+├── namespaces ───── quyết định process nhìn thấy những gì
+├── cgroups ──────── quyết định process dùng được bao nhiêu tài nguyên
+├── security rules ─ quyết định process được phép làm gì
+└── filesystem ───── cung cấp file từ image và một writable layer
 
-Cô lập không đồng nghĩa với ranh giới bảo mật tuyệt đối. Container vẫn dùng chung host kernel, nên kernel vulnerability hoặc cấu hình đặc quyền có thể phá vỡ isolation.
+Tất cả vẫn chạy bằng kernel của host.
+```
 
-### 3.2 cgroups
+Khi chạy `docker run nginx`, Docker không khởi động một hệ điều hành mới. Runtime lấy command từ image, tạo process `nginx`, chuẩn bị filesystem rồi yêu cầu kernel áp dụng isolation và giới hạn tài nguyên cho process đó.
 
-Control groups giới hạn và đo tài nguyên:
+### 3.1 Namespaces: tạo góc nhìn riêng cho Container
 
-- CPU time.
-- Memory.
-- Process count.
-- I/O và các controller khác tùy hệ thống.
+> [!IMPORTANT]
+> **Namespace là tính năng của Linux kernel, không phải khái niệm do Container hay Docker tạo ra.** Container Runtime chỉ sử dụng nhiều Linux namespaces để cô lập process. Namespace cũng có thể được dùng mà không cần Container.
 
-Kubernetes `resources.requests` và `resources.limits` cuối cùng được thực thi thông qua cơ chế của OS và Container Runtime, thường liên quan đến cgroups trên Linux.
+Namespace không phải là một “cái hộp” hay một kernel riêng. Nó là **góc nhìn được kernel áp dụng cho process**. Một process thường thuộc một namespace cho từng loại tài nguyên: một PID namespace, một Network namespace, một Mount namespace…
 
-### 3.3 Capabilities và security profile
+Có thể hiểu mối quan hệ như sau:
 
-Process `root` trong Container không nên mặc định có mọi quyền của host. Linux capabilities chia quyền root thành các đơn vị nhỏ hơn. Seccomp có thể giới hạn system calls; AppArmor hoặc SELinux kiểm soát truy cập bắt buộc.
+```text
+Linux namespaces + cgroups + filesystem + security rules
+                              │
+                              │ được runtime cấu hình
+                              ▼
+                    Process chạy trong Container
+```
 
-Nguyên tắc:
+Trên một máy Linux có nhiều danh sách dùng chung, chẳng hạn:
+
+- Danh sách process đang chạy.
+- Danh sách network interface, địa chỉ IP và port.
+- Danh sách filesystem đang được mount.
+- Hostname của máy.
+
+Nếu không có namespaces, các process trên máy sẽ đọc cùng những danh sách này. **Namespace yêu cầu kernel chỉ đưa cho một nhóm process phần danh sách thuộc về nhóm đó.** Khi process gọi system call hoặc đọc thông tin hệ thống, kernel trả về kết quả theo namespace của process.
+
+Vì vậy, ứng dụng trong Container có cảm giác như nó đang có process, network và filesystem riêng, dù tất cả vẫn nằm trên cùng host. Kernel vẫn quản lý toàn bộ resource; namespace chỉ thay đổi process đó được nhìn thấy phần nào.
+
+```text
+                         Linux host
+┌─────────────────────────────────────────────────────────┐
+│ Linux kernel quản lý tất cả process và resource         │
+│                                                         │
+│  Namespace của A             Namespace của B            │
+│  ┌────────────────────┐      ┌────────────────────┐     │
+│  │ nginx: PID 1       │      │ node: PID 1        │     │
+│  │ IP: 172.17.0.2     │      │ IP: 172.17.0.3     │     │
+│  │ filesystem của A   │      │ filesystem của B   │     │
+│  └────────────────────┘      └────────────────────┘     │
+│         Container A                 Container B         │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### Ví dụ 1: PID namespace
+
+Giả sử host chạy hai Container. Mỗi Container có một process `sleep`:
+
+```text
+Nhìn từ host:
+PID 4101  sleep 300   ← thuộc Container A
+PID 4172  sleep 300   ← thuộc Container B
+
+Nhìn từ bên trong Container A:
+PID 1     sleep 300   ← chỉ thấy process của A
+
+Nhìn từ bên trong Container B:
+PID 1     sleep 300   ← chỉ thấy process của B
+```
+
+Không có hai process trùng PID trên cùng một danh sách. Mỗi PID namespace có cách đánh số riêng: kernel có thể hiển thị **cùng một process** là PID `4101` từ host nhưng là PID `1` từ bên trong Container A. Host hoặc process ở PID namespace cha có thể quan sát process ở namespace con; chiều ngược lại thì không.
+
+Có thể tự quan sát bằng Docker:
+
+```bash
+docker run -d --name ns-demo alpine:3.20 sleep 300
+
+docker exec ns-demo ps   # PID nhìn từ trong Container
+docker top ns-demo       # PID nhìn từ host
+docker rm -f ns-demo
+```
+
+#### Ví dụ 2: Network namespace
+
+Network namespace cung cấp một network stack riêng gồm interface, IP, route và bảng port. Container A và B đều có thể chạy web server ở port `80` mà không xung đột:
+
+```text
+Container A: 172.17.0.2:80
+Container B: 172.17.0.3:80
+```
+
+Mỗi Container có network interface, địa chỉ IP, routing table và danh sách port riêng. Khi dùng `-p 8080:80`, Docker chỉ tạo đường chuyển tiếp từ port `8080` của host đến port `80` trong network namespace của Container.
+
+#### Ví dụ 3: Mount namespace
+
+Khi process trong Container đọc thư mục `/`, nó thấy filesystem được dựng từ image và writable layer của Container. Nó không mặc định thấy **các thư mục tương ứng của host**, chẳng hạn `/home` hoặc `/etc` của host. Container vẫn có thể có `/etc` riêng do image cung cấp. Muốn Container thấy một thư mục từ host, phải mount thư mục đó vào Container một cách rõ ràng.
+
+Ba namespace quan trọng nhất khi mới học là:
+
+| Namespace | Tạo riêng cái gì? | Lệnh cho thấy sự khác biệt |
+|-----------|-------------------|----------------------------|
+| PID | Danh sách và ID của process | `ps` |
+| Network | Interface, IP, route và port | `ip addr`, `ip route` |
+| Mount | Danh sách mount và góc nhìn filesystem | `mount`, `ls /` |
+
+Linux còn có UTS namespace cho hostname, IPC namespace cho shared memory/message queue và User namespace cho ánh xạ UID/GID. Chưa cần nhớ hết tên ở giai đoạn này; chỉ cần nhớ:
+
+> [!IMPORTANT]
+> Namespace không tạo một máy mới và không giới hạn CPU hoặc memory. Nó chỉ làm cho process trong Container nhận được **góc nhìn riêng** khi hỏi kernel về process, network, filesystem và các resource khác. cgroups mới là cơ chế giới hạn tài nguyên.
+
+Tóm tắt:
+
+```text
+Namespace = process được nhìn thấy gì?
+cgroups   = process được dùng bao nhiêu?
+```
+
+### 3.2 cgroups: process dùng được bao nhiêu?
+
+Nếu namespaces giống như đặt process vào một căn phòng riêng, cgroups giống như đặt hạn mức điện, nước và số người cho căn phòng đó.
+
+| Tài nguyên | cgroups có thể làm gì? | Khi chạm giới hạn |
+|------------|------------------------|-------------------|
+| CPU | Phân chia hoặc giới hạn CPU time | Process thường bị throttled, tức phải chạy chậm lại. |
+| Memory | Giới hạn lượng memory được dùng | Process có thể bị OOM-killed nếu không thể cấp thêm memory. |
+| PIDs | Giới hạn số process được tạo | Container không thể tạo thêm process khi đã đạt giới hạn. |
+| I/O | Kiểm soát hoạt động đọc/ghi thiết bị | Tốc độ hoặc mức ưu tiên I/O có thể bị hạn chế. |
+
+Ví dụ sau giới hạn Container ở `128 MiB` memory và `0.5` CPU:
+
+```bash
+docker run --rm --memory=128m --cpus=0.5 nginx:1.27-alpine
+```
+
+Trong Kubernetes:
+
+- `resources.requests` giúp Scheduler chọn Node và có thể ảnh hưởng cách chia tài nguyên.
+- `resources.limits` đặt mức tối đa; Container vượt memory limit có thể bị OOM-killed, còn vượt CPU limit thường bị throttled.
+
+### 3.3 Security rules: process được phép làm gì?
+
+Namespaces và cgroups không tạo ra ranh giới bảo mật tuyệt đối vì Container vẫn dùng chung kernel với host. Linux bổ sung nhiều lớp kiểm soát để giảm quyền của process:
+
+| Cơ chế | Cách hiểu đơn giản |
+|--------|--------------------|
+| Non-root user | Không cho ứng dụng chạy với UID `0` nếu không cần thiết. |
+| Linux capabilities | Chia quyền `root` thành các quyền nhỏ, ví dụ quyền bind port đặc biệt hoặc quản lý network. |
+| Seccomp | Chặn những system call mà process không cần sử dụng. |
+| AppArmor/SELinux | Giới hạn process được truy cập file và resource nào theo security policy. |
+| Read-only root filesystem | Không cho process sửa filesystem gốc của Container. |
+
+Ví dụ, một web server chỉ cần đọc file và mở port phục vụ request thì không nên có quyền thay đổi network của host hoặc load kernel module.
+
+Các nguyên tắc nên áp dụng:
 
 - Chạy non-root khi có thể.
 - Không dùng `--privileged` nếu không có lý do cụ thể.
 - Drop capabilities không cần thiết.
 - Dùng read-only root filesystem nếu ứng dụng hỗ trợ.
 
-### 3.4 OCI và Container Runtime
+> [!WARNING]
+> `--privileged` mở rộng rất nhiều quyền và làm yếu phần lớn ranh giới giữa Container với host. Không dùng tùy tiện chỉ để sửa lỗi `permission denied`.
 
-Open Container Initiative định nghĩa các chuẩn quan trọng cho image và runtime. Các công cụ phổ biến:
+### 3.4 Runtime: ai tạo các process này?
 
-| Thành phần | Vai trò |
-|------------|---------|
-| Docker/Podman | Trải nghiệm build và chạy Container cho người dùng |
-| containerd/CRI-O | Runtime thường dùng trên Kubernetes Node |
-| runc/crun | Low-level runtime tạo process cô lập |
-| CRI | Giao diện Kubernetes dùng để nói chuyện với runtime |
+Các tên Docker, containerd, CRI-O và runc dễ gây nhầm vì chúng nằm ở **những tầng khác nhau**, không phải tất cả đều là công cụ thay thế trực tiếp cho nhau.
+
+```text
+Chạy local:
+Docker CLI / Podman
+        │
+        ▼
+containerd hoặc lớp quản lý tương đương
+        │
+        ▼
+runc / crun ──▶ Linux kernel
+
+Trên Kubernetes Node:
+kubelet ── CRI ──▶ containerd / CRI-O ──▶ runc / crun ──▶ Linux kernel
+```
+
+| Thành phần | Nhiệm vụ chính |
+|------------|----------------|
+| Docker/Podman | Cung cấp CLI và trải nghiệm build, pull, run Container cho người dùng. |
+| kubelet | Yêu cầu runtime trên Kubernetes Node tạo hoặc dừng Container theo PodSpec. |
+| CRI | Chuẩn giao tiếp giữa kubelet và Container Runtime; CRI không phải một runtime riêng. |
+| containerd/CRI-O | Quản lý image, lifecycle và gọi low-level runtime trên Node. |
+| runc/crun | Tạo process và cấu hình namespaces, cgroups cùng các security rule ở mức thấp. |
+| Linux kernel | Thực thi process và các cơ chế isolation/resource control thật sự. |
+
+OCI (Open Container Initiative) định nghĩa chuẩn cho định dạng image và cách low-level runtime chạy Container. Nhờ chuẩn chung, một OCI image có thể được nhiều công cụ và runtime tương thích sử dụng.
 
 > [!NOTE]
-> Kubernetes không yêu cầu Docker Engine trên mỗi Node. Kubernetes giao tiếp với runtime qua Container Runtime Interface; containerd và CRI-O là các lựa chọn phổ biến.
+> Kubernetes không yêu cầu Docker Engine trên mỗi Node. Kubelet giao tiếp với runtime qua CRI; containerd và CRI-O là hai lựa chọn phổ biến.
+
+Tóm lại, hãy nhớ công thức:
+
+```text
+Container = process + filesystem từ image + isolation + resource limits
+```
 
 ---
 
