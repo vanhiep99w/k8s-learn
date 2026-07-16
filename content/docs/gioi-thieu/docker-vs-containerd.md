@@ -620,36 +620,36 @@ Sau khi loại bỏ:
 
 ```text
 ┌──────────────── Kubernetes Node ────────────────┐
-│                                                │
-│ kubelet                                        │
-│    │                                           │
-│    ▼                                           │
-│ dockershim (in-tree, thuộc kubelet/Kubernetes) │
-│    │ Docker Engine API                         │
-│    ▼                                           │
-│ dockerd                                        │
-│    │                                           │
-│    ▼                                           │
-│ containerd                                     │
-│    │                                           │
-│    ▼                                           │
-│ containerd-shim → runc → application process  │
-└────────────────────────────────────────────────┘
+│                                                 │
+│ kubelet                                         │
+│    │                                            │
+│    ▼                                            │
+│ dockershim (in-tree, thuộc kubelet/Kubernetes)  │
+│    │ Docker Engine API                          │
+│    ▼                                            │
+│ dockerd                                         │
+│    │                                            │
+│    ▼                                            │
+│ containerd                                      │
+│    │                                            │
+│    ▼                                            │
+│ containerd-shim → runc → application process    │
+└─────────────────────────────────────────────────┘
 ```
 
 ### 10.2 Kubernetes hiện đại với containerd
 
 ```text
 ┌──────────────── Kubernetes Node ───────────────┐
-│                                               │
-│ kubelet                                       │
-│    │ CRI v1 qua gRPC                          │
-│    ▼                                          │
-│ containerd + CRI plugin                       │
-│    │                                          │
-│    ▼                                          │
-│ containerd-shim → runc → application process │
-└───────────────────────────────────────────────┘
+│                                                │
+│ kubelet                                        │
+│    │ CRI v1 qua gRPC                           │
+│    ▼                                           │
+│ containerd + CRI plugin                        │
+│    │                                           │
+│    ▼                                           │
+│ containerd-shim → runc → application process   │
+└────────────────────────────────────────────────┘
 ```
 
 ### 10.3 Kubernetes hiện đại với CRI-O
