@@ -1,98 +1,174 @@
 ---
-title: "Bản đồ nội dung"
-description: "Curriculum Kubernetes, quy ước tổ chức page và trạng thái nội dung trong content/docs."
+title: "Curriculum and content map"
+description: "The Kubernetes learning sequence, domain boundaries, content maturity, navigation metadata, and authoring source of truth."
 ---
 
-# Bản đồ nội dung
+# Curriculum and content map
 
-## Curriculum hiện tại
+## Product model
 
-Root `content/docs/meta.json` định nghĩa 17 entry theo thứ tự sidebar: `index`, `gioi-thieu`, `kien-truc`, `workloads`, `cau-hinh`, `networking`, `storage`, `scheduling`, `security`, `observability`, `delivery`, `cluster-administration`, `troubleshooting`, `ecosystem`, `production`, `labs-projects` và `certifications`.
+The repository's product is a staged Kubernetes curriculum for Vietnamese-speaking learners. Categories move from prerequisite container knowledge through Kubernetes architecture and workload primitives, then toward platform operation, production concerns, labs, and certification preparation.
 
-Mỗi directory có `meta.json` riêng. `title` là tên hiển thị; `pages` là danh sách basename không có `.md` và đồng thời là thứ tự điều hướng. Vì vậy `meta.json` là một phần của public navigation contract.
+The curriculum structure is intentionally broader than the currently completed material. Most categories were scaffolded in the initial commit so page names and sidebar order could be planned before every lesson was written. A filename or navigation entry therefore proves that a topic is planned, not that its lesson is complete.
 
-| Nhóm | Câu hỏi mà nhóm trả lời | Nên đọc khi |
-|---|---|---|
-| `gioi-thieu/` | Kubernetes là gì, cần công cụ gì, dùng `kubectl`/YAML ra sao? | Bắt đầu từ số 0 hoặc tạo lab đầu tiên. |
-| `kien-truc/` | Control Plane, Node và control loop phối hợp thế nào? | Cần hiểu nguyên nhân thay vì chỉ nhớ command. |
-| `workloads/` | Pod và các controller quản lý vòng đời workload thế nào? | Viết hoặc sửa Deployment/StatefulSet/Job. |
-| `cau-hinh/` | Cấu hình, Secret, resource, probe và QoS đi vào workload ra sao? | Ứng dụng cần config hoặc giới hạn tài nguyên. |
-| `networking/` | Pod, Service, DNS, Ingress/Gateway và policy kết nối ra sao? | Không truy cập được service hoặc thiết kế traffic. |
-| `storage/` | Volume, PV/PVC, StorageClass và CSI cung cấp dữ liệu bền vững thế nào? | Workload có state hoặc cần backup. |
-| `scheduling/` | Scheduler dùng selector, affinity, taint, priority và topology thế nào? | Cần kiểm soát Pod chạy ở Node nào. |
-| `security/` | Identity, authentication, authorization, RBAC và runtime guardrail? | Cấp quyền, hardening hoặc điều tra access denied. |
-| `observability/` | Logs, Events, metrics, traces, dashboard và alert? | Cần biết hệ thống đang xảy ra gì. |
-| `delivery/` | Manifest management, Helm/Kustomize, GitOps, rollout và autoscaling? | Đưa thay đổi vào cluster lặp lại được. |
-| `cluster-administration/` | Bootstrap, node lifecycle, HA, certificate, upgrade và etcd? | Vận hành chính cluster. |
-| `troubleshooting/` | Methodology và runbook cho từng lớp lỗi? | Triệu chứng đã biết nhưng chưa có root cause. |
-| `ecosystem/` | CRD, Operator, controller và các integration phổ biến? | Mở rộng Kubernetes bằng platform component. |
-| `production/` | Readiness, DR, cost, tenancy, hardening và platform engineering? | Đánh giá workload/cluster trước production. |
-| `labs-projects/` | Bài thực hành và capstone nối các domain? | Muốn kiểm chứng bằng một sản phẩm end-to-end. |
-| `certifications/` | CKA, CKAD, CKS và chiến lược luyện thi? | Học theo mục tiêu chứng chỉ. |
+## Navigation is the curriculum contract
 
-Lộ trình khuyến nghị đi theo thứ tự trong các file `meta.json`: Container → Kubernetes API → Workloads → Networking → Storage → Scheduling → Security → Observability → Delivery → Cluster Administration → Production. Thứ tự này nên được ưu tiên khi thêm cross-link hoặc mở rộng curriculum.
+`content/docs/meta.json` defines the root sidebar order:
 
-## Trạng thái nội dung
-
-Inventory hiện tại có **182 file Markdown** dưới `content/docs/`; **174 file** chứa marker `placeholder`. Nhóm `gioi-thieu/` có các page đã viết chi tiết như:
-
-- `container-fundamentals.md`
-- `docker-vs-containerd.md`
-- `kubernetes-la-gi.md`
-- `cai-dat-moi-truong.md`
-- `kubectl-co-ban.md`
-- `yaml-manifest.md`
-- `api-resources.md`
-- `first-application.md`
-
-Phần lớn các nhóm còn lại hiện giữ curriculum placeholder. Ví dụ `kien-truc/tong-quan-cluster.md`, `workloads/deployment.md`, `networking/service.md`, `security/rbac.md`, `troubleshooting/troubleshooting-methodology.md` và `production/production-readiness.md` đều mô tả mục tiêu dự kiến thay vì hướng dẫn hoàn chỉnh.
-
-`content/docs/index.md` vẫn ghi rằng các trang là placeholder. Nhận định này đã lỗi thời một phần vì commit gần nhất đã hoàn thiện nhóm giới thiệu; khi viết tài liệu mới, ưu tiên trạng thái file thực tế và git diff hơn mô tả tổng quát cũ.
-
-## Quy ước page
-
-Mỗi page content cần frontmatter tối thiểu:
-
-```yaml
----
-title: "Tên hiển thị"
-description: "Mô tả ngắn cho page và metadata"
----
+```text
+index
+→ gioi-thieu
+→ kien-truc
+→ workloads
+→ cau-hinh
+→ networking
+→ storage
+→ scheduling
+→ security
+→ observability
+→ delivery
+→ cluster-administration
+→ troubleshooting
+→ ecosystem
+→ production
+→ labs-projects
+→ certifications
 ```
 
-Theo `AGENTS.md` và skill `write-docs`:
+Each category has its own `meta.json` with:
 
-- Viết nội dung bằng tiếng Việt; giữ tên kỹ thuật, service, tool và code bằng English.
-- Khi tạo hoặc đổi tên page, cập nhật `meta.json` cùng lúc.
-- Link nội bộ dùng URL có trailing slash, ví dụ `/workloads/deployment/`.
-- Dùng heading theo cấp, fenced code block có language, và giữ cấu trúc giải thích → thực hành → troubleshooting phù hợp với loại page.
-- Có thể dùng Callout, Cards, Steps, Tabs, Accordion, TypeTable và Mermaid; chúng đã được đăng ký trong MDX renderer.
+- `title`: the sidebar label;
+- `pages`: ordered Markdown basenames without `.md`.
 
-Skill chi tiết nằm ở `.agents/skills/write-docs/SKILL.md` và các reference files bên cạnh nó. Đây là hướng dẫn cho việc viết content, không phải source runtime của site.
+The ordering is pedagogical rather than alphabetical. For example, `gioi-thieu/meta.json` starts with container fundamentals, compares Docker and containerd, introduces Kubernetes, then proceeds through environment setup, `kubectl`, YAML, API resources, and the first application lab.
 
-## Workflow chọn nơi sửa
+Treat these files as a public navigation contract:
 
-### Thêm một concept Kubernetes
+- A new page needs a category `pages` entry in the intended learning position.
+- A renamed or deleted page needs its old entry removed and all inbound links reviewed.
+- A new category needs both its own `meta.json` and a root `content/docs/meta.json` entry.
+- Public page URLs derive from directory and basename, for example `content/docs/kien-truc/etcd.md` becomes `/kien-truc/etcd/`.
 
-1. Chọn nhóm theo domain, thay vì tạo directory mới cho mỗi concept.
-2. Đọc `meta.json` của nhóm và các page liên quan để tránh trùng nội dung.
-3. Viết page có frontmatter tiếng Việt.
-4. Thêm basename vào `pages` ở vị trí logic.
-5. Thêm link từ page liên quan nếu concept là bước học tiếp theo.
-6. Chạy `npm run build`.
+The current inventory has no category metadata entries missing on disk and no category Markdown files omitted from `pages`.
 
-### Hoàn thiện placeholder
+## Curriculum domains and current maturity
 
-Giữ filename và thứ tự sidebar hiện có nếu không có lý do điều hướng rõ ràng. Thay nội dung placeholder bằng hành vi đã kiểm chứng, ví dụ command, manifest, điều kiện, failure mode và cách xác minh. Không coi phần `Nội dung dự kiến` là bằng chứng rằng implementation hay workflow cụ thể đã tồn tại trong repository.
+The table follows root navigation order. “Placeholder” means the page still contains the standard notice and generic planned-content outline rather than a repository-specific lesson.
 
-### Thay đổi curriculum
+| Directory | Pages | Learner question | Current state |
+|---|---:|---|---|
+| `gioi-thieu/` | 8 | What are containers and Kubernetes, how do I set up tools, and how do I deploy a first application? | **Substantive:** all 8 pages are developed lessons. |
+| `kien-truc/` | 10 | How do API Server, etcd, Scheduler, controllers, kubelet, runtime, and reconciliation cooperate? | **Substantive:** all 10 pages were completed in the latest architecture-writing commit. |
+| `workloads/` | 14 | How are Pods and controllers such as Deployment, StatefulSet, DaemonSet, Job, and CronJob managed? | Placeholder curriculum. |
+| `cau-hinh/` | 10 | How do environment data, ConfigMap, Secret, probes, requests, limits, quotas, QoS, and disruption budgets shape workloads? | Placeholder curriculum. |
+| `networking/` | 12 | How do Pod networking, Service, DNS, Ingress, Gateway API, CNI, kube-proxy, and NetworkPolicy work? | Placeholder curriculum. |
+| `storage/` | 11 | How do volumes, PV/PVC, StorageClass, CSI, snapshots, backup, and stateful storage fit together? | Placeholder curriculum. |
+| `scheduling/` | 10 | How do selectors, affinity, taints, priority, preemption, topology, and device resources affect placement? | Placeholder curriculum. |
+| `security/` | 16 | How do identity, authentication, authorization, RBAC, policy, Secret handling, and runtime hardening work? | Placeholder curriculum. |
+| `observability/` | 10 | How should operators use Events, logs, metrics, dashboards, traces, SLI/SLOs, and alerts? | Placeholder curriculum. |
+| `delivery/` | 13 | How are manifests packaged, promoted, rolled out, rolled back, reconciled by GitOps, and autoscaled? | Placeholder curriculum. |
+| `cluster-administration/` | 15 | How is a cluster bootstrapped, networked, upgraded, made highly available, backed up, and managed? | Placeholder curriculum. |
+| `troubleshooting/` | 11 | What investigation method and layer-specific checks isolate workload, network, storage, node, and control-plane failures? | Placeholder curriculum. |
+| `ecosystem/` | 12 | How do CRDs, Operators, controllers, certificate/DNS/Secret integrations, policy engines, and service mesh extend Kubernetes? | Placeholder curriculum. |
+| `production/` | 11 | What makes a platform production-ready across HA, DR, tenancy, cost, security, identity, and change management? | Placeholder curriculum. |
+| `labs-projects/` | 12 | How can learners integrate concepts in guided labs and a production-platform capstone? | Placeholder curriculum. |
+| `certifications/` | 6 | How should learners prepare for CKA, CKAD, and CKS and practice efficient `kubectl` usage? | Placeholder curriculum. |
 
-Nếu đổi tên hoặc di chuyển nhóm, phải cập nhật root `content/docs/meta.json`, `meta.json` của nhóm, các internal links và các page có liên quan. Với URL public, ưu tiên giữ slug cũ hoặc bổ sung kế hoạch redirect phù hợp với static export; repository hiện không có redirect map riêng.
+`content/docs/index.md` is the additional root page. It is short and still states that all pages are placeholders. `README.md` repeats that statement. Both are stale in light of the completed `gioi-thieu/` and `kien-truc/` content and should not be used to assess individual lesson maturity.
 
-## Nguồn sự thật và giới hạn
+### Inventory snapshot
 
-- Sidebar: `content/docs/meta.json` và `content/docs/*/meta.json`.
-- Metadata page: frontmatter của từng `.md`.
-- Route/render behavior: `src/app/[[...slug]]/page.tsx`.
-- Nội dung học: chính các page Markdown; README chỉ là overview ngắn.
-- Không có tests, fixtures, application manifests hay API schema nghiệp vụ được phát hiện trong inventory hiện tại. Kiểm thử chủ yếu là build và kiểm tra site/render/search.
+At the current `HEAD`:
+
+| Measure | Count |
+|---|---:|
+| Markdown pages | 182 |
+| Pages with required `title` and `description` frontmatter | 182 |
+| Substantive pages in completed categories | 18 |
+| Placeholder category pages | 163 |
+| Files containing a placeholder marker, including root `index.md` | 164 |
+| Category metadata registrations missing files | 0 |
+| Category Markdown files missing registrations | 0 |
+
+These figures are useful orientation, not permanent policy. Recalculate them before making planning claims after content changes.
+
+## Completed learning path
+
+The currently usable end-to-end path is concentrated in two areas.
+
+### Getting started (`gioi-thieu/`)
+
+The eight registered pages cover:
+
+1. container images, runtime isolation, lifecycle, registries, storage, and networking;
+2. Docker versus containerd and their layers of responsibility;
+3. Kubernetes motivation and core resource concepts;
+4. local setup using a container engine, `kind`, and `kubectl`;
+5. basic `kubectl` inspection and mutation;
+6. YAML manifests;
+7. API resources; and
+8. an NGINX lab with Namespace, Deployment, Service, scaling, rollout, rollback, troubleshooting, and cleanup.
+
+`content/docs/gioi-thieu/first-application.md` is the best representative page for practical lesson structure because it combines architecture, manifests, verification commands, failure investigation, and cleanup.
+
+### Kubernetes architecture (`kien-truc/`)
+
+The ten registered pages cover cluster overview, component boundaries, Control Plane, Worker Node, API Server, etcd, Scheduler, Controller Manager, kubelet/container runtime, and declarative reconciliation.
+
+These pages teach Kubernetes as a distributed reconciliation system rather than a list of commands. `content/docs/kien-truc/tong-quan-cluster.md` provides the cross-component request flow; `content/docs/kien-truc/declarative-reconciliation.md` is the conceptual anchor for desired state, observed state, eventual convergence, ownership, and drift.
+
+The latest commit replaced all ten architecture placeholders with long-form material. Future content should link to these canonical explanations rather than duplicate control-plane and reconciliation fundamentals in every domain page.
+
+## Placeholder semantics
+
+Representative placeholder pages such as `content/docs/workloads/deployment.md`, `content/docs/troubleshooting/troubleshooting-methodology.md`, and `content/docs/labs-projects/capstone-production-platform.md` contain:
+
+- valid frontmatter and a page title;
+- a notice that detailed content will be added later;
+- generic objectives;
+- a planned-content list;
+- an empty practice promise; and
+- a generic Kubernetes documentation link.
+
+Do not quote their “planned content” as implemented behavior, a tested runbook, or an available lab. Completing a placeholder means replacing generic promises with verified explanations and exercises, not merely expanding the objective list.
+
+## Source-of-truth hierarchy
+
+When repository evidence conflicts, use this order:
+
+1. **Current page content** for what a lesson actually teaches.
+2. **Category and root `meta.json`** for public navigation and learning order.
+3. **Runtime source** for routing, rendering, and component behavior.
+4. **`AGENTS.md` and `.agents/skills/write-docs/`** for contribution requirements and writing conventions.
+5. **Git history** for why important navigation or content transitions occurred.
+6. **`README.md` and root `content/docs/index.md`** for a high-level introduction only; their maturity statements are currently stale.
+
+## Choosing where to make a content change
+
+Use domain ownership rather than keyword matching alone:
+
+- Put resource lifecycle and controller behavior in `workloads/`; put values injected into those workloads in `cau-hinh/`.
+- Put packet flow, service discovery, and traffic policy in `networking/`; put diagnosis procedures in `troubleshooting/` and link back to the canonical networking concept.
+- Put Kubernetes-native storage contracts in `storage/`; put recovery planning that spans the platform in `production/` or `cluster-administration/` as appropriate.
+- Put built-in scheduling mechanics in `scheduling/`; put cluster capacity operations in `cluster-administration/`.
+- Put identity and policy primitives in `security/`; put production hardening decisions in `production/` and reuse the primitive explanations.
+- Put tool-specific extension behavior in `ecosystem/`; put delivery process and GitOps workflow in `delivery/`.
+- Put executable, integrated exercises in `labs-projects/`, but link to canonical concept pages instead of recreating all theory inside each lab.
+
+Before creating a page, inspect the target category's `meta.json` and adjacent pages. The curriculum was scaffolded broadly, so the intended slug may already exist as a placeholder.
+
+## Content page contract
+
+Every curriculum page must:
+
+- be written in Vietnamese, preserving English technical terms where translation would reduce accuracy;
+- begin with frontmatter containing `title` and `description`;
+- use heading levels consistently;
+- label fenced code blocks with a language;
+- use trailing-slash internal URLs;
+- be registered in category metadata; and
+- pass `npm run build`.
+
+The repository-specific skill at `.agents/skills/write-docs/SKILL.md` and its references document the preferred structure and supported Fumadocs components. `source.config.ts` and `src/app/[[...slug]]/page.tsx` remain the authority on what the renderer actually supports.
+
+For the implementation checklist and validation strategy, continue with [Development and operations](development.md).

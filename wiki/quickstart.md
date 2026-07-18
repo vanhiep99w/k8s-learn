@@ -1,80 +1,108 @@
 ---
-title: "Wiki quickstart"
-description: "Bản đồ repository k8s-learn và hướng dẫn cho người mới hoặc coding agent."
+title: "Repository quickstart"
+description: "Orientation for the k8s-learn Vietnamese Kubernetes curriculum and its Next.js/Fumadocs documentation site."
 ---
 
-# Wiki quickstart
+# Repository quickstart
 
-## Repository này là gì?
+## What this repository is
 
-`k8s-learn` là một website tài liệu học Kubernetes bằng tiếng Việt. Repository không chứa cluster, service backend hay manifest triển khai ứng dụng; sản phẩm chính là bộ Markdown/MDX trong `content/docs/`, được build thành site tĩnh bằng Next.js, Fumadocs và Cloudflare Pages.
+`k8s-learn` is a Vietnamese-language Kubernetes learning site. Its product is the curriculum under `content/docs/`; the small application under `src/` turns that Markdown/MDX content into a statically exported documentation site.
 
-Mục tiêu nội dung là dẫn người học từ Container và Kubernetes fundamentals đến workloads, networking, storage, security, observability, delivery, cluster administration và production. `content/docs/meta.json` và các `meta.json` theo category là nguồn xác định thứ tự học trên sidebar.
+The repository currently has two distinct concerns:
 
-## Bắt đầu nhanh
+1. **Learning content:** 182 Markdown pages arranged into 16 curriculum categories plus the root landing page. The `gioi-thieu/` and `kien-truc/` categories contain substantive lessons; most remaining category pages are curriculum placeholders.
+2. **Documentation runtime:** Next.js 15, React 19, Fumadocs, custom remark transforms, Mermaid rendering, static search, and Cloudflare Pages deployment.
 
-### Người đọc tài liệu
+This is not a Kubernetes controller, cluster configuration repository, or backend service. No database, authentication subsystem, business API, test suite, or site-deployment Kubernetes manifests are present in the inspected source.
 
-1. Đọc [Nền tảng Container](/gioi-thieu/container-fundamentals/) rồi [Kubernetes là gì?](/gioi-thieu/kubernetes-la-gi/).
-2. Làm theo [Cài đặt môi trường học tập](/gioi-thieu/cai-dat-moi-truong/); đường dẫn chính dùng Docker hoặc Podman, `kind` và `kubectl`.
-3. Thực hành [Triển khai ứng dụng đầu tiên](/gioi-thieu/first-application/).
-4. Khi gặp lỗi, bắt đầu từ nhóm Troubleshooting trong [bản đồ nội dung](content-map.md).
+## Start here by task
 
-### Người phát triển repository
+| Task | First source to inspect | Wiki guide |
+|---|---|---|
+| Understand how the site builds and serves pages | `source.config.ts`, `src/lib/source.ts`, `src/app/[[...slug]]/page.tsx` | [Site architecture](architecture.md) |
+| Add or complete a Kubernetes lesson | `content/docs/meta.json`, the target category's `meta.json`, adjacent lessons | [Curriculum and content map](content-map.md) |
+| Change local development, build, search, styling, or deployment | `package.json`, `next.config.mjs`, `src/`, `wrangler.toml` | [Development and operations](development.md) |
+| Understand the public learning sequence | `content/docs/meta.json` and category `meta.json` files | [Curriculum and content map](content-map.md) |
 
-```bash
-npm install
-npm run dev       # mở http://localhost:3000
-npm run build     # tạo static output trong dist/
-npm run preview   # chạy dist/ qua Wrangler Pages dev
-npm run deploy    # build rồi deploy dist/ lên Cloudflare Pages
+## Repository layout
+
+```text
+.
+├── content/docs/                 # Vietnamese curriculum pages and navigation metadata
+│   ├── meta.json                 # Root sidebar/category order
+│   └── <category>/
+│       ├── meta.json             # Page order within one category
+│       └── *.md                  # Learning pages
+├── src/
+│   ├── app/[[...slug]]/          # Catch-all Fumadocs layout and page renderer
+│   ├── app/api/search/route.ts   # Build-time static search endpoint
+│   ├── components/mermaid.tsx    # Client-side Mermaid SVG rendering
+│   └── lib/source.ts             # Fumadocs source loader
+├── source.config.ts              # Content source and remark transforms
+├── next.config.mjs               # Static export, dist directory, trailing slashes
+├── wrangler.toml                 # Cloudflare Pages output configuration
+├── .agents/skills/write-docs/    # Repository-specific content-authoring skill
+└── wiki/                         # Repository knowledge for humans and coding agents
 ```
 
-Route `/` redirect đến `/gioi-thieu/container-fundamentals/`; hành vi này nằm trong `src/app/[[...slug]]/page.tsx`. Site dùng `trailingSlash: true`, vì vậy URL tài liệu nên giữ dấu `/` cuối.
+Generated directories such as `.source/`, `.next/`, `dist/`, and `.wrangler/` are ignored by `.gitignore` and are not source-of-truth inputs.
 
-## Bản đồ Wiki
+## Run the site
 
-- [Kiến trúc site](architecture.md) — pipeline từ file `.md` đến page tĩnh, MDX plugins, component và search.
-- [Bản đồ nội dung](content-map.md) — curriculum, trạng thái nội dung, quy ước `meta.json`/frontmatter và cách chọn nơi sửa.
-- [Hướng dẫn phát triển](development.md) — workflow local/build/deploy, kiểm tra trước commit và các bẫy thường gặp.
+Use the checked-in lockfile for reproducible setup:
 
-## Các phần tài liệu chính
+```bash
+npm ci
+npm run dev
+```
 
-Thứ tự dưới đây lấy từ `content/docs/meta.json`; mỗi phần có `meta.json` riêng để định nghĩa title và pages:
+Open `http://localhost:3000`. The root route redirects to `/gioi-thieu/container-fundamentals/` in `src/app/[[...slug]]/page.tsx`.
 
-| Phần | Vai trò | Nguồn |
-|---|---|---|
-| Bắt đầu | Container, Kubernetes overview, môi trường, `kubectl`, YAML và app đầu tiên | `content/docs/gioi-thieu/` |
-| Kiến trúc Kubernetes | Control Plane, Worker Node, API Server, etcd, Scheduler và reconciliation | `content/docs/kien-truc/` |
-| Workloads | Pod, Deployment, StatefulSet, DaemonSet, Job và CronJob | `content/docs/workloads/` |
-| Cấu hình ứng dụng | Environment, ConfigMap, Secret, resources, probes và QoS | `content/docs/cau-hinh/` |
-| Networking | Pod network, Service, DNS, Ingress, Gateway API và NetworkPolicy | `content/docs/networking/` |
-| Storage | Volumes, PV/PVC, StorageClass, CSI, snapshot và backup | `content/docs/storage/` |
-| Scheduling | Selector, affinity, taints/tolerations, priority và topology spread | `content/docs/scheduling/` |
-| Security | Authentication, Authorization, RBAC, ServiceAccount, admission và runtime security | `content/docs/security/` |
-| Observability | Events, logs, metrics, Prometheus, Grafana, tracing và alerting | `content/docs/observability/` |
-| Application Delivery | Helm, Kustomize, CI/CD, GitOps, rollout và autoscaling | `content/docs/delivery/` |
-| Cluster Administration | Bootstrap, node, HA, DNS, certificate, upgrade và etcd | `content/docs/cluster-administration/` |
-| Troubleshooting | Methodology và chẩn đoán Pod, Deployment, Service, DNS, Node, Storage, Control Plane | `content/docs/troubleshooting/` |
-| Ecosystem | CRD, Operator, ingress/gateway controller, cert-manager, KEDA, policy và mesh | `content/docs/ecosystem/` |
-| Production | Readiness, HA, multi-tenancy, DR, cost, hardening và platform engineering | `content/docs/production/` |
-| Labs và Projects | Labs theo chủ đề và capstone production platform | `content/docs/labs-projects/` |
-| Certifications | CKA, CKAD, CKS, exam strategy và kubectl cheatsheet | `content/docs/certifications/` |
+Production-oriented commands are defined in `package.json`:
+
+```bash
+npm run build     # Next.js static export to dist/
+npm run preview   # Serve dist/ through Wrangler Pages dev
+npm run deploy    # Build, then deploy dist/ to Cloudflare Pages
+```
+
+Do not run `npm run deploy` merely to validate a change; it requires the appropriate Cloudflare context and publishes the built output. Use `npm run build` as the required repository check.
+
+## Current content maturity
+
+Recent history completed the eight-page getting-started sequence and the ten-page Kubernetes architecture sequence. Inventory at the current `HEAD` shows:
+
+- **182** Markdown pages total.
+- **18** substantive pages across `content/docs/gioi-thieu/` and `content/docs/kien-truc/`.
+- **163** category pages that still contain the standard placeholder curriculum body.
+- The root `content/docs/index.md` also contains a placeholder marker, bringing the repository-wide marker count to **164**.
+- Every category page currently has a matching `meta.json` registration, and all 182 Markdown files have `title` and `description` frontmatter.
+
+`README.md` and `content/docs/index.md` still say that all pages are placeholders. That statement is stale relative to the current files and the recent `Write Kubernetes introduction documentation` and `Write Kubernetes architecture documentation` commits. Use the files themselves and [Curriculum and content map](content-map.md) when deciding what remains to be written.
+
+## Non-negotiable content contracts
+
+For changes under `content/docs/`, the repository instructions and authoring skill establish these contracts:
+
+- Write explanatory content in Vietnamese while preserving technical names, code, commands, and identifiers in English.
+- Every page must have `title` and `description` frontmatter.
+- Add or rename a page only together with the relevant category `meta.json`; add a new category to root `content/docs/meta.json` as well.
+- Keep internal site URLs trailing-slash form, for example `/workloads/deployment/`, because `next.config.mjs` enables `trailingSlash: true`.
+- Run `npm run build` before finishing.
+
+See [Development and operations](development.md) for the complete change checklist. Harness Wiki pages themselves are intentionally written in English and are not part of the Vietnamese Fumadocs curriculum.
 
 ## Rule loading
 
-Trước khi sửa bất kỳ file nào, đọc [global Wiki rules](_rules.md) và mọi `_rules.md` thuộc section liên quan (nếu có). Hiện tại repository chỉ có `wiki/_rules.md`; không sửa các file `_rules.md` ngoài workflow Harness được phê duyệt. Nếu phạm vi thay đổi chuyển sang domain khác, đọc lại các rule áp dụng.
+Before editing repository files, read [the global Wiki rules](_rules.md) and every `_rules.md` in the Wiki section or source domain relevant to the change. Read all applicable rule files when work spans multiple sections, and re-read them if the scope changes. At present, only `wiki/_rules.md` exists.
 
-## Điều cần nhớ cho agent
+## Wiki map
 
-- Source of truth của sidebar là các `meta.json`, không phải việc file `.md` tồn tại trên disk.
-- Mỗi page nội dung cần frontmatter `title` và `description`; internal link trong `content/docs/` dùng trailing slash.
-- Nhiều page vẫn là placeholder curriculum. Không suy ra rằng một chủ đề đã được triển khai chỉ vì nó có tên trong sidebar.
-- `next.config.mjs` và `source.config.ts` có thay đổi chưa commit tại thời điểm Wiki này được tạo; kiểm tra `git status` trước khi kết luận về baseline.
-- Không đọc hoặc ghi secret, `.env`, token hay file cấu hình nhạy cảm. Thay đổi tài liệu repository chỉ nên nằm trong `content/docs/` theo hướng dẫn dự án; riêng Wiki nằm dưới `wiki/`.
+- [Site architecture](architecture.md) — content compilation, routing, MDX components, search, static export, and extension points.
+- [Curriculum and content map](content-map.md) — learning sequence, category ownership, maturity, navigation metadata, and source-of-truth guidance.
+- [Development and operations](development.md) — setup, authoring workflow, runtime changes, validation, deployment, and rollback.
 
-## Đọc tiếp theo
+## Backlog
 
-- Nếu cần hiểu runtime/build: đọc [Kiến trúc site](architecture.md).
-- Nếu cần thêm hoặc hoàn thiện một bài học: đọc [Bản đồ nội dung](content-map.md) rồi [Hướng dẫn phát triển](development.md).
-- Nếu cần thay đổi route, MDX component hoặc search: bắt đầu từ `src/app/[[...slug]]/page.tsx`, `source.config.ts` và `src/app/api/search/route.ts`, sau đó chạy build.
+No substantial source area was deferred from this initial repository map. The unfinished curriculum is documented as product work in [Curriculum and content map](content-map.md), rather than split into thin Wiki pages for every placeholder category.

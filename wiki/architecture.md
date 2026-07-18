@@ -1,86 +1,160 @@
 ---
-title: "Kiến trúc site"
-description: "Cách k8s-learn biến Markdown/MDX thành website Kubernetes tĩnh với Next.js và Fumadocs."
+title: "Site architecture"
+description: "How Markdown content becomes a static Fumadocs site with routing, search, Mermaid, and Cloudflare Pages output."
 ---
 
-# Kiến trúc site
+# Site architecture
 
-## Mô hình tổng thể
+## System boundary
 
-Repository có một pipeline nội dung đơn giản: Markdown là dữ liệu chính, Fumadocs tạo source được typed, Next.js render page và static export tạo artifact để Cloudflare Pages phục vụ.
+The application is a content compiler and static documentation frontend. Source Markdown and metadata are read during the build; the resulting HTML and static endpoint assets are written to `dist/` for Cloudflare Pages. There is no database or runtime content service.
 
-```mermaid
-flowchart LR
-    MD[content/docs/*.md] --> CFG[source.config.ts]
-    META[meta.json] --> CFG
-    CFG --> SRC[Fumadocs docs source]
-    SRC --> ROUTE[src/app/[[...slug]]/page.tsx]
-    ROUTE --> HTML[Next static export]
-    HTML --> DIST[dist/]
-    DIST --> CF[Cloudflare Pages]
-    SRC --> SEARCH[src/app/api/search/route.ts]
-    SEARCH --> INDEX[Static search index]
+```text
+content/docs/**/*.md ─┐
+content/docs/**/meta.json
+                      ▼
+              source.config.ts
+        Fumadocs MDX compilation
+                      ▼
+             generated .source/
+                      ▼
+              src/lib/source.ts
+               Fumadocs loader
+                 ┌────┴─────────┐
+                 ▼              ▼
+src/app/[[...slug]]/page.tsx   src/app/api/search/route.ts
+         page HTML                 static search data
+                 └────┬─────────┘
+                      ▼
+          Next.js static export
+                      ▼
+                    dist/
+                      ▼
+              Cloudflare Pages
 ```
 
-### Các lớp chính
+The important architectural consequence is that a content or renderer error can fail the build across the entire curriculum. A normal documentation page is not fetched from storage on demand; it must be accepted by the Fumadocs source compiler and included in static generation.
 
-| Lớp | File/thư mục | Trách nhiệm |
-|---|---|---|
-| Nội dung | `content/docs/` | Các page `.md`, frontmatter và `meta.json` cho sidebar. |
-| Content compiler | `source.config.ts` | Khai báo docs directory và biến admonition/Mermaid trong Markdown thành MDX component. |
-| Loader | `src/lib/source.ts` | Chuyển docs source thành nguồn mà Fumadocs route/search sử dụng; base URL là `/`. |
-| Page route | `src/app/[[...slug]]/page.tsx` | Resolve slug, redirect root, render title/description/body, tạo static params và metadata. |
-| UI runtime | `src/app/layout.tsx`, `src/app/globals.css` | RootProvider, locale `vi`, metadata, typography và style của Fumadocs. |
-| MDX components | `src/app/[[...slug]]/page.tsx`, `src/components/mermaid.tsx` | Đăng ký Callout, Cards, Steps, Tabs, Accordion, TypeTable và Mermaid. |
-| Search | `src/app/api/search/route.ts` | Tạo static GET từ source; index chỉ lấy title, description và headings. |
-| Hosting | `next.config.mjs`, `wrangler.toml` | Static export trong `dist/`, trailing slash và Cloudflare Pages output. |
+## Content source and generated source
 
-## Luồng render một page
+`source.config.ts` declares `content/docs` through `defineDocs({ dir: 'content/docs' })` and configures the Markdown transforms. Fumadocs generates typed source under `.source/`; `tsconfig.json` maps `@/.source` to `.source/index.ts`.
 
-1. `source.config.ts` gọi `defineDocs({ dir: 'content/docs' })`.
-2. Fumadocs đọc frontmatter, Markdown và `meta.json`; source generated được import qua alias `@/.source` trong `src/lib/source.ts`.
-3. Dynamic route nhận `slug` dưới dạng `Promise<{ slug?: string[] }>`.
-4. Không có slug thì redirect tới trang Nền tảng Container; slug không tồn tại thì `notFound()`.
-5. Page lấy `page.data.body`, render trong `DocsPage`, đồng thời dùng `page.data.title`, `description` và `toc`.
-6. `generateStaticParams()` đưa toàn bộ page vào static export; `generateMetadata()` tạo metadata theo từng page.
+`src/lib/source.ts` wraps that generated module with the Fumadocs `loader`:
 
-Điều này nghĩa là thêm một Markdown page không tự tạo route động lúc runtime theo kiểu server database; page phải được source compiler nhận diện trong quá trình build.
+- `baseUrl` is `/`.
+- `source.pageTree` supplies sidebar navigation.
+- `source.getPage(slug)` resolves a page.
+- `source.generateParams()` supplies static route parameters.
 
-## MDX và plugin
+Do not hand-edit `.source/`. It is generated, ignored by Git, and rebuilt from the Markdown and metadata inputs.
 
-`source.config.ts` đăng ký ba remark plugin theo thứ tự:
+### Navigation contract
 
-- `remarkGithubAdmonitions`: nhận cú pháp GitHub admonition như `> [!NOTE]`.
-- `remarkCalloutDirectives`: chuyển directive thành `Callout`, map `note`/`tip`/`info` sang `info`, `warning` sang `warn`, `danger` sang `error`, đồng thời đặt title tiếng Việt.
-- `remarkMermaid`: thay code block có language `mermaid` bằng `MermaidDiagram`.
+Fumadocs uses `content/docs/meta.json` for root order and each `content/docs/<category>/meta.json` for page order. A Markdown file can exist and compile while still being absent from the intended sidebar if its basename is not registered. Conversely, a `pages` entry with no file is a broken navigation declaration.
 
-`page.tsx` phải cung cấp đúng component cho các node MDX mà content sử dụng. Các component Fumadocs hiện được đăng ký gồm `Callout`, `Card`, `Cards`, `Step`, `Steps`, `Tab`, `Tabs`, `Accordion`, `Accordions` và `TypeTable`.
+For the domain model and current registration inventory, see [Curriculum and content map](content-map.md).
 
-`MermaidDiagram` là client component. Nó lazy-load package `mermaid` trong `useEffect`, render SVG vào `div` và hủy kết quả nếu component unmount trước khi render xong. Vì vậy Mermaid không được xử lý như HTML tĩnh trực tiếp trong Markdown.
+## Request and page rendering
 
-## Static export và deploy
+The catch-all route is split across two files:
 
-`next.config.mjs` đặt:
+- `src/app/[[...slug]]/layout.tsx` creates `DocsLayout`, supplies `source.pageTree`, labels the navigation `Kubernetes Learning`, and disables sidebar tabs.
+- `src/app/[[...slug]]/page.tsx` resolves and renders the page.
 
-- `output: 'export'`: build thành site tĩnh.
-- `distDir: 'dist'`: artifact nằm trong `dist/`.
-- `trailingSlash: true`: route tài liệu có URL kết thúc bằng `/`.
-- `images.unoptimized: true`: phù hợp với static export, không dùng Next image optimization server.
+The page path behaves as follows:
 
-`wrangler.toml` khai báo `pages_build_output_dir = "./dist"`. `npm run deploy` trong `package.json` chạy `npm run build` trước rồi gọi `wrangler pages deploy dist`.
+1. Next.js provides an optional slug array.
+2. An empty slug redirects to `/gioi-thieu/container-fundamentals/`.
+3. `source.getPage(slug)` resolves the content; an unknown slug calls `notFound()`.
+4. The route renders `title`, `description`, body, and generated table of contents through Fumadocs UI components.
+5. `generateStaticParams()` returns the empty root path plus every source page.
+6. `generateMetadata()` uses repository-level metadata for the root and page frontmatter for content routes.
 
-## Search
+The root redirect formerly targeted `gioi-thieu/lo-trinh-hoc`. Commit `f94a2e1` removed that page from the curriculum and changed the redirect to the current container fundamentals entrypoint. When changing the first lesson, update the category metadata and route together; do not leave the redirect pointing at a removed slug.
 
-`src/app/api/search/route.ts` dùng `createFromSource(source, ...)` và export `dynamic = 'force-static'` để tương thích static export. Search item lấy `title`, `description`, `url`, `id`; `structuredData` chỉ giữ `headings` và bỏ `contents`. Comment trong source giải thích đây là quyết định để static search index nằm dưới giới hạn asset 25 MiB của Cloudflare Pages.
+`src/app/layout.tsx` provides the global shell:
 
-Khi đổi cấu trúc heading hoặc title/description, search index có thể thay đổi sau build. Khi sửa search route, phải kiểm tra cả build static và hành vi tìm kiếm ở site, không chỉ type-check.
+- `<html lang="vi">` identifies the public curriculum language.
+- `RootProvider` enables Fumadocs static search in the client.
+- Global title, description, and favicon are defined here.
 
-## Điểm mở rộng có kiểm soát
+## Markdown and MDX pipeline
 
-- **Thêm nội dung:** sửa `content/docs/` và `meta.json`, không cần sửa route.
-- **Đổi cú pháp Markdown:** sửa plugin trong `source.config.ts`, sau đó kiểm tra các page đang dùng cú pháp đó.
-- **Thêm MDX component:** import và đăng ký component trong `page.tsx`, rồi thêm page mẫu để build kiểm chứng.
-- **Đổi URL/static behavior:** xem đồng thời `next.config.mjs`, `src/lib/source.ts`, route dynamic và internal links.
-- **Đổi search payload:** sửa `src/app/api/search/route.ts`, cân nhắc kích thước artifact Cloudflare.
+`source.config.ts` registers three remark stages in this order:
 
-Không có bằng chứng trong repository về database, authentication của site, server-side API nghiệp vụ hay background job; không nên thêm các giả định này vào thiết kế thay đổi.
+1. `remark-github-admonitions-to-directives` parses GitHub-style admonitions such as `> [!NOTE]`.
+2. `remarkCalloutDirectives` replaces recognized directives with Fumadocs `Callout` MDX nodes. It maps `note`, `tip`, and `info` to `info`; `warning` to `warn`; and `danger` to `error`, with Vietnamese display titles.
+3. `remarkMermaid` replaces fenced `mermaid` code nodes with a `MermaidDiagram` MDX element whose `chart` property contains the diagram source.
+
+This configuration was centralized in `source.config.ts` in commit `f94a2e1`. `next.config.mjs` now calls `createMDX()` without a second remark configuration. Preserve this single ownership point to avoid transforms running inconsistently or twice.
+
+### Registered content components
+
+`src/app/[[...slug]]/page.tsx` merges the default Fumadocs MDX components with:
+
+- `Callout`
+- `Card` and `Cards`
+- `Step` and `Steps`
+- `Tab` and `Tabs`
+- `Accordion` and `Accordions`
+- `TypeTable`
+- `MermaidDiagram`
+
+A transform that emits a custom MDX element and the component registration that renders it are one contract. If either side changes, build a representative page that uses the syntax.
+
+### Mermaid runtime
+
+`src/components/mermaid.tsx` is a client component. It:
+
+1. creates a React-stable, colon-free render ID;
+2. dynamically imports `mermaid` in `useEffect`;
+3. initializes Mermaid with `startOnLoad: false`;
+4. renders SVG and inserts it into a referenced `div`; and
+5. uses a cancellation flag to avoid updating an unmounted component.
+
+The SVG is therefore rendered in the browser rather than embedded by the static Markdown compiler. A successful static build catches MDX integration errors, but a browser check is still needed for invalid chart syntax, hydration behavior, and layout overflow.
+
+## Static search
+
+`src/app/api/search/route.ts` uses `createFromSource(source, mapper)` and exports its `staticGET` handler as `GET`. `dynamic = 'force-static'` makes the route compatible with static export.
+
+Each search record contains the page title, description, URL, ID, and headings. The mapper deliberately sets `structuredData.contents` to an empty array. The source comment and original commit history identify the reason: keep the exported search asset below Cloudflare Pages' 25 MiB asset limit.
+
+This means search is optimized for discovery by title, description, and heading, not full body text. Reintroducing body contents is not a harmless relevance improvement; it changes artifact size and must be measured against the hosting constraint.
+
+## Static export and hosting
+
+`next.config.mjs` establishes the deployment shape:
+
+| Setting | Effect |
+|---|---|
+| `output: 'export'` | Build a static site rather than a Node.js server deployment. |
+| `distDir: 'dist'` | Write generated output to `dist/`. |
+| `trailingSlash: true` | Export directory-style routes and require canonical internal URLs with a final slash. |
+| `images.unoptimized: true` | Avoid depending on Next.js server-side image optimization. |
+
+`wrangler.toml` names the Pages project `k8s-learn` and points `pages_build_output_dir` at `./dist`. `npm run deploy` performs a fresh build and then runs `wrangler pages deploy dist`.
+
+Do not infer credentials, account selection, preview environments, or rollback automation from `wrangler.toml`; none are committed here.
+
+## Global presentation
+
+`src/app/globals.css` imports the Fumadocs stylesheet and Google-hosted Inter and JetBrains Mono fonts. It widens article content and tunes Vietnamese prose, headings, code, and table sizing. Because the selectors are global, visual changes should be checked against:
+
+- a long prose page, such as `content/docs/gioi-thieu/container-fundamentals.md`;
+- a lesson with commands and manifests, such as `content/docs/gioi-thieu/first-application.md`;
+- a diagram-heavy architecture page, such as `content/docs/kien-truc/tong-quan-cluster.md`; and
+- a short placeholder page, such as `content/docs/workloads/deployment.md`.
+
+## Change impact guide
+
+| Change | Read together | Main risks | Minimum validation |
+|---|---|---|---|
+| Add or move a lesson | Target `.md`, category `meta.json`, root `meta.json` if adding a category | Missing sidebar entry, broken link, stale root redirect | `npm run build`; inspect sidebar and URL |
+| Change Markdown syntax | `source.config.ts`, renderer component registration, representative pages | AST mismatch, compile failure across all pages | Build all pages; browser-check one example |
+| Add an MDX component | Component source and `src/app/[[...slug]]/page.tsx` | Element not registered, client/server boundary errors | Build and render a sample page |
+| Change routing | Catch-all page/layout, `src/lib/source.ts`, `next.config.mjs` | Missing static params, broken redirect, URL churn | Build; test root, valid slug, invalid slug |
+| Change search | Search route and representative frontmatter/headings | Larger artifact, weak results, static export failure | Build; inspect asset size; query local preview |
+| Change deployment output | `package.json`, `next.config.mjs`, `wrangler.toml`, `.gitignore` | Deploying wrong directory or committing generated files | Build; confirm `dist/`; use preview before deploy |
+
+The repository has no backend integration tests to absorb these risks. The production build and focused browser checks are the effective architecture-level test strategy; see [Development and operations](development.md).
