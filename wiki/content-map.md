@@ -60,7 +60,7 @@ The table follows root navigation order. “Placeholder” means the page still 
 | `gioi-thieu/` | 8 | What are containers and Kubernetes, how do I set up tools, and how do I deploy a first application? | **Substantive:** all 8 pages are developed lessons. |
 | `kien-truc/` | 10 | How do API Server, etcd, Scheduler, controllers, kubelet, runtime, and reconciliation cooperate? | **Substantive:** all 10 pages were completed in the latest architecture-writing commit. |
 | `workloads/` | 14 | How are Pods and controllers such as Deployment, StatefulSet, DaemonSet, Job, and CronJob managed? | **Substantive:** all 14 pages form a complete workload learning path with manifests, operational trade-offs, troubleshooting, and labs. |
-| `cau-hinh/` | 10 | How do environment data, ConfigMap, Secret, probes, requests, limits, quotas, QoS, and disruption budgets shape workloads? | Placeholder curriculum. |
+| `cau-hinh/` | 10 | How do environment data, ConfigMap, Secret, probes, requests, limits, quotas, QoS, and disruption budgets shape workloads? | **Substantive:** all 10 pages form a detailed application-configuration path with manifests, runtime semantics, security and capacity trade-offs, troubleshooting, and labs. |
 | `networking/` | 12 | How do Pod networking, Service, DNS, Ingress, Gateway API, CNI, kube-proxy, and NetworkPolicy work? | Placeholder curriculum. |
 | `storage/` | 11 | How do volumes, PV/PVC, StorageClass, CSI, snapshots, backup, and stateful storage fit together? | Placeholder curriculum. |
 | `scheduling/` | 10 | How do selectors, affinity, taints, priority, preemption, topology, and device resources affect placement? | Placeholder curriculum. |
@@ -84,9 +84,9 @@ In the current source tree:
 |---|---:|
 | Markdown pages | 182 |
 | Pages with required `title` and `description` frontmatter | 182 |
-| Substantive pages in completed categories | 32 |
-| Placeholder category pages | 149 |
-| Files containing a placeholder marker, including root `index.md` | 150 |
+| Substantive pages in completed categories | 42 |
+| Placeholder category pages | 139 |
+| Files containing a placeholder marker, including root `index.md` | 140 |
 | Category metadata registrations missing files | 0 |
 | Category Markdown files missing registrations | 0 |
 
@@ -94,7 +94,7 @@ These figures are useful orientation, not permanent policy. Recalculate them bef
 
 ## Completed learning path
 
-The currently usable end-to-end path is concentrated in three areas.
+The currently usable end-to-end path is concentrated in four areas.
 
 ### Getting started (`gioi-thieu/`)
 
@@ -124,6 +124,12 @@ All ten architecture placeholders have been replaced with long-form material. Fu
 The fourteen registered pages now form a complete progression from the Pod execution model through lifecycle, init and multi-container patterns, metadata and Namespace boundaries, then ReplicaSet, Deployment, rollout strategies, StatefulSet, DaemonSet, Job, CronJob, and workload cleanup.
 
 Every lesson includes operational semantics, manifests or command examples, failure analysis, production trade-offs, and a cluster-neutral practice flow. `content/docs/workloads/deployment.md` is the main stateless-controller reference; `content/docs/workloads/statefulset.md` covers stable identity and storage; `content/docs/workloads/workload-cleanup.md` closes the section with ownership, finalizers, propagation policies, and safe deletion.
+
+### Application configuration (`cau-hinh/`)
+
+The ten registered pages now cover process commands and arguments, environment injection, ConfigMap and Secret delivery, CPU/memory requests and limits, health probes, Pod QoS, the Downward API, namespace-level quota and defaults, and voluntary-disruption protection with PodDisruptionBudget.
+
+The section follows the configuration lifecycle from container startup inputs through runtime resource enforcement and health signaling to platform guardrails and maintenance availability. Each lesson explains control-plane and kubelet behavior, update semantics, security or capacity trade-offs, production failure modes, troubleshooting commands, and an isolated practice flow. `content/docs/cau-hinh/configmap.md` and `content/docs/cau-hinh/secret.md` are the canonical data-injection references; `content/docs/cau-hinh/resource-requests-limits.md` anchors scheduling and cgroup behavior; `content/docs/cau-hinh/pod-disruption-budget.md` closes the sequence with eviction-aware maintenance.
 
 ## Placeholder semantics
 
