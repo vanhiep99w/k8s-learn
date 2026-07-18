@@ -59,7 +59,7 @@ The table follows root navigation order. “Placeholder” means the page still 
 |---|---:|---|---|
 | `gioi-thieu/` | 8 | What are containers and Kubernetes, how do I set up tools, and how do I deploy a first application? | **Substantive:** all 8 pages are developed lessons. |
 | `kien-truc/` | 10 | How do API Server, etcd, Scheduler, controllers, kubelet, runtime, and reconciliation cooperate? | **Substantive:** all 10 pages were completed in the latest architecture-writing commit. |
-| `workloads/` | 14 | How are Pods and controllers such as Deployment, StatefulSet, DaemonSet, Job, and CronJob managed? | Placeholder curriculum. |
+| `workloads/` | 14 | How are Pods and controllers such as Deployment, StatefulSet, DaemonSet, Job, and CronJob managed? | **Substantive:** all 14 pages form a complete workload learning path with manifests, operational trade-offs, troubleshooting, and labs. |
 | `cau-hinh/` | 10 | How do environment data, ConfigMap, Secret, probes, requests, limits, quotas, QoS, and disruption budgets shape workloads? | Placeholder curriculum. |
 | `networking/` | 12 | How do Pod networking, Service, DNS, Ingress, Gateway API, CNI, kube-proxy, and NetworkPolicy work? | Placeholder curriculum. |
 | `storage/` | 11 | How do volumes, PV/PVC, StorageClass, CSI, snapshots, backup, and stateful storage fit together? | Placeholder curriculum. |
@@ -74,19 +74,19 @@ The table follows root navigation order. “Placeholder” means the page still 
 | `labs-projects/` | 12 | How can learners integrate concepts in guided labs and a production-platform capstone? | Placeholder curriculum. |
 | `certifications/` | 6 | How should learners prepare for CKA, CKAD, and CKS and practice efficient `kubectl` usage? | Placeholder curriculum. |
 
-`content/docs/index.md` is the additional root page. It is short and still states that all pages are placeholders. `README.md` repeats that statement. Both are stale in light of the completed `gioi-thieu/` and `kien-truc/` content and should not be used to assess individual lesson maturity.
+`content/docs/index.md` is the additional root page. It is short and still states that all pages are placeholders. `README.md` repeats that statement. Both are stale in light of the completed `gioi-thieu/`, `kien-truc/`, and `workloads/` content and should not be used to assess individual lesson maturity.
 
 ### Inventory snapshot
 
-At the current `HEAD`:
+In the current source tree:
 
 | Measure | Count |
 |---|---:|
 | Markdown pages | 182 |
 | Pages with required `title` and `description` frontmatter | 182 |
-| Substantive pages in completed categories | 18 |
-| Placeholder category pages | 163 |
-| Files containing a placeholder marker, including root `index.md` | 164 |
+| Substantive pages in completed categories | 32 |
+| Placeholder category pages | 149 |
+| Files containing a placeholder marker, including root `index.md` | 150 |
 | Category metadata registrations missing files | 0 |
 | Category Markdown files missing registrations | 0 |
 
@@ -94,7 +94,7 @@ These figures are useful orientation, not permanent policy. Recalculate them bef
 
 ## Completed learning path
 
-The currently usable end-to-end path is concentrated in two areas.
+The currently usable end-to-end path is concentrated in three areas.
 
 ### Getting started (`gioi-thieu/`)
 
@@ -117,11 +117,17 @@ The ten registered pages cover cluster overview, component boundaries, Control P
 
 These pages teach Kubernetes as a distributed reconciliation system rather than a list of commands. `content/docs/kien-truc/tong-quan-cluster.md` provides the cross-component request flow; `content/docs/kien-truc/declarative-reconciliation.md` is the conceptual anchor for desired state, observed state, eventual convergence, ownership, and drift.
 
-The latest commit replaced all ten architecture placeholders with long-form material. Future content should link to these canonical explanations rather than duplicate control-plane and reconciliation fundamentals in every domain page.
+All ten architecture placeholders have been replaced with long-form material. Future content should link to these canonical explanations rather than duplicate control-plane and reconciliation fundamentals in every domain page.
+
+### Workloads (`workloads/`)
+
+The fourteen registered pages now form a complete progression from the Pod execution model through lifecycle, init and multi-container patterns, metadata and Namespace boundaries, then ReplicaSet, Deployment, rollout strategies, StatefulSet, DaemonSet, Job, CronJob, and workload cleanup.
+
+Every lesson includes operational semantics, manifests or command examples, failure analysis, production trade-offs, and a cluster-neutral practice flow. `content/docs/workloads/deployment.md` is the main stateless-controller reference; `content/docs/workloads/statefulset.md` covers stable identity and storage; `content/docs/workloads/workload-cleanup.md` closes the section with ownership, finalizers, propagation policies, and safe deletion.
 
 ## Placeholder semantics
 
-Representative placeholder pages such as `content/docs/workloads/deployment.md`, `content/docs/troubleshooting/troubleshooting-methodology.md`, and `content/docs/labs-projects/capstone-production-platform.md` contain:
+Representative placeholder pages such as `content/docs/troubleshooting/troubleshooting-methodology.md` and `content/docs/labs-projects/capstone-production-platform.md` contain:
 
 - valid frontmatter and a page title;
 - a notice that detailed content will be added later;
