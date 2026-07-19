@@ -63,7 +63,7 @@ The table follows root navigation order. “Placeholder” means the page still 
 | `cau-hinh/` | 10 | How do environment data, ConfigMap, Secret, probes, requests, limits, quotas, QoS, and disruption budgets shape workloads? | **Substantive:** all 10 pages form a detailed application-configuration path with manifests, runtime semantics, security and capacity trade-offs, troubleshooting, and labs. |
 | `networking/` | 12 | How do Pod networking, Service, DNS, Ingress, Gateway API, CNI, kube-proxy, and NetworkPolicy work? | **Substantive:** all 12 pages form a complete network learning path from the Kubernetes network model and Pod data plane through discovery, exposure, policy, service routing, and layered troubleshooting. |
 | `storage/` | 11 | How do volumes, PV/PVC, StorageClass, CSI, snapshots, backup, and stateful storage fit together? | **Substantive:** all 11 pages form a complete storage path from Pod volumes and ephemeral data through PV/PVC provisioning, access semantics, StatefulSet storage, CSI internals, snapshots, and recovery planning. |
-| `scheduling/` | 10 | How do selectors, affinity, taints, priority, preemption, topology, and device resources affect placement? | Placeholder curriculum. |
+| `scheduling/` | 10 | How do selectors, affinity, taints, priority, preemption, topology, and device resources affect placement? | **Substantive:** all 10 pages form a complete placement path from Scheduling Framework internals through node and inter-Pod constraints, taints, topology spread, priority/preemption, Static Pods, device allocation, and production policy. |
 | `security/` | 16 | How do identity, authentication, authorization, RBAC, policy, Secret handling, and runtime hardening work? | Placeholder curriculum. |
 | `observability/` | 10 | How should operators use Events, logs, metrics, dashboards, traces, SLI/SLOs, and alerts? | Placeholder curriculum. |
 | `delivery/` | 13 | How are manifests packaged, promoted, rolled out, rolled back, reconciled by GitOps, and autoscaled? | Placeholder curriculum. |
@@ -84,9 +84,9 @@ In the current source tree:
 |---|---:|
 | Markdown pages | 182 |
 | Pages with required `title` and `description` frontmatter | 182 |
-| Substantive pages in completed categories | 65 |
-| Placeholder category pages | 116 |
-| Files containing a placeholder marker, including root `index.md` | 117 |
+| Substantive pages in completed categories | 75 |
+| Placeholder category pages | 105 |
+| Files containing a placeholder marker, including root `index.md` | 106 |
 | Category metadata registrations missing files | 0 |
 | Category Markdown files missing registrations | 0 |
 
@@ -94,7 +94,7 @@ These figures are useful orientation, not permanent policy. Recalculate them bef
 
 ## Completed learning path
 
-The currently usable end-to-end path is concentrated in six areas.
+The currently usable end-to-end path is concentrated in seven areas.
 
 ### Getting started (`gioi-thieu/`)
 
@@ -142,6 +142,12 @@ The section separates control-plane intent from packet-processing data planes an
 The eleven registered pages now progress from the Pod-level Volume abstraction and ephemeral lifecycle through PersistentVolume/PersistentVolumeClaim contracts, StorageClass policy, dynamic provisioning, access and volume modes, storage design for StatefulSet workloads, CSI controller/node internals, VolumeSnapshot restore, and end-to-end backup planning.
 
 The section separates Kubernetes API state from backend storage assets and application-level consistency. Lessons trace provisioning, binding, scheduling, attach, mount, snapshot, reclaim, and restore flows; include cluster-neutral manifests and verification commands; and cover topology, capacity, fencing, data retention, encryption, RPO/RTO, and layered troubleshooting. `content/docs/storage/volumes.md` is the conceptual entry point; `content/docs/storage/persistent-volume.md`, `content/docs/storage/persistent-volume-claim.md`, and `content/docs/storage/storage-class.md` anchor persistent storage contracts; `content/docs/storage/csi.md` explains the implementation boundary; and `content/docs/storage/storage-backup-restore.md` closes the sequence with a recovery design and restore-drill checklist.
+
+### Scheduling (`scheduling/`)
+
+The ten registered pages now progress from Scheduling Framework cycles and extension points through Node selectors and affinity, inter-Pod placement, taints and tolerations, topology spread, priority and preemption, Static Pods, and extended device resources before closing with an end-to-end production design guide.
+
+The section separates hard filters from soft scoring and repeatedly connects placement intent with resource requests, Node label and taint governance, failure-domain capacity, disruption policy, autoscaling, and observability. Each lesson includes manifests, verification commands, failure analysis, and operational trade-offs. `content/docs/scheduling/scheduling-framework.md` provides the internal scheduler model; `content/docs/scheduling/node-selector.md`, `content/docs/scheduling/pod-affinity-anti-affinity.md`, and `content/docs/scheduling/topology-spread.md` anchor placement constraints; `content/docs/scheduling/priority-classes.md` and `content/docs/scheduling/preemption.md` cover capacity competition; and `content/docs/scheduling/scheduling-best-practices.md` integrates the section into a production decision and troubleshooting guide.
 
 ## Placeholder semantics
 
