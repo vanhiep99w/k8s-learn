@@ -1,104 +1,113 @@
-# Doc Template — Copy và điền vào
+# Skeleton tài liệu linh hoạt
 
-```markdown
+Dùng skeleton này để bắt đầu nhanh. Xóa section không phù hợp, thêm section cần thiết và đổi thứ tự theo mạch của chủ đề. Không dùng skeleton như giới hạn về độ dài hoặc số heading.
+
+````markdown
 ---
-title: "THAY_BẰNG_TÊN"
-description: "THAY_BẰNG_MÔ_TẢ_NGẮN — keywords quan trọng, không quá 1 dòng"
+title: "Tên chủ đề cụ thể"
+description: "Mô tả người đọc sẽ hiểu hoặc thực hiện được gì"
 ---
 
-# Tên Topic / Service
+# Tên chủ đề
 
 ## Mục lục
 
 - [Tổng quan](#tổng-quan)
-- [Use Cases phổ biến](#use-cases-phổ-biến)
-- [1. Core Concepts](#1-core-concepts)
-  - [1.1 Khái niệm A](#11-khái-niệm-a)
-  - [1.2 Khái niệm B](#12-khái-niệm-b)
-- [2. Cấu hình & Setup](#2-cấu-hình--setup)
-- [3. Best Practices](#3-best-practices)
-- [4. So sánh / Khi nào dùng](#4-so-sánh--khi-nào-dùng)
+- [1. Vấn đề và mental model](#1-vấn-đề-và-mental-model)
+- [2. Thành phần và cơ chế](#2-thành-phần-và-cơ-chế)
+- [3. Luồng xử lý](#3-luồng-xử-lý)
+- [4. Thực hành](#4-thực-hành)
+- [5. Xác minh](#5-xác-minh)
+- [6. Failure modes và troubleshooting](#6-failure-modes-và-troubleshooting)
+- [7. Trade-offs và best practices](#7-trade-offs-và-best-practices)
 - [Tài liệu tham khảo](#tài-liệu-tham-khảo)
 
 ---
 
 ## Tổng quan
 
-Mô tả ngắn gọn service/topic là gì, giải quyết vấn đề gì.
-
-```
-┌─────────────────────────────┐
-│   ASCII diagram (optional)  │
-└─────────────────────────────┘
-```
+Nêu chủ đề là gì, giải quyết vấn đề nào, phạm vi trang và kết quả người đọc đạt được. Đi thẳng vào thông tin cụ thể; không dùng mở đầu chung chung.
 
 > [!IMPORTANT]
-> Key point cần nhớ nhất (nếu là AWS doc: exam tip)
+> Nêu invariant, giới hạn hoặc điểm dễ hiểu sai nhất nếu cần.
 
----
+## 1. Vấn đề và mental model
 
-## Use Cases phổ biến
+Mô tả starting state, pain point và cách nhìn đơn giản giúp hiểu các phần sau.
 
-| Use Case | Mô tả |
-|----------|-------|
-| **Trường hợp 1** | Giải thích |
-| **Trường hợp 2** | Giải thích |
+```mermaid
+flowchart LR
+    A[Starting state] --> B[Mechanism]
+    B --> C[Desired result]
+```
 
----
+Giải thích điểm người đọc cần quan sát trong diagram.
 
-## 1. Core Concepts
+## 2. Thành phần và cơ chế
 
-### 1.1 Khái niệm A
+### 2.1 Thành phần A
 
-Giải thích. Ví dụ cụ thể.
+Giải thích trách nhiệm, input/output, state và quan hệ với thành phần khác.
 
-### 1.2 Khái niệm B
+### 2.2 Thành phần B
 
-Giải thích. Ví dụ cụ thể.
+Giải thích behavior và ranh giới trách nhiệm.
 
----
+## 3. Luồng xử lý
 
-## 2. Cấu hình & Setup
+Đi từng bước từ trigger đến kết quả. Nêu nơi state thay đổi, nơi có thể fail và signal dùng để quan sát.
+
+## 4. Thực hành
+
+Nêu mục tiêu và prerequisite của ví dụ.
+
+```yaml
+# Manifest minh họa; thay các placeholder được ghi chú.
+apiVersion: example.io/v1
+kind: Example
+metadata:
+  name: demo
+spec:
+  enabled: true
+```
+
+Giải thích field quyết định behavior. Không diễn giải lại mọi dòng hiển nhiên.
+
+## 5. Xác minh
 
 ```bash
-# Command mẫu
-command --flag value
+examplectl get example demo
 ```
 
-```json
-{
-  "config": "example"
-}
-```
+Mô tả expected state/output và cách phân biệt kết quả đúng với trạng thái chưa hoàn tất hoặc lỗi.
 
----
+## 6. Failure modes và troubleshooting
 
-## 3. Best Practices
+| Triệu chứng | Giả thuyết | Cách kiểm tra | Hướng xử lý |
+|---|---|---|---|
+| Ví dụ lỗi | Nguyên nhân có khả năng | Command hoặc signal | Fix và verification |
 
-- **Điểm 1**: Giải thích ngắn
-- **Điểm 2**: Giải thích ngắn
-- **Điểm 3**: Giải thích ngắn
+Nếu chẩn đoán có nhiều nhánh, dùng flow theo request path thay vì danh sách command rời rạc.
 
-> [!TIP]
-> Mẹo thực tế từ kinh nghiệm
+## 7. Trade-offs và best practices
 
----
-
-## 4. So sánh / Khi nào dùng
-
-| Tiêu chí | Option A | Option B |
-|----------|----------|----------|
-| Performance | ... | ... |
-| Cost | ... | ... |
-| Complexity | ... | ... |
-
-**Khi nào dùng A:** ...
-**Khi nào dùng B:** ...
-
----
+- Nêu recommendation.
+- Giải thích vì sao.
+- Nêu điều kiện áp dụng.
+- Nêu trade-off hoặc trường hợp không phù hợp.
 
 ## Tài liệu tham khảo
 
-- [Official Docs](https://example.com)
-- [Related doc trong repo](./related-topic.md)
-```
+- [Official documentation](https://example.com)
+- [Tài liệu liên quan trong site](/category/related-topic/)
+````
+
+## Cách điều chỉnh
+
+- Với concept page, mở rộng mental model và cơ chế; phần thực hành có thể ngắn.
+- Với tutorial, chuyển prerequisite và Steps lên trước; thêm cleanup.
+- Với reference, thay flow bằng field/option tables và compatibility notes.
+- Với troubleshooting, bắt đầu từ triệu chứng và decision tree.
+- Với production guide, thêm SLO, scaling, security, observability, rollout và rollback.
+
+Đọc [`content-patterns.md`](content-patterns.md) để chọn coverage phù hợp.
