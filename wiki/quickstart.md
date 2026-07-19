@@ -11,7 +11,7 @@ description: "Orientation for the k8s-learn Vietnamese Kubernetes curriculum and
 
 The repository currently has two distinct concerns:
 
-1. **Learning content:** 182 Markdown pages arranged into 16 curriculum categories plus the root landing page. The `gioi-thieu/`, `kien-truc/`, `workloads/`, `cau-hinh/`, and `networking/` categories contain substantive lessons; most remaining category pages are curriculum placeholders.
+1. **Learning content:** 182 Markdown pages arranged into 16 curriculum categories plus the root landing page. The `gioi-thieu/`, `kien-truc/`, `workloads/`, `cau-hinh/`, `networking/`, and `storage/` categories contain substantive lessons; most remaining category pages are curriculum placeholders.
 2. **Documentation runtime:** Next.js 15, React 19, Fumadocs, custom remark transforms, Mermaid rendering, static search, and Cloudflare Pages deployment.
 
 This is not a Kubernetes controller, cluster configuration repository, or backend service. No database, authentication subsystem, business API, test suite, or site-deployment Kubernetes manifests are present in the inspected source.
@@ -71,15 +71,15 @@ Do not run `npm run deploy` merely to validate a change; it requires the appropr
 
 ## Current content maturity
 
-The curriculum currently has five complete learning sections: the eight-page getting-started sequence, the ten-page Kubernetes architecture sequence, the fourteen-page workloads sequence, the ten-page application-configuration sequence, and the twelve-page networking sequence. Inventory after the networking authoring pass shows:
+The curriculum currently has six complete learning sections: the eight-page getting-started sequence, the ten-page Kubernetes architecture sequence, the fourteen-page workloads sequence, the ten-page application-configuration sequence, the twelve-page networking sequence, and the eleven-page storage sequence. Inventory after the storage authoring pass shows:
 
 - **182** Markdown pages total.
-- **54** substantive pages across `content/docs/gioi-thieu/`, `content/docs/kien-truc/`, `content/docs/workloads/`, `content/docs/cau-hinh/`, and `content/docs/networking/`.
-- **127** category pages that still contain the standard placeholder curriculum body.
-- The root `content/docs/index.md` also contains a placeholder marker, bringing the repository-wide marker count to **128**.
+- **65** substantive pages across `content/docs/gioi-thieu/`, `content/docs/kien-truc/`, `content/docs/workloads/`, `content/docs/cau-hinh/`, `content/docs/networking/`, and `content/docs/storage/`.
+- **116** category pages that still contain the standard placeholder curriculum body.
+- The root `content/docs/index.md` also contains a placeholder marker, bringing the repository-wide marker count to **117**.
 - Every category page currently has a matching `meta.json` registration, and all 182 Markdown files have `title` and `description` frontmatter.
 
-`README.md` and `content/docs/index.md` still say that all pages are placeholders. That statement is stale relative to the current files in the completed introduction, architecture, workloads, application-configuration, and networking sections. Use the files themselves and [Curriculum and content map](content-map.md) when deciding what remains to be written.
+`README.md` and `content/docs/index.md` still say that all pages are placeholders. That statement is stale relative to the current files in the completed introduction, architecture, workloads, application-configuration, networking, and storage sections. Use the files themselves and [Curriculum and content map](content-map.md) when deciding what remains to be written.
 
 ## Non-negotiable content contracts
 

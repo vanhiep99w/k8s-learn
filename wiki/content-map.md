@@ -62,7 +62,7 @@ The table follows root navigation order. “Placeholder” means the page still 
 | `workloads/` | 14 | How are Pods and controllers such as Deployment, StatefulSet, DaemonSet, Job, and CronJob managed? | **Substantive:** all 14 pages form a complete workload learning path with manifests, operational trade-offs, troubleshooting, and labs. |
 | `cau-hinh/` | 10 | How do environment data, ConfigMap, Secret, probes, requests, limits, quotas, QoS, and disruption budgets shape workloads? | **Substantive:** all 10 pages form a detailed application-configuration path with manifests, runtime semantics, security and capacity trade-offs, troubleshooting, and labs. |
 | `networking/` | 12 | How do Pod networking, Service, DNS, Ingress, Gateway API, CNI, kube-proxy, and NetworkPolicy work? | **Substantive:** all 12 pages form a complete network learning path from the Kubernetes network model and Pod data plane through discovery, exposure, policy, service routing, and layered troubleshooting. |
-| `storage/` | 11 | How do volumes, PV/PVC, StorageClass, CSI, snapshots, backup, and stateful storage fit together? | Placeholder curriculum. |
+| `storage/` | 11 | How do volumes, PV/PVC, StorageClass, CSI, snapshots, backup, and stateful storage fit together? | **Substantive:** all 11 pages form a complete storage path from Pod volumes and ephemeral data through PV/PVC provisioning, access semantics, StatefulSet storage, CSI internals, snapshots, and recovery planning. |
 | `scheduling/` | 10 | How do selectors, affinity, taints, priority, preemption, topology, and device resources affect placement? | Placeholder curriculum. |
 | `security/` | 16 | How do identity, authentication, authorization, RBAC, policy, Secret handling, and runtime hardening work? | Placeholder curriculum. |
 | `observability/` | 10 | How should operators use Events, logs, metrics, dashboards, traces, SLI/SLOs, and alerts? | Placeholder curriculum. |
@@ -84,9 +84,9 @@ In the current source tree:
 |---|---:|
 | Markdown pages | 182 |
 | Pages with required `title` and `description` frontmatter | 182 |
-| Substantive pages in completed categories | 54 |
-| Placeholder category pages | 127 |
-| Files containing a placeholder marker, including root `index.md` | 128 |
+| Substantive pages in completed categories | 65 |
+| Placeholder category pages | 116 |
+| Files containing a placeholder marker, including root `index.md` | 117 |
 | Category metadata registrations missing files | 0 |
 | Category Markdown files missing registrations | 0 |
 
@@ -94,7 +94,7 @@ These figures are useful orientation, not permanent policy. Recalculate them bef
 
 ## Completed learning path
 
-The currently usable end-to-end path is concentrated in five areas.
+The currently usable end-to-end path is concentrated in six areas.
 
 ### Getting started (`gioi-thieu/`)
 
@@ -136,6 +136,12 @@ The section follows the configuration lifecycle from container startup inputs th
 The twelve registered pages now form a complete progression from the Kubernetes network model, Pod network namespaces and CNI through Service virtual IPs, Service types, EndpointSlice discovery, CoreDNS, Ingress, Gateway API, NetworkPolicy, kube-proxy, and end-to-end troubleshooting.
 
 The section separates control-plane intent from packet-processing data planes and repeatedly traces direct Pod, Service, DNS, and north-south request paths. Lessons include current API lifecycle guidance such as the deprecation of legacy Endpoints and IPVS mode, the frozen status of Ingress, Gateway API role delegation, traffic locality, dual-stack considerations, production security and capacity trade-offs, isolated labs, and symptom-driven diagnostics. `content/docs/networking/networking-model.md` is the conceptual entry point; `content/docs/networking/service.md` and `content/docs/networking/endpoints-endpointslices.md` anchor service discovery; `content/docs/networking/network-policy.md` covers portable L3/L4 isolation; and `content/docs/networking/network-troubleshooting.md` closes the sequence with a layered incident runbook.
+
+### Storage (`storage/`)
+
+The eleven registered pages now progress from the Pod-level Volume abstraction and ephemeral lifecycle through PersistentVolume/PersistentVolumeClaim contracts, StorageClass policy, dynamic provisioning, access and volume modes, storage design for StatefulSet workloads, CSI controller/node internals, VolumeSnapshot restore, and end-to-end backup planning.
+
+The section separates Kubernetes API state from backend storage assets and application-level consistency. Lessons trace provisioning, binding, scheduling, attach, mount, snapshot, reclaim, and restore flows; include cluster-neutral manifests and verification commands; and cover topology, capacity, fencing, data retention, encryption, RPO/RTO, and layered troubleshooting. `content/docs/storage/volumes.md` is the conceptual entry point; `content/docs/storage/persistent-volume.md`, `content/docs/storage/persistent-volume-claim.md`, and `content/docs/storage/storage-class.md` anchor persistent storage contracts; `content/docs/storage/csi.md` explains the implementation boundary; and `content/docs/storage/storage-backup-restore.md` closes the sequence with a recovery design and restore-drill checklist.
 
 ## Placeholder semantics
 
