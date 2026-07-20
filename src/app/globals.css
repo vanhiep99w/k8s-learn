@@ -6,11 +6,9 @@
   --fd-font-mono: 'JetBrains Mono', monospace;
 }
 
-/* Let the main document fill the entire space between sidebar and TOC. */
-#nd-page {
-  max-width: none;
-  margin-inline: 0;
-  padding-inline: 0;
+/* Use the full viewport width while preserving the page content padding. */
+#nd-docs-layout {
+  --fd-layout-width: 100%;
 }
 
 /* Vietnamese text readability */
