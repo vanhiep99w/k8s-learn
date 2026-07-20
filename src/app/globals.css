@@ -6,9 +6,11 @@
   --fd-font-mono: 'JetBrains Mono', monospace;
 }
 
-/* Wider content area */
-#nd-page article {
+/* Let the main document fill the entire space between sidebar and TOC. */
+#nd-page {
   max-width: none;
+  margin-inline: 0;
+  padding-inline: 0;
 }
 
 /* Vietnamese text readability */
