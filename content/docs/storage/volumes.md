@@ -39,22 +39,27 @@ Pod
     └── mounted read-only /etc/app trong cả hai container
 ```
 
-Volume là abstraction ở cấp Pod. Độ bền, vị trí dữ liệu và khả năng dùng trên nhiều Node phụ thuộc **volume type** và storage backend, không phụ thuộc riêng từ khóa `volumeMounts`.
+Volume là abstraction ở cấp Pod. `volumeMounts` chỉ xác định Volume được gắn vào đâu trong filesystem của từng container. Việc dữ liệu được lưu ở đâu, có tồn tại sau khi Pod bị xóa hay có thể được truy cập từ nhiều Node hay không phụ thuộc vào **volume type** và storage backend. Chỉ khai báo `volumeMounts` không tự làm cho dữ liệu trở thành persistent storage.
 
 ## 1. Vì sao container filesystem chưa đủ
 
 Cần phân biệt ba lifecycle:
 
-| Nơi ghi dữ liệu | Sống qua container restart | Sống qua Pod replacement | Phạm vi chia sẻ |
+| Nơi ghi dữ liệu | Giữ dữ liệu khi container được khởi động lại trong cùng Pod | Giữ dữ liệu khi Pod cũ được thay bằng Pod mới | Phạm vi chia sẻ |
 |---|---:|---:|---|
 | Writable layer của container | Không nên dựa vào | Không | Một container |
-| Ephemeral Volume như `emptyDir` | Có, khi Pod vẫn tồn tại trên Node | Không | Các container trong Pod |
+| Ephemeral Volume như `emptyDir` | Có, nếu vẫn là cùng một Pod trên cùng Node | Không | Các container trong Pod |
 | Persistent Volume qua PVC | Có | Có | Theo capability và access mode của backend |
 
-Kubelet restart container trong cùng Pod không xóa `emptyDir`. Nhưng khi Pod object bị xóa, bị eviction hoặc được controller thay bằng Pod mới, dữ liệu `emptyDir` cũ không đi theo Pod mới.
+`emptyDir` gắn với vòng đời của **một Pod cụ thể**, không phải với vòng đời của từng container trong Pod:
+
+- Nếu container bị lỗi, kubelet có thể khởi động lại container bên trong cùng Pod. Pod vẫn giữ nguyên UID và tiếp tục dùng `emptyDir` cũ, nên dữ liệu còn tồn tại.
+- Nếu Pod bị xóa, bị eviction hoặc được controller thay thế, Pod cũ kết thúc. Pod mới có UID khác và nhận một `emptyDir` mới, nên dữ liệu trong `emptyDir` của Pod cũ không được chuyển sang.
+
+Ví dụ, khi container trong một Pod của Deployment bị crash, dữ liệu trong `emptyDir` vẫn còn sau khi container được khởi động lại. Nhưng nếu chạy `kubectl delete pod <pod-name>`, Deployment tạo Pod thay thế và Pod mới bắt đầu với một `emptyDir` trống.
 
 > [!IMPORTANT]
-> Container restart và Pod replacement là hai sự kiện khác nhau. Một Volume chỉ bền qua container restart chưa đồng nghĩa với persistent storage.
+> Việc dữ liệu còn tồn tại sau khi **container được khởi động lại trong cùng Pod** không có nghĩa là dữ liệu đó là persistent. Persistent storage phải tiếp tục tồn tại ngay cả khi Pod cũ bị xóa và một Pod mới được tạo.
 
 ## 2. Mental model của Volume
 
