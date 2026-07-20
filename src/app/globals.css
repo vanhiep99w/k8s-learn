@@ -6,9 +6,13 @@
   --fd-font-mono: 'JetBrains Mono', monospace;
 }
 
-/* Use the full viewport width while preserving the page content padding. */
+/* Use the full viewport and keep only Fumadocs' normal content padding. */
 #nd-docs-layout {
   --fd-layout-width: 100%;
+}
+
+#nd-page {
+  max-width: none;
 }
 
 /* Vietnamese text readability */
