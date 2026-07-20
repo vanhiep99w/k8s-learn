@@ -15,6 +15,16 @@
   max-width: none;
 }
 
+/* A collapsed sidebar must not reserve an outer grid gutter. */
+#nd-docs-layout[data-sidebar-collapsed='true'] {
+  grid-template-columns:
+    0
+    var(--fd-sidebar-col)
+    minmax(0, calc(100% - var(--fd-sidebar-col) - var(--fd-toc-width)))
+    var(--fd-toc-width)
+    0 !important;
+}
+
 /* Vietnamese text readability */
 .prose {
   line-height: 1.8;
