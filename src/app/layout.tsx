@@ -5,7 +5,6 @@ import './globals.css';
 export const metadata = {
   title: 'Kubernetes Learning',
   description: 'Tài liệu học Kubernetes tiếng Việt từ nền tảng đến production',
-  icons: { icon: '/favicon.svg' },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
