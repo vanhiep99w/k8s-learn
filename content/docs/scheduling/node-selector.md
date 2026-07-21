@@ -8,7 +8,7 @@ description: "Cách dùng Node label, nodeSelector và required/preferred Node A
 ## Mục lục
 
 - [Tổng quan](#tổng-quan)
-- [1. Node label là dữ liệu placement](#1-node-label-là-dữ-liệu-placement)
+- [1. Node label là dữ liệu để scheduler chọn Node](#1-node-label-là-dữ-liệu-để-scheduler-chọn-node)
 - [2. nodeSelector](#2-nodeselector)
 - [3. Node Affinity](#3-node-affinity)
 - [4. Operator và logic kết hợp](#4-operator-và-logic-kết-hợp)
@@ -44,7 +44,7 @@ Bind Pod vào Node phù hợp nhất
 
 `IgnoredDuringExecution` nghĩa scheduler kiểm tra rule lúc placement; thay đổi label sau đó không tự evict Pod đang chạy chỉ vì affinity không còn match.
 
-## 1. Node label là dữ liệu placement
+## 1. Node label là dữ liệu để scheduler chọn Node
 
 Liệt kê label hiện tại:
 

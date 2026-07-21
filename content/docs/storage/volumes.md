@@ -1,6 +1,6 @@
 ---
 title: "Volumes"
-description: "Mental model về Kubernetes Volume, cách khai báo volumeMount, chia sẻ dữ liệu trong Pod, lựa chọn volume type và xử lý lỗi mount."
+description: "Cách hiểu Kubernetes Volume, cách khai báo volumeMount, chia sẻ dữ liệu trong Pod, lựa chọn volume type và xử lý lỗi mount."
 ---
 
 # Volumes
@@ -9,7 +9,7 @@ description: "Mental model về Kubernetes Volume, cách khai báo volumeMount, 
 
 - [Tổng quan](#tổng-quan)
 - [1. Vì sao container filesystem chưa đủ](#1-vì-sao-container-filesystem-chưa-đủ)
-- [2. Mental model của Volume](#2-mental-model-của-volume)
+- [2. Volume được khai báo và mount như thế nào](#2-volume-được-khai-báo-và-mount-như-thế-nào)
 - [3. Khai báo và mount Volume](#3-khai-báo-và-mount-volume)
 - [4. Chọn loại Volume](#4-chọn-loại-volume)
 - [5. emptyDir và chia sẻ dữ liệu trong Pod](#5-emptydir-và-chia-sẻ-dữ-liệu-trong-pod)
@@ -61,7 +61,7 @@ Ví dụ, khi container trong một Pod của Deployment bị crash, dữ liệu
 > [!IMPORTANT]
 > Việc dữ liệu còn tồn tại sau khi **container được khởi động lại trong cùng Pod** không có nghĩa là dữ liệu đó là persistent. Persistent storage phải tiếp tục tồn tại ngay cả khi Pod cũ bị xóa và một Pod mới được tạo.
 
-## 2. Mental model của Volume
+## 2. Volume được khai báo và mount như thế nào
 
 Khai báo Volume có hai phía:
 

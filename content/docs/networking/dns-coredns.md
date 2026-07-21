@@ -19,7 +19,7 @@ description: "Kubernetes DNS deep-dive: Service/Pod records, search domain, ndot
 - [9. NetworkPolicy cho DNS](#9-networkpolicy-cho-dns)
 - [10. Production design](#10-production-design)
 - [11. Thực hành](#11-thực-hành)
-- [12. Troubleshooting theo layer](#12-troubleshooting-theo-layer)
+- [12. Troubleshooting theo từng tầng](#12-troubleshooting-theo-từng-tầng)
 - [13. Best practices](#13-best-practices)
 - [Tài liệu tham khảo](#tài-liệu-tham-khảo)
 
@@ -471,7 +471,7 @@ kubectl delete namespace dns-lab
 rm -f dns-lab.yaml
 ```
 
-## 12. Troubleshooting theo layer
+## 12. Troubleshooting theo từng tầng
 
 ### 12.1 Kiểm tra từ cùng Pod bị lỗi
 

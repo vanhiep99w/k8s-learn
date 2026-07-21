@@ -8,7 +8,7 @@ description: "Cách đặt Pod gần hoặc tách khỏi các Pod khác bằng l
 ## Mục lục
 
 - [Tổng quan](#tổng-quan)
-- [1. Mental model](#1-mental-model)
+- [1. Cách scheduler hiểu Pod affinity](#1-cách-scheduler-hiểu-pod-affinity)
 - [2. Cấu trúc một rule](#2-cấu-trúc-một-rule)
 - [3. Pod Affinity](#3-pod-affinity)
 - [4. Pod Anti-affinity](#4-pod-anti-affinity)
@@ -31,7 +31,7 @@ Node Affinity so khớp Pod với **label của Node**. Pod Affinity và Anti-af
 
 Ví dụ, web Pod có thể muốn ở cùng zone với cache để giảm latency, trong khi ba replicas của API nên tránh cùng hostname để một Node lỗi không làm mất toàn bộ service.
 
-## 1. Mental model
+## 1. Cách scheduler hiểu Pod affinity
 
 Một rule được đánh giá theo ba lớp:
 

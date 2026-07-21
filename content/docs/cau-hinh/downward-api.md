@@ -13,7 +13,7 @@ description: "Expose metadata, Pod/Node identity và resource requests/limits v�
 - [3. fieldRef: metadata và identity](#3-fieldref-metadata-và-identity)
 - [4. resourceFieldRef: requests và limits](#4-resourcefieldref-requests-và-limits)
 - [5. Downward API volume](#5-downward-api-volume)
-- [6. Update semantics](#6-update-semantics)
+- [6. Giá trị có cập nhật khi Pod đang chạy không](#6-giá-trị-có-cập-nhật-khi-pod-đang-chạy-không)
 - [7. Use cases và anti-patterns](#7-use-cases-và-anti-patterns)
 - [8. Manifest hoàn chỉnh](#8-manifest-hoàn-chỉnh)
 - [9. Thực hành](#9-thực-hành)
@@ -241,7 +241,7 @@ volumes:
 
 Giữ path không collision và permission phù hợp.
 
-## 6. Update semantics
+## 6. Giá trị có cập nhật khi Pod đang chạy không
 
 ### 6.1 Environment là snapshot
 

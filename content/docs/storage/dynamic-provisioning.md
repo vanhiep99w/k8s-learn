@@ -17,7 +17,7 @@ description: "Luồng cấp PersistentVolume theo yêu cầu từ PVC và Storag
 - [7. Idempotency, retry và cleanup](#7-idempotency-retry-và-cleanup)
 - [8. Capacity, quota và scale](#8-capacity-quota-và-scale)
 - [9. Thực hành quan sát provisioning](#9-thực-hành-quan-sát-provisioning)
-- [10. Troubleshooting theo layer](#10-troubleshooting-theo-layer)
+- [10. Troubleshooting theo từng tầng](#10-troubleshooting-theo-từng-tầng)
 - [11. Best practices](#11-best-practices)
 - [Tài liệu tham khảo](#tài-liệu-tham-khảo)
 
@@ -277,9 +277,9 @@ kubectl delete namespace storage-lab
 
 Nếu policy `Retain`, dọn PV/backend asset theo runbook.
 
-## 10. Troubleshooting theo layer
+## 10. Troubleshooting theo từng tầng
 
-### Layer 1: PVC và StorageClass
+### Tầng 1: PVC và StorageClass
 
 ```bash
 kubectl describe pvc PVC -n NS
@@ -289,7 +289,7 @@ kubectl get events -n NS --sort-by=.lastTimestamp
 
 Kiểm tra tên class, provisioner, quota, size, selector và first consumer.
 
-### Layer 2: CSI controller
+### Tầng 2: CSI controller
 
 ```bash
 kubectl get pods -A -o wide | grep -i csi
@@ -306,7 +306,7 @@ Tín hiệu phổ biến:
 - API timeout/rate limit.
 - Driver leader election hoặc controller unavailable.
 
-### Layer 3: Scheduler/topology
+### Tầng 3: Scheduler và topology
 
 ```bash
 kubectl describe pod POD -n NS
@@ -316,7 +316,7 @@ kubectl get pv PV -o jsonpath='{.spec.nodeAffinity}{"\n"}'
 
 So sánh zone, node selector, affinity, taint/toleration và capacity. Với nhiều PVC, mỗi Volume có thể bị tạo ở topology khác khiến giao điểm rỗng.
 
-### Layer 4: Attach và mount
+### Tầng 4: Attach và mount
 
 ```bash
 kubectl get volumeattachment
@@ -326,7 +326,7 @@ kubectl get pods -A -o wide | grep -i csi
 
 Kiểm tra stale attachment, attach limit, Node plugin thiếu, mount helper/filesystem lỗi và permission. Không force detach khi Node cũ có thể vẫn ghi.
 
-### Layer 5: Cleanup stuck
+### Tầng 5: Cleanup bị kẹt
 
 ```bash
 kubectl get pvc PVC -n NS -o jsonpath='{.metadata.finalizers}{"\n"}'

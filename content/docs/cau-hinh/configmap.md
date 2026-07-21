@@ -1,6 +1,6 @@
 ---
 title: "ConfigMap"
-description: "Deep-dive ConfigMap: data model, cách kubelet inject qua env/volume, update semantics, immutable configuration, rollout và troubleshooting production."
+description: "Deep-dive ConfigMap: data model, cách kubelet inject qua env/volume, cách cập nhật tới Pod, immutable configuration, rollout và troubleshooting production."
 ---
 
 # ConfigMap
@@ -470,7 +470,7 @@ kubectl patch configmap demo-config -n configmap-lab --type=merge \
   -p '{"data":{"message":"v2"}}'
 ```
 
-Sau độ trễ projection, log sẽ cho thấy `env=v1` nhưng `file=v2`. Điều này chứng minh hai update semantics khác nhau.
+Sau độ trễ projection, log sẽ cho thấy `env=v1` nhưng `file=v2`. Điều này chứng minh env và file nhận cập nhật theo hai cách khác nhau.
 
 Kiểm tra mount:
 

@@ -469,7 +469,7 @@ Luôn xem `observedGeneration`: status cũ hơn `.metadata.generation` nghĩa co
 
 ## 13. Production governance
 
-### 13.1 Platform contract
+### 13.1 Quy ước platform phải công bố
 
 Platform team nên publish:
 

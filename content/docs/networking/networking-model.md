@@ -429,7 +429,7 @@ kubectl delete namespace net-model-lab
 - Chọn CNI dựa trên route model, policy, observability, scale và compatibility, không chỉ benchmark.
 - Chuẩn hóa debug image có `dig`, `curl`, `ip`, `ss`, `tcpdump` theo quyền được kiểm soát.
 - Theo dõi CoreDNS, CNI agent, service proxy, EndpointSlice churn và conntrack capacity.
-- Tách lỗi theo layer; xác minh direct Pod IP trước Service, Service trước Ingress/Gateway.
+- Tách lỗi theo từng tầng; xác minh direct Pod IP trước Service, Service trước Ingress/Gateway.
 - Kiểm thử MTU, dual-stack, cross-node và cross-zone trong môi trường gần production.
 - Không xem NetworkPolicy là firewall L7 hoặc cơ chế identity/TLS.
 

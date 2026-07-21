@@ -1,6 +1,6 @@
 ---
 title: "PersistentVolumeClaim"
-description: "Cách workload yêu cầu và sử dụng persistent storage qua PVC, binding semantics, default StorageClass, resize, clone, cleanup và troubleshooting."
+description: "Cách workload yêu cầu và sử dụng persistent storage qua PVC, cách binding hoạt động, default StorageClass, resize, clone, cleanup và troubleshooting."
 ---
 
 # PersistentVolumeClaim
@@ -8,7 +8,7 @@ description: "Cách workload yêu cầu và sử dụng persistent storage qua P
 ## Mục lục
 
 - [Tổng quan](#tổng-quan)
-- [1. PVC là storage contract của workload](#1-pvc-là-storage-contract-của-workload)
+- [1. PVC là yêu cầu lưu trữ của workload](#1-pvc-là-yêu-cầu-lưu-trữ-của-workload)
 - [2. Cấu trúc một PVC](#2-cấu-trúc-một-pvc)
 - [3. Binding hoạt động như thế nào](#3-binding-hoạt-động-như-thế-nào)
 - [4. storageClassName bị bỏ trống và chuỗi rỗng](#4-storageclassname-bị-bỏ-trống-và-chuỗi-rỗng)
@@ -40,7 +40,7 @@ PV pvc-<uid> → storage backend asset
 
 PVC tách application khỏi volume handle, zone, endpoint và credential của backend. Đây là resource mà manifest portable nên tham chiếu.
 
-## 1. PVC là storage contract của workload
+## 1. PVC là yêu cầu lưu trữ của workload
 
 PVC tương tự resource request của Pod, nhưng có lifecycle riêng:
 

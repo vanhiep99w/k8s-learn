@@ -408,7 +408,7 @@ Status update failed
   → updates status instead of creating duplicate
 ```
 
-### 10.3 Finalizer contract
+### 10.3 Quy ước vận hành finalizer
 
 Mỗi finalizer cần:
 

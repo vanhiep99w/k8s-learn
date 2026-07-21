@@ -16,7 +16,7 @@ description: "Bản đồ các Kubernetes component, trách nhiệm, giao tiếp
 - [6. Ai sở hữu trạng thái nào](#6-ai-sở-hữu-trạng-thái-nào)
 - [7. Cách component được triển khai](#7-cách-component-được-triển-khai)
 - [8. Health, metrics, logs và Events](#8-health-metrics-logs-và-events)
-- [9. Failure mapping](#9-failure-mapping)
+- [9. Lỗi ở đâu thì triệu chứng thế nào](#9-lỗi-ở-đâu-thì-triệu-chứng-thế-nào)
 - [10. Thực hành lập inventory](#10-thực-hành-lập-inventory)
 - [11. Checklist ghi nhớ](#11-checklist-ghi-nhớ)
 - [Tài liệu tham khảo](#tài-liệu-tham-khảo)
@@ -371,7 +371,7 @@ kubectl get events -A --sort-by=.metadata.creationTimestamp
 
 ---
 
-## 9. Failure mapping
+## 9. Lỗi ở đâu thì triệu chứng thế nào
 
 | Triệu chứng | Component/lớp cần kiểm tra trước |
 |-------------|----------------------------------|

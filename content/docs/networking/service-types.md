@@ -8,7 +8,7 @@ description: "So sánh Service types: ClusterIP, NodePort, LoadBalancer, Externa
 ## Mục lục
 
 - [Tổng quan](#tổng-quan)
-- [1. Service type là các lớp capability](#1-service-type-là-các-lớp-capability)
+- [1. Service type khác nhau ở điểm truy cập](#1-service-type-khác-nhau-ở-điểm-truy-cập)
 - [2. ClusterIP](#2-clusterip)
 - [3. NodePort](#3-nodeport)
 - [4. LoadBalancer](#4-loadbalancer)
@@ -36,30 +36,73 @@ description: "So sánh Service types: ClusterIP, NodePort, LoadBalancer, Externa
 | `LoadBalancer` | External/internal LB address | VPC/Internet | Cloud/LB controller + Service data plane |
 | `ExternalName` | DNS CNAME | Alias tới DNS ngoài cluster | CoreDNS/DNS, không proxy |
 
-`NodePort` thường bao gồm capability của `ClusterIP`; `LoadBalancer` thường xây trên NodePort, trừ implementation route trực tiếp tới Pod và tắt allocation NodePort.
+`NodePort` thường giữ cách truy cập của `ClusterIP`; `LoadBalancer` thường xây trên NodePort, trừ implementation route trực tiếp tới Pod và tắt allocation NodePort.
 
-## 1. Service type là các lớp capability
+## 1. Service type khác nhau ở điểm truy cập
+
+Cách đọc dễ nhất: `spec.type` không phải bốn cơ chế hoàn toàn tách rời. Mỗi type thường **mở thêm một cách để client đi vào cùng một Service**.
+
+- `ClusterIP` tạo địa chỉ ổn định bên trong cluster: client trong cluster gọi `Service DNS/ClusterIP:port`.
+- `NodePort` giữ cách truy cập qua `ClusterIP`, rồi mở thêm một port trên Node: client có thể gọi `NodeIP:nodePort`.
+- `LoadBalancer` thường giữ cách truy cập qua `NodePort` và `ClusterIP`, rồi yêu cầu cloud/LB controller cấp thêm địa chỉ load balancer bên ngoài hoặc trong VPC.
+- `ExternalName` là ngoại lệ: nó chỉ tạo DNS alias dạng CNAME, không tạo VIP và không proxy packet.
+
+Nói ngắn gọn, với ba type đầu, type “cao hơn” thường có thêm một entry point ở phía trước type “thấp hơn”:
 
 ```mermaid
 flowchart TB
-    LB[LoadBalancer address] --> NP[NodeIP:NodePort]
-    NP --> VIP[ClusterIP:port]
-    VIP --> EP[Ready endpoint PodIP:targetPort]
+    LB[LoadBalancer address\nclient ngoài cluster/VPC gọi] --> NP[NodeIP:NodePort\nport mở trên Node]
+    NP --> VIP[ClusterIP:port\nđịa chỉ ổn định trong cluster]
+    VIP --> EP[Ready endpoint\nPodIP:targetPort]
 ```
 
-Đây là flow phổ biến, không phải bắt buộc. Cloud controller có thể cấu hình LB target thẳng Pod IP hoặc Node theo provider.
+Ví dụ cùng một backend `api` có `targetPort: 8080`:
 
-Ingress và Gateway API **không phải Service type**. Chúng là L7/L4 routing API thường dùng một Service làm backend.
+| Type | Client thường gọi gì? | Traffic cuối cùng tới đâu? |
+|---|---|---|
+| `ClusterIP` | `api.production.svc.cluster.local:80` hoặc `10.96.x.y:80` | Một Pod ready ở `PodIP:8080` |
+| `NodePort` | `192.0.2.10:30080` | Cũng là một Pod ready ở `PodIP:8080` |
+| `LoadBalancer` | `203.0.113.20:443` hoặc DNS của LB | Cũng là một Pod ready ở `PodIP:8080` |
+
+Điểm quan trọng là Service type thay đổi **điểm vào** mà client thấy, không thay đổi bản chất backend: Kubernetes vẫn cần danh sách endpoint ready để gửi traffic tới Pod phù hợp.
+
+Sơ đồ trên là mental model phổ biến, không phải đường đi bắt buộc ở mọi cluster. Một số cloud controller hoặc CNI có thể cấu hình load balancer target thẳng Pod IP, target Node nhưng bỏ qua NodePort, hoặc dùng eBPF thay vì rule kube-proxy truyền thống. Khi vận hành production, luôn kiểm tra tài liệu của provider và trạng thái Service thực tế.
+
+Ingress và Gateway API **không phải Service type**. Chúng là API routing L7/L4 thường đứng trước một hoặc nhiều Service backend.
 
 ## 2. ClusterIP
 
-Mặc định:
+`ClusterIP` là Service type mặc định. Nó tạo một địa chỉ IP ảo ổn định chỉ dùng được **bên trong cluster**. Client nội bộ không cần biết Pod nào đang chạy hay Pod IP hiện tại là gì; client chỉ gọi DNS/ClusterIP của Service.
+
+Hình dung một Deployment `api` có ba Pod:
+
+```text
+Pod api-1: 10.244.1.11:8080
+Pod api-2: 10.244.2.12:8080
+Pod api-3: 10.244.3.13:8080
+```
+
+Service `ClusterIP` đặt một địa chỉ ổn định ở phía trước các Pod đó:
+
+```text
+Client trong cluster
+  gọi api.production.svc.cluster.local:80
+      ↓ DNS trả về ClusterIP, ví dụ 10.96.30.40
+  gọi 10.96.30.40:80
+      ↓ service proxy chọn một endpoint ready
+  tới một Pod api-x:8080
+```
+
+Điểm dễ nhầm: `10.96.30.40` trong ví dụ trên thường **không phải IP của một Pod và cũng không phải IP gắn trên card mạng của một Node**. Nó là virtual IP của Service. kube-proxy hoặc data plane thay thế watch Service và EndpointSlice, rồi program rule để traffic tới `ClusterIP:port` được chuyển sang một `PodIP:targetPort` phù hợp.
+
+Manifest tối thiểu:
 
 ```yaml
 apiVersion: v1
 kind: Service
 metadata:
   name: api
+  namespace: production
 spec:
   type: ClusterIP
   selector:
@@ -70,24 +113,74 @@ spec:
       targetPort: 8080
 ```
 
-Use case:
+Đọc manifest này theo ba ý:
 
-- Service-to-service nội bộ.
-- Backend cho Gateway/Ingress.
-- Monitoring/admin endpoint chỉ trong cluster.
+| Field | Ý nghĩa |
+|---|---|
+| `type: ClusterIP` | Tạo Service IP nội bộ cluster. Nếu bỏ `type`, Kubernetes cũng dùng mặc định này. |
+| `selector: app: api` | Chọn các Pod có label `app=api` làm backend. Chỉ Pod ready mới nhận traffic bình thường. |
+| `port: 80` → `targetPort: 8080` | Client gọi Service port `80`; Service chuyển tới container/backend port `8080` trên Pod. |
 
-`ClusterIP` chỉ có nghĩa routable theo cluster data plane; không nên quảng bá trực tiếp ra Internet.
+Ví dụ nếu một Pod khác trong cùng cluster muốn gọi API, có nhiều cách viết DNS name. Tên đầy đủ nhất là:
 
-### 2.1 Truy cập tạm thời từ máy operator
+```bash
+curl http://api.production.svc.cluster.local/
+```
 
-Dùng `kubectl port-forward` để debug:
+Trong thực tế bạn thường thấy dạng ngắn hơn:
+
+| Client đang ở đâu? | Có thể gọi | Ghi chú |
+|---|---|---|
+| Cùng Namespace `production` | `http://api/` | DNS search path của Pod tự thử `api.production.svc.cluster.local`. |
+| Khác Namespace | `http://api.production/` | Đây là dạng `<service-name>.<namespace>`; DNS search path tự bổ sung `.svc.cluster.local`. |
+| Muốn viết rõ tuyệt đối | `http://api.production.svc.cluster.local/` | Dùng được từ mọi Namespace trong cluster. |
+
+Vì vậy `api.production` và `api.production.svc.cluster.local` cùng trỏ tới Service `api` trong Namespace `production`; khác nhau ở mức độ viết tắt. Dạng chỉ có `api` chỉ an toàn khi client cũng nằm trong Namespace `production`.
+
+### 2.1 Kiểm tra ClusterIP và endpoint
+
+Sau khi tạo Service, kiểm tra địa chỉ ổn định của Service:
+
+```bash
+kubectl get svc api -n production -o wide
+```
+
+Output sẽ có cột `CLUSTER-IP`, ví dụ:
+
+```text
+NAME   TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)   AGE   SELECTOR
+api    ClusterIP   10.96.30.40   <none>        80/TCP    1m    app=api
+```
+
+Sau đó kiểm tra Service có backend ready hay chưa:
+
+```bash
+kubectl get endpointslice -n production \
+  -l kubernetes.io/service-name=api
+```
+
+Nếu Service có `CLUSTER-IP` nhưng không có endpoint, DNS vẫn có thể resolve nhưng request sẽ không tới được backend. Khi đó thường cần kiểm tra label selector và readiness của Pod.
+
+### 2.2 Khi nào dùng ClusterIP?
+
+Use case phù hợp:
+
+- Service-to-service nội bộ, ví dụ `frontend` gọi `api`, `api` gọi `postgres` qua Service nội bộ.
+- Backend cho Gateway/Ingress controller. Bên ngoài đi vào Ingress/Gateway; controller tiếp tục route tới Service `ClusterIP`.
+- Monitoring/admin endpoint chỉ nên truy cập từ trong cluster hoặc qua đường debug có kiểm soát.
+
+`ClusterIP` chỉ routable theo cluster data plane. Máy laptop, người dùng Internet hoặc hệ thống ngoài VPC thường không gọi trực tiếp được `10.96.x.y`. Không nên quảng bá `ClusterIP` ra ngoài như một địa chỉ public.
+
+### 2.3 Truy cập tạm thời từ máy operator
+
+Nếu cần debug từ máy operator, dùng `kubectl port-forward` để tạo đường hầm tạm thời:
 
 ```bash
 kubectl port-forward -n production service/api 8080:80
 curl http://127.0.0.1:8080/
 ```
 
-Đây không phải production exposure: connection phụ thuộc workstation, kubectl và API server path.
+Lệnh trên nghĩa là: cổng `8080` trên máy local được forward tới Service `api` port `80` trong Namespace `production`. Đây không phải production exposure vì connection phụ thuộc workstation, tiến trình `kubectl` và API server path.
 
 ## 3. NodePort
 

@@ -242,7 +242,7 @@ Một webhook lỗi có thể làm cluster không tạo được workload dù AP
 
 ## 6. Validation, conversion và persistence
 
-### 6.1 Schema và semantic validation
+### 6.1 Validation theo schema và ý nghĩa field
 
 API Server kiểm tra field type, required fields và quy tắc nghiệp vụ. Với CRD, structural schema quyết định validation, pruning và một số khả năng khác.
 

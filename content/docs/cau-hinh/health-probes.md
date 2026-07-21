@@ -1,6 +1,6 @@
 ---
 title: "Liveness, Readiness và Startup Probes"
-description: "Thiết kế health probes đúng semantics: startup gating, readiness routing, liveness restart, HTTP/TCP/gRPC/exec handlers, tuning và troubleshooting."
+description: "Thiết kế health probes phản ánh đúng trạng thái ứng dụng: startup gating, readiness routing, liveness restart, HTTP/TCP/gRPC/exec handlers, tuning và troubleshooting."
 ---
 
 # Liveness, Readiness và Startup Probes

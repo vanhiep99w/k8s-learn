@@ -8,13 +8,13 @@ description: "Chạy batch task đến khi hoàn thành bằng Job; hiểu compl
 ## Mục lục
 
 - [Tổng quan](#tổng-quan)
-- [1. Completion semantics](#1-completion-semantics)
+- [1. Job hoàn thành khi nào](#1-job-hoàn-thành-khi-nào)
 - [2. Manifest cơ bản](#2-manifest-cơ-bản)
 - [3. Completions và parallelism](#3-completions-và-parallelism)
 - [4. Retry và failure policy](#4-retry-và-failure-policy)
 - [5. Deadline và timeout](#5-deadline-và-timeout)
 - [6. Indexed Job](#6-indexed-job)
-- [7. Idempotency và delivery semantics](#7-idempotency-và-delivery-semantics)
+- [7. Idempotency và xử lý chạy lặp](#7-idempotency-và-xử-lý-chạy-lặp)
 - [8. Cleanup Job](#8-cleanup-job)
 - [9. Thực hành](#9-thực-hành)
 - [10. Troubleshooting](#10-troubleshooting)
@@ -42,7 +42,7 @@ Use cases: migration có kiểm soát, batch processing, report, import/export, 
 
 ---
 
-## 1. Completion semantics
+## 1. Job hoàn thành khi nào
 
 Job theo dõi Pods thành công/thất bại và cập nhật conditions:
 
@@ -201,7 +201,7 @@ Các phiên bản mới có thêm controls cho backoff theo index/success policy
 
 ---
 
-## 7. Idempotency và delivery semantics
+## 7. Idempotency và xử lý chạy lặp
 
 Giả sử Job gửi hóa đơn rồi Pod chết trước khi API status ghi success. Retry có thể gửi lần hai.
 

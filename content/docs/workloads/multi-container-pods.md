@@ -121,7 +121,7 @@ flowchart LR
 
 Cách truyền thống đặt app và sidecar cùng `spec.containers`. Kubernetes start chúng gần như song song và không đảm bảo thứ tự. Mỗi container phải retry dependency của nó.
 
-### 3.2 Native sidecar semantics
+### 3.2 Native sidecar: thứ tự start/stop rõ hơn
 
 Cluster hỗ trợ có thể khai báo sidecar trong `initContainers` với `restartPolicy: Always`. Cơ chế này cung cấp ordering/termination semantics rõ hơn. Hãy kiểm tra API support trước khi dùng:
 
@@ -181,7 +181,7 @@ Trong `spec.containers`, container đầu danh sách không được đảm bả
 - Retry với exponential backoff.
 - Startup/readiness probes.
 - Init container cho bước phải hoàn tất.
-- Native sidecar semantics nếu cluster hỗ trợ.
+- Cơ chế native sidecar nếu cluster hỗ trợ.
 
 ### 6.2 Readiness của Pod
 
@@ -189,7 +189,7 @@ Pod Ready khi mọi container có readiness yêu cầu đều Ready. Một sidec
 
 ### 6.3 Termination
 
-Mọi container cần xử lý shutdown. Với sidecar truyền thống, đừng giả định app luôn dừng trước sidecar. Nếu log sidecar phải flush sau app, native sidecar semantics hoặc một thiết kế flush rõ ràng giúp giảm race condition.
+Mọi container cần xử lý shutdown. Với sidecar truyền thống, đừng giả định app luôn dừng trước sidecar. Nếu log sidecar phải flush sau app, cơ chế native sidecar hoặc một thiết kế flush rõ ràng giúp giảm race condition.
 
 ---
 

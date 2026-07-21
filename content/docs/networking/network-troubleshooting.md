@@ -1,6 +1,6 @@
 ---
 title: "Troubleshooting Networking"
-description: "Runbook troubleshooting Kubernetes networking theo layer: process, Pod route, CNI, Service, EndpointSlice, DNS, NetworkPolicy, Ingress/Gateway, egress và packet capture."
+description: "Runbook troubleshooting Kubernetes networking theo từng tầng: process, Pod route, CNI, Service, EndpointSlice, DNS, NetworkPolicy, Ingress/Gateway, egress và packet capture."
 ---
 
 # Troubleshooting Networking
@@ -11,7 +11,7 @@ description: "Runbook troubleshooting Kubernetes networking theo layer: process,
 - [1. Chuẩn hóa mô tả sự cố](#1-chuẩn-hóa-mô-tả-sự-cố)
 - [2. Cây quyết định nhanh](#2-cây-quyết-định-nhanh)
 - [3. Chuẩn bị debug environment](#3-chuẩn-bị-debug-environment)
-- [4. Layer 7: application và protocol](#4-layer-7-application-và-protocol)
+- [4. Ứng dụng và protocol](#4-ứng-dụng-và-protocol)
 - [5. Pod network namespace](#5-pod-network-namespace)
 - [6. Pod-to-Pod và CNI](#6-pod-to-pod-và-cni)
 - [7. Service và EndpointSlice](#7-service-và-endpointslice)
@@ -169,7 +169,7 @@ Ephemeral container chia sẻ Pod network namespace, phù hợp nhất để tes
 - `tracepath`, `ping` với hạn chế.
 - `tcpdump` khi được cấp quyền.
 
-## 4. Layer 7: application và protocol
+## 4. Ứng dụng và protocol
 
 Bắt đầu ở backend:
 

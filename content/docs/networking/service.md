@@ -126,7 +126,7 @@ kubectl get endpointslice -n production \
 
 Không chọn label quá rộng như chỉ `app: api` nếu cùng Namespace có canary, migration job hoặc debug Pod cũng mang label đó.
 
-### 2.2 Selector immutable về mặt release contract
+### 2.2 Đổi selector có thể chuyển traffic ngay
 
 API có thể cho sửa selector, nhưng thay đổi live có thể chuyển toàn bộ traffic ngay lập tức. Dùng Deployment rollout, version label có chiến lược hoặc Service riêng cho canary thay vì edit tùy hứng.
 
@@ -242,11 +242,12 @@ curl http://api.production:80/
 curl http://api.production.svc.cluster.local:80/
 ```
 
-DNS là cách khuyến nghị. Kubelet cũng có thể inject Service environment variable cho Service tồn tại trước lúc Pod start, nhưng:
+DNS là cách khuyến nghị. Kubelet cũng có thể inject Service environment variable cho Service tồn tại trước lúc Pod start, ví dụ `API_SERVICE_HOST` hoặc `API_SERVICE_PORT_HTTP`. Cơ chế này được giải thích chi tiết trong [Environment Variables](/cau-hinh/environment-variables/#6-service-environment-variables-tự-động), nhưng không nên xem là discovery mechanism chính vì:
 
-- Có ordering dependency.
+- Có ordering dependency: Service phải tồn tại trước khi Pod/container start.
 - Không update trong Pod đang chạy.
-- Nhiều Service làm environment lớn.
+- Nhiều Service làm environment lớn và khó audit.
+- Có thể tắt cho Pod bằng `spec.enableServiceLinks: false` nếu application không cần legacy service links.
 
 ### 5.1 DNS name không phải health guarantee
 
@@ -467,7 +468,7 @@ EndpointSlice được tách theo `addressType`. Client, DNS, CNI, proxy, Networ
 
 ## 12. Thiết kế Service production
 
-### 12.1 Stable contract
+### 12.1 Giữ ổn định giao diện client gọi
 
 Giữ ổn định:
 

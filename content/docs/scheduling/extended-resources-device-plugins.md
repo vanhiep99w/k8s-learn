@@ -291,7 +291,7 @@ Sau đó dùng tool trong image/vendor để xác minh concrete device; `Running
 
 ### Node không advertise resource
 
-Kiểm tra theo layer:
+Kiểm tra theo từng tầng:
 
 1. Hardware hiện diện và kernel driver healthy.
 2. Device Plugin DaemonSet Pod có chạy trên Node không.

@@ -162,7 +162,7 @@ Step 4: v2 100%
 
 Một Service chọn Pods của cả hai Deployments; tỷ lệ replicas gần đúng tỷ lệ endpoints. Cách này đơn giản nhưng không chính xác và không route theo header/user.
 
-### 5.2 Canary bằng traffic layer
+### 5.2 Canary bằng lớp định tuyến traffic
 
 Ingress controller, Gateway API, service mesh hoặc rollout controller có thể weighted routing, header routing và automated analysis. Cơ chế mạnh hơn nhưng thêm CRDs, controller và failure modes.
 

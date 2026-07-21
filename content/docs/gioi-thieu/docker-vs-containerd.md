@@ -32,7 +32,7 @@ description: "Phân biệt Docker với containerd, giải thích CRI, OCI, dock
 - [21. Thực hành với kind](#21-thực-hành-với-kind)
 - [22. Troubleshooting](#22-troubleshooting)
 - [23. Câu hỏi thường gặp](#23-câu-hỏi-thường-gặp)
-- [24. Mental model cần ghi nhớ](#24-mental-model-cần-ghi-nhớ)
+- [24. Mô hình cần ghi nhớ](#24-mô-hình-cần-ghi-nhớ)
 - [Tài liệu tham khảo](#tài-liệu-tham-khảo)
 
 ---
@@ -1433,7 +1433,7 @@ kubectl get nodes -o wide
 
 ---
 
-## 24. Mental model cần ghi nhớ
+## 24. Mô hình cần ghi nhớ
 
 ### 24.1 Tách build khỏi run
 

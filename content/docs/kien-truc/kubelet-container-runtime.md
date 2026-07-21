@@ -327,7 +327,7 @@ Projected files có thể được cập nhật eventual, nhưng ứng dụng ph
 
 ### 8.3 `subPath`
 
-Mount bằng `subPath` có update semantics khác projected volume thông thường. Không giả định file sẽ hot-reload.
+Mount bằng `subPath` nhận cập nhật khác projected volume thông thường. Không giả định file sẽ hot-reload.
 
 ### 8.4 `emptyDir`
 

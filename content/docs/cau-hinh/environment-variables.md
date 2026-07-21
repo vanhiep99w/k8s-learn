@@ -1,6 +1,6 @@
 ---
 title: "Environment Variables"
-description: "Cấu hình container bằng env, envFrom, ConfigMap, Secret và Downward API; hiểu precedence, expansion, update semantics và rủi ro production."
+description: "Cấu hình container bằng env, envFrom, ConfigMap, Secret và Downward API; hiểu precedence, expansion, cách cập nhật và rủi ro production."
 ---
 
 # Environment Variables
@@ -13,13 +13,14 @@ description: "Cấu hình container bằng env, envFrom, ConfigMap, Secret và D
 - [3. Lấy một key bằng valueFrom](#3-lấy-một-key-bằng-valuefrom)
 - [4. Import hàng loạt bằng envFrom](#4-import-hàng-loạt-bằng-envfrom)
 - [5. Precedence và mở rộng biến](#5-precedence-và-mở-rộng-biến)
-- [6. Update semantics](#6-update-semantics)
-- [7. Environment variable hay file?](#7-environment-variable-hay-file)
-- [8. Thiết kế configuration contract](#8-thiết-kế-configuration-contract)
-- [9. Manifest hoàn chỉnh](#9-manifest-hoàn-chỉnh)
-- [10. Thực hành](#10-thực-hành)
-- [11. Troubleshooting](#11-troubleshooting)
-- [12. Best practices](#12-best-practices)
+- [6. Service environment variables tự động](#6-service-environment-variables-tự-động)
+- [7. Env có cập nhật khi Pod đang chạy không](#7-env-có-cập-nhật-khi-pod-đang-chạy-không)
+- [8. Environment variable hay file?](#8-environment-variable-hay-file)
+- [9. Thiết kế quy ước cấu hình rõ ràng](#9-thiết-kế-quy-ước-cấu-hình-rõ-ràng)
+- [10. Manifest hoàn chỉnh](#10-manifest-hoàn-chỉnh)
+- [11. Thực hành](#11-thực-hành)
+- [12. Troubleshooting](#12-troubleshooting)
+- [13. Best practices](#13-best-practices)
 - [Tài liệu tham khảo](#tài-liệu-tham-khảo)
 
 ---
@@ -35,13 +36,16 @@ flowchart LR
     C[ConfigMap] --> E
     S[Secret] --> E
     D[Downward API] --> E
+    L[Service links] --> E
     E --> P[Application process]
 ```
 
-Kubernetes cung cấp hai field chính:
+Kubernetes cung cấp hai field chính trong container spec:
 
 - `env`: khai báo từng biến, giá trị trực tiếp hoặc lấy từ nguồn khác.
 - `envFrom`: import toàn bộ key-value từ ConfigMap hoặc Secret, có thể thêm prefix.
+
+Ngoài các biến bạn khai báo, kubelet còn có thể thêm **Service environment variables** để tương thích cơ chế service discovery cũ. DNS vẫn là cách khuyến nghị cho Service discovery, nhưng hiểu nhóm biến tự động này giúp bạn giải thích vì sao trong `printenv` có nhiều biến không xuất hiện trong manifest.
 
 > [!IMPORTANT]
 > Environment được chụp tại lúc container start. Sửa ConfigMap hoặc Secret phía sau **không cập nhật** environment của process đang chạy; phải restart/rollout Pod.
@@ -247,7 +251,165 @@ args: ["--port=$(PORT)"]
 
 Không có shell thì `$PORT` không tự mở rộng. Xem [Commands và Arguments](/cau-hinh/commands-arguments/).
 
-## 6. Update semantics
+## 6. Service environment variables tự động
+
+Khi một container được tạo, kubelet tạo thêm một số biến môi trường mô tả các Service mà container có thể nhìn thấy. Cơ chế này thường được gọi là **Service links** hoặc **Service environment variables**. Nó tồn tại để tương thích với kiểu Docker legacy links và để hỗ trợ ứng dụng cũ không dùng DNS.
+
+Phạm vi mặc định gồm:
+
+- Service có `ClusterIP` trong **cùng Namespace** với Pod, nếu `spec.enableServiceLinks` không bị tắt.
+- Service `kubernetes` trong Namespace `default`, dùng để workload trong cluster tìm API server.
+
+Headless Service (`clusterIP: None`) và Service không có ClusterIP không tạo nhóm biến dạng này. Với Service discovery mới, ưu tiên dùng DNS như `api.production.svc.cluster.local` thay vì đọc env.
+
+### 6.1 Điều kiện xuất hiện
+
+Các biến này là snapshot tại lúc container start. Service phải tồn tại và kubelet phải nhìn thấy Service đó trước khi container được tạo. Nếu bạn tạo Service sau khi Pod đã chạy, environment trong container cũ không tự cập nhật.
+
+```text
+Service tồn tại trước → Pod/container start → env có biến Service
+Pod/container start trước → Service tạo sau → env của container cũ không đổi
+```
+
+Cơ chế này cũng có race nhỏ khi kubelet thấy Pod trước khi cache Service đồng bộ. Vì vậy Kubernetes documentation khuyến nghị dùng DNS nếu bạn không muốn phụ thuộc thứ tự tạo resource.
+
+Biến bạn khai báo trong `env` hoặc import từ `envFrom` có thể ghi đè biến Service cùng tên. Kubernetes cũng cho phép `env.value` tham chiếu biến Service bằng cú pháp `$(VAR_NAME)` nếu biến Service đó có mặt tại lúc container start, nhưng cách này càng làm Pod phụ thuộc vào thứ tự tạo Service.
+
+### 6.2 Quy tắc đặt tên biến
+
+Kubelet lấy tên Service và port name, chuyển thành uppercase và đổi dấu `-` thành `_`. Với Service `redis-primary`, prefix sẽ là `REDIS_PRIMARY`.
+
+Nhóm biến chính:
+
+| Biến | Ý nghĩa |
+|---|---|
+| `<SERVICE>_SERVICE_HOST` | ClusterIP của Service |
+| `<SERVICE>_SERVICE_PORT` | `spec.ports[0].port`, tức port đầu tiên của Service |
+| `<SERVICE>_SERVICE_PORT_<PORT_NAME>` | Port có `name` tương ứng, chỉ có khi Service port được đặt tên |
+| `<SERVICE>_PORT` | URL kiểu legacy link cho port đầu tiên, ví dụ `tcp://10.0.0.11:6379` |
+| `<SERVICE>_PORT_<PORT>_<PROTO>` | URL legacy link cho từng port/protocol |
+| `<SERVICE>_PORT_<PORT>_<PROTO>_PROTO` | Protocol viết thường, ví dụ `tcp` |
+| `<SERVICE>_PORT_<PORT>_<PROTO>_PORT` | Port number |
+| `<SERVICE>_PORT_<PORT>_<PROTO>_ADDR` | ClusterIP |
+
+`<PORT_NAME>` ở đây là **tên port nằm sau prefix Service**, không đứng đầu biến. Vì vậy nếu Service `backend-api` có port tên `http`, biến là `BACKEND_API_SERVICE_PORT_HTTP`, không phải `HTTP_SERVICE_PORT`.
+
+### 6.3 Ví dụ một Service một port
+
+Service:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-primary
+  namespace: app
+spec:
+  selector:
+    app: redis
+  ports:
+    - name: redis
+      protocol: TCP
+      port: 6379
+      targetPort: 6379
+```
+
+Container được tạo sau Service này có thể thấy:
+
+```bash
+REDIS_PRIMARY_SERVICE_HOST=10.0.0.11
+REDIS_PRIMARY_SERVICE_PORT=6379
+REDIS_PRIMARY_SERVICE_PORT_REDIS=6379
+REDIS_PRIMARY_PORT=tcp://10.0.0.11:6379
+REDIS_PRIMARY_PORT_6379_TCP=tcp://10.0.0.11:6379
+REDIS_PRIMARY_PORT_6379_TCP_PROTO=tcp
+REDIS_PRIMARY_PORT_6379_TCP_PORT=6379
+REDIS_PRIMARY_PORT_6379_TCP_ADDR=10.0.0.11
+```
+
+Giá trị IP là ClusterIP thực tế được cấp trong cluster; output trên là minh họa.
+
+### 6.4 Ví dụ nhiều port
+
+Với Service nhiều port, biến `<SERVICE>_SERVICE_PORT` vẫn trỏ đến **port đầu tiên** trong danh sách `spec.ports`. Các port có `name` sẽ có biến riêng theo tên:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-api
+spec:
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      protocol: TCP
+```
+
+Các biến đáng chú ý:
+
+```bash
+BACKEND_API_SERVICE_PORT=8080
+BACKEND_API_SERVICE_PORT_HTTP=8080
+BACKEND_API_SERVICE_PORT_METRICS=9090
+BACKEND_API_PORT_8080_TCP_PORT=8080
+BACKEND_API_PORT_9090_TCP_PORT=9090
+```
+
+Nếu application phụ thuộc một port cụ thể, không nên đọc `<SERVICE>_SERVICE_PORT` khi Service có nhiều port; dùng DNS kèm port cấu hình rõ ràng hoặc khai báo biến config riêng như `BACKEND_URL`.
+
+### 6.5 Biến `KUBERNETES_*`
+
+Ngay cả trong Namespace không có Service do bạn tạo, Pod thường có các biến cho Service mặc định `kubernetes`:
+
+```bash
+KUBERNETES_SERVICE_HOST=10.96.0.1
+KUBERNETES_SERVICE_PORT=443
+KUBERNETES_SERVICE_PORT_HTTPS=443
+KUBERNETES_PORT=tcp://10.96.0.1:443
+KUBERNETES_PORT_443_TCP=tcp://10.96.0.1:443
+KUBERNETES_PORT_443_TCP_PROTO=tcp
+KUBERNETES_PORT_443_TCP_PORT=443
+KUBERNETES_PORT_443_TCP_ADDR=10.96.0.1
+```
+
+Nhóm này giúp thư viện Kubernetes client cấu hình in-cluster client, nhưng application business thường không cần đọc trực tiếp.
+
+### 6.6 Tắt Service links
+
+Nếu Namespace có nhiều Service, danh sách env tự động có thể rất lớn, gây nhiễu diagnostics và đôi khi vượt giới hạn kích thước environment của process. Bạn có thể tắt Service links cho Pod:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: app
+spec:
+  enableServiceLinks: false
+  containers:
+    - name: app
+      image: example.com/app:1.0
+```
+
+`enableServiceLinks: false` tắt biến cho các Service thông thường trong cùng Namespace. Service `kubernetes` của control plane vẫn thường được inject để hỗ trợ in-cluster API access.
+
+### 6.7 Kiểm tra thực tế
+
+Trong lab, bạn có thể kiểm tra bằng `printenv`:
+
+```bash
+kubectl exec POD_NAME -n NAMESPACE -- printenv | sort | grep -E 'SERVICE_HOST|SERVICE_PORT|_PORT_[0-9]+_TCP'
+```
+
+Không chạy lệnh dump toàn bộ environment trên production nếu container có Secret trong env. Khi cần debug, lọc prefix cụ thể:
+
+```bash
+kubectl exec POD_NAME -n NAMESPACE -- printenv | grep '^BACKEND_API_'
+```
+
+## 7. Env có cập nhật khi Pod đang chạy không
 
 Giả sử Pod dùng:
 
@@ -282,7 +444,7 @@ kubectl rollout status deployment/api -n production --timeout=5m
 
 Restart container trong cùng Pod cũng đọc lại environment, nhưng không nên dựa vào crash như cơ chế reload config.
 
-## 7. Environment variable hay file?
+## 8. Environment variable hay file?
 
 | Nhu cầu | Environment | Mounted file |
 |---|---|---|
@@ -298,7 +460,7 @@ File projection không đồng nghĩa application tự reload. Application phả
 > [!WARNING]
 > Không dùng environment cho secret nếu runtime, crash dump, debug endpoint hoặc thư viện có thể log toàn bộ environment. Mounted file với permission chặt hoặc external secret provider thường giảm exposure, dù không loại bỏ hoàn toàn rủi ro.
 
-## 8. Thiết kế configuration contract
+## 9. Thiết kế quy ước cấu hình rõ ràng
 
 Một contract tốt cần định nghĩa:
 
@@ -321,7 +483,7 @@ configuration error: HTTP_PORT must be an integer between 1 and 65535
 
 Không nên âm thầm fallback khi một biến bắt buộc bị sai; Pod có thể trông `Running` nhưng phục vụ sai endpoint.
 
-### 8.1 Phân nhóm nguồn
+### 9.1 Phân nhóm nguồn
 
 ```text
 ConfigMap app-runtime
@@ -340,7 +502,7 @@ Downward API
 
 Không đặt dữ liệu nhạy cảm vào ConfigMap. Không đặt mọi config của nhiều ứng dụng vào một object khổng lồ.
 
-## 9. Manifest hoàn chỉnh
+## 10. Manifest hoàn chỉnh
 
 ```yaml
 apiVersion: apps/v1
@@ -394,7 +556,7 @@ spec:
 
 Giá trị trực tiếp cuối cùng có thể dùng để override có chủ đích; tuy nhiên nên tránh định nghĩa cùng tên ở nhiều nguồn.
 
-## 10. Thực hành
+## 11. Thực hành
 
 ```bash
 kubectl create namespace env-lab
@@ -458,9 +620,9 @@ kubectl delete namespace env-lab
 rm -f env-demo.yaml
 ```
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
-### 11.1 Pod kẹt `CreateContainerConfigError`
+### 12.1 Pod kẹt `CreateContainerConfigError`
 
 ```bash
 kubectl describe pod POD_NAME -n NAMESPACE
@@ -469,7 +631,7 @@ kubectl get events -n NAMESPACE --sort-by=.metadata.creationTimestamp
 
 Tìm ConfigMap/Secret không tồn tại hoặc thiếu key bắt buộc. Object phải ở cùng Namespace với Pod.
 
-### 11.2 Biến không xuất hiện khi dùng envFrom
+### 12.2 Biến không xuất hiện khi dùng envFrom
 
 Kiểm tra key có hợp lệ làm environment name không và có collision/prefix không:
 
@@ -480,19 +642,19 @@ kubectl exec POD_NAME -n NAMESPACE -- printenv
 
 Không in `printenv` trên production nếu environment chứa Secret.
 
-### 11.3 Đã sửa ConfigMap nhưng application vẫn dùng giá trị cũ
+### 12.3 Đã sửa ConfigMap nhưng application vẫn dùng giá trị cũ
 
 Đây là behavior đúng của environment. Xác nhận Pod creation time và rollout revision, sau đó restart có kiểm soát.
 
-### 11.4 Expansion còn nguyên `$(VAR)`
+### 12.4 Expansion còn nguyên `$(VAR)`
 
 Kiểm tra thứ tự trong `env`, spelling và nguồn. Với shell script, phân biệt Kubernetes `$(VAR)` với shell `$VAR`.
 
-### 11.5 Application crash vì kiểu dữ liệu
+### 12.5 Application crash vì kiểu dữ liệu
 
 Kubernetes chỉ truyền string; application phải parse và validate. Kiểm tra log startup nhưng không log credential.
 
-## 12. Best practices
+## 13. Best practices
 
 - Xem environment là public contract của image và document rõ kiểu/default/validation.
 - Chọn `env.valueFrom` cho dependency quan trọng; chỉ dùng `envFrom` khi toàn object cùng scope.
@@ -513,4 +675,6 @@ Tiếp tục với [ConfigMap](/cau-hinh/configmap/) để quản lý cấu hìn
 
 - [Define Environment Variables for a Container](https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/)
 - [Dependent Environment Variables](https://kubernetes.io/docs/tasks/inject-data-application/define-interdependent-environment-variables/)
+- [Container Environment](https://kubernetes.io/docs/concepts/containers/container-environment/)
+- [Service discovery bằng environment variables](https://kubernetes.io/docs/concepts/services-networking/service/#environment-variables)
 - [EnvVar API reference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#envvar-v1-core)

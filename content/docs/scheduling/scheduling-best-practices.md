@@ -92,7 +92,7 @@ Xem chi tiết tại [Resource Requests và Limits](/cau-hinh/resource-requests-
 
 ## 3. Xây taxonomy Node label và taint
 
-### 3.1 Label contract
+### 3.1 Quy ước label
 
 Phân loại label theo owner:
 
@@ -102,7 +102,7 @@ Phân loại label theo owner:
 
 Mỗi custom label cần schema, owner, source automation, drift alert và deprecation plan. Dùng prefix domain tổ chức, ví dụ `platform.example.com/pool`.
 
-### 3.2 Taint contract
+### 3.2 Quy ước taint
 
 Mỗi taint cần mô tả:
 

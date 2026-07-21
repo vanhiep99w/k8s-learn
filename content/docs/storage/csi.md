@@ -1,6 +1,6 @@
 ---
 title: "Container Storage Interface"
-description: "Kiến trúc CSI trong Kubernetes: controller/node plugin, sidecars, provisioning, attach, mount, API objects, capability, security và troubleshooting."
+description: "Kiến trúc CSI trong Kubernetes: controller/node plugin, sidecars, provisioning, attach, mount, API objects, tính năng driver, security và troubleshooting."
 ---
 
 # Container Storage Interface
@@ -13,7 +13,7 @@ description: "Kiến trúc CSI trong Kubernetes: controller/node plugin, sidecar
 - [3. Các sidecar phổ biến](#3-các-sidecar-phổ-biến)
 - [4. API objects liên quan](#4-api-objects-liên-quan)
 - [5. Luồng provision, attach và mount](#5-luồng-provision-attach-và-mount)
-- [6. Capability không đồng nhất giữa drivers](#6-capability-không-đồng-nhất-giữa-drivers)
+- [6. Mỗi CSI driver hỗ trợ tính năng khác nhau](#6-mỗi-csi-driver-hỗ-trợ-tính-năng-khác-nhau)
 - [7. Topology, capacity và attach limits](#7-topology-capacity-và-attach-limits)
 - [8. Credentials và security boundary](#8-credentials-và-security-boundary)
 - [9. Cài đặt và nâng cấp an toàn](#9-cài-đặt-và-nâng-cấp-an-toàn)
@@ -173,7 +173,7 @@ Operation cụ thể phụ thuộc capability:
 
 Một lỗi ở mỗi phase tạo Event khác nhau. Đọc operation name trong log/Event giúp xác định controller side hay node side.
 
-## 6. Capability không đồng nhất giữa drivers
+## 6. Mỗi CSI driver hỗ trợ tính năng khác nhau
 
 CSI chuẩn hóa RPC, không bắt mọi driver support mọi feature. Kiểm tra riêng:
 

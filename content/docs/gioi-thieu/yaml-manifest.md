@@ -45,7 +45,7 @@ spec:                     # Desired state là gì?
 
 ## 1. YAML cơ bản
 
-### 1.1 Mapping
+### 1.1 Mapping là cặp key-value
 
 Mapping là tập key-value:
 
@@ -55,7 +55,7 @@ replicas: 3
 enabled: true
 ```
 
-### 1.2 Nested mapping
+### 1.2 Nested mapping là object lồng nhau
 
 Indentation thể hiện cấu trúc lồng nhau:
 

@@ -8,7 +8,7 @@ description: "Hiểu Pod phase, conditions, container states, restart policy, pr
 ## Mục lục
 
 - [Tổng quan](#tổng-quan)
-- [1. Ba lớp trạng thái cần phân biệt](#1-ba-lớp-trạng-thái-cần-phân-biệt)
+- [1. Ba nhóm trạng thái cần phân biệt](#1-ba-nhóm-trạng-thái-cần-phân-biệt)
 - [2. Pod phase](#2-pod-phase)
 - [3. Pod conditions](#3-pod-conditions)
 - [4. Container states và restart](#4-container-states-và-restart)
@@ -38,9 +38,9 @@ Created → Scheduled → Initialized → ContainersStarted → Ready
 
 ---
 
-## 1. Ba lớp trạng thái cần phân biệt
+## 1. Ba nhóm trạng thái cần phân biệt
 
-| Lớp | Câu hỏi trả lời | Ví dụ |
+| Nhóm trạng thái | Câu hỏi trả lời | Ví dụ |
 |---|---|---|
 | Pod phase | Pod đang ở giai đoạn tổng quát nào? | `Pending`, `Running`, `Failed` |
 | Pod conditions | Những điều kiện nào đã đạt? | `PodScheduled`, `Ready` |
@@ -187,7 +187,7 @@ flowchart TD
     H -- Yes --> J[Running and Ready]
 ```
 
-Các application containers không có thứ tự startup mặc định. Nếu A phải đợi B, hãy dùng retry/backoff ở A, startup probe, init container hoặc native sidecar semantics phù hợp; đừng giả định thứ tự trong YAML là thứ tự chạy.
+Các application containers không có thứ tự startup mặc định. Nếu A phải đợi B, hãy dùng retry/backoff ở A, startup probe, init container hoặc cơ chế native sidecar phù hợp; đừng giả định thứ tự trong YAML là thứ tự chạy.
 
 ---
 

@@ -170,7 +170,7 @@ Các toán tử shell không hoạt động khi exec trực tiếp:
 command: ["echo hello && sleep 30"]
 ```
 
-### 3.2 Chỉ dùng shell khi cần semantics của shell
+### 3.2 Chỉ dùng shell khi cần tính năng của shell
 
 Pipeline, redirect, glob, vòng lặp hoặc nhiều command cần shell:
 
