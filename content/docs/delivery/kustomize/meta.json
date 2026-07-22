@@ -1,0 +1,13 @@
+{
+  "title": "Kustomize",
+  "pages": [
+    "concepts",
+    "project-structure",
+    "bases-and-overlays",
+    "patches",
+    "generators",
+    "commands",
+    "troubleshooting",
+    "best-practices"
+  ]
+}
