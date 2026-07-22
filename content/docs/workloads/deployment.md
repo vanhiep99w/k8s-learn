@@ -126,6 +126,38 @@ spec:
               memory: 128Mi
 ```
 
+### 2.1 Vì sao ví dụ có `app.kubernetes.io/*`?
+
+Các label như `app.kubernetes.io/name` và `app.kubernetes.io/part-of` là schema label khuyến nghị của Kubernetes. Chúng vẫn là label bình thường, nhưng có ý nghĩa đã được cộng đồng thống nhất nên dễ dùng với `kubectl`, dashboard, Helm, Argo CD, policy và monitoring tool.
+
+Trong manifest trên:
+
+```yaml
+metadata:
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: workloads-course
+```
+
+các label này mô tả chính object Deployment. Còn selector của Deployment đang dùng label ngắn `app: web` để giữ ví dụ lab đơn giản:
+
+```yaml
+selector:
+  matchLabels:
+    app: web
+```
+
+Trong môi trường thực tế, bạn có thể dùng identity label cụ thể hơn cho selector, ví dụ:
+
+```yaml
+selector:
+  matchLabels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/instance: web-prod
+```
+
+Khi dùng label nào trong `spec.selector.matchLabels`, label đó cũng phải có trong `spec.template.metadata.labels`, vì Deployment/ReplicaSet dùng selector để tìm Pods của nó. Không cần đưa mọi label vào selector; tránh dùng label thay đổi thường xuyên như `app.kubernetes.io/version` làm selector. Xem giải thích chi tiết ở [Schema labels khuyến nghị](/workloads/labels-annotations-selectors/#5-schema-labels-khuyến-nghị).
+
 Các invariant:
 
 - Selector khớp Pod template labels.

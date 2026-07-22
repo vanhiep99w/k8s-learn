@@ -205,6 +205,8 @@ selector:
     app.kubernetes.io/component: frontend
 ```
 
+Nhóm `app.kubernetes.io/*` là convention được Kubernetes khuyến nghị để mô tả app theo cùng một schema giữa nhiều workload và tool. Nó không bắt buộc, nhưng giúp selector, query và dashboard rõ nghĩa hơn so với một label quá chung như `app=web`. Xem thêm mục [Schema labels khuyến nghị](/workloads/labels-annotations-selectors/#5-schema-labels-khuyến-nghị) trong bài Labels, Annotations và Selectors.
+
 Các label trong `spec.selector.matchLabels` phải xuất hiện trong `spec.template.metadata.labels`; nếu không, ReplicaSet sẽ không tạo được Pod hợp lệ vì Pods mới không khớp chính selector của nó.
 
 ```yaml

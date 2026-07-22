@@ -194,18 +194,41 @@ Selector của Deployment không nên và thường không thể đổi sau khi 
 
 ## 5. Schema labels khuyến nghị
 
-Kubernetes khuyến nghị nhóm `app.kubernetes.io/*`:
+Kubernetes khuyến nghị nhóm `app.kubernetes.io/*` để các workload, Service, dashboard, Helm chart, GitOps tool và script vận hành cùng hiểu metadata theo một ngôn ngữ chung. Đây không phải cú pháp đặc biệt của Deployment; nó vẫn chỉ là label key/value bình thường. Điểm khác biệt là cộng đồng đã thống nhất ý nghĩa của từng key.
+
+Nếu mỗi team tự đặt label theo cách riêng, cùng một ý “tên ứng dụng” có thể thành `app`, `service`, `application`, `name` hoặc `component`. Khi đó query và automation dễ bị lệch. Nhóm `app.kubernetes.io/*` giảm vấn đề này bằng một schema ổn định hơn:
 
 | Label | Ý nghĩa | Ví dụ |
 |---|---|---|
-| `name` | Tên ứng dụng | `checkout` |
-| `instance` | Một instance cụ thể | `checkout-prod` |
-| `version` | Version ứng dụng | `2.4.1` |
-| `component` | Thành phần kiến trúc | `api` |
-| `part-of` | Hệ thống cấp cao | `commerce` |
-| `managed-by` | Tool quản lý | `argocd` |
+| `app.kubernetes.io/name` | Tên ứng dụng hoặc service logic | `checkout` |
+| `app.kubernetes.io/instance` | Một bản triển khai cụ thể của app | `checkout-prod` |
+| `app.kubernetes.io/version` | Version app đang chạy | `2.4.1` |
+| `app.kubernetes.io/component` | Thành phần trong kiến trúc | `api` |
+| `app.kubernetes.io/part-of` | Hệ thống/sản phẩm cấp cao hơn | `commerce` |
+| `app.kubernetes.io/managed-by` | Tool quản lý object | `argocd` |
 
-Không cần ép mọi label vào selector. Selector nên dùng các identity labels ổn định; version/track có thể dùng cho rollout hoặc traffic switching tùy strategy.
+Ví dụ đọc nhanh một object có labels sau:
+
+```yaml
+labels:
+  app.kubernetes.io/name: checkout
+  app.kubernetes.io/instance: checkout-prod
+  app.kubernetes.io/component: api
+  app.kubernetes.io/part-of: commerce
+  app.kubernetes.io/managed-by: argocd
+```
+
+Bạn có thể hiểu: đây là component `api` của ứng dụng `checkout`, instance production, thuộc hệ thống `commerce`, và đang được Argo CD quản lý.
+
+Các label này cũng giúp query rõ hơn:
+
+```bash
+kubectl get pods -l app.kubernetes.io/name=checkout
+kubectl get pods -l app.kubernetes.io/instance=checkout-prod
+kubectl get all -l app.kubernetes.io/part-of=commerce
+```
+
+Không cần ép mọi label vào selector của Deployment, ReplicaSet hoặc Service. Selector nên dùng các identity labels ổn định như `app.kubernetes.io/name` và `app.kubernetes.io/instance`. Tránh đưa label thay đổi thường xuyên như `app.kubernetes.io/version` vào selector của Deployment, vì đổi selector sau khi tạo workload là thao tác nhạy cảm và thường không nên làm.
 
 Ví dụ tách identity và operations:
 
@@ -213,10 +236,13 @@ Ví dụ tách identity và operations:
 labels:
   app.kubernetes.io/name: checkout
   app.kubernetes.io/instance: checkout-prod
+  app.kubernetes.io/version: "2.4.1"
   environment: production
   team: payments
   track: stable
 ```
+
+Trong ví dụ này, `name` và `instance` phù hợp để nhận diện workload ổn định; `version`, `environment`, `team`, `track` hữu ích cho quan sát, lọc hoặc rollout strategy tùy hệ thống, nhưng không nhất thiết phải nằm trong selector.
 
 ---
 
