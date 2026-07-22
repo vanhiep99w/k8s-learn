@@ -117,28 +117,138 @@ kubectl apply --dry-run=server -f replicaset.yaml
 
 ## 3. Ownership, selector và Pod adoption
 
-Pod do ReplicaSet tạo có `ownerReferences` trỏ về ReplicaSet:
+Phần này dễ nhầm vì ReplicaSet dùng **label selector** để tìm Pods, nhưng dùng **ownerReferences** để biểu diễn quan hệ sở hữu. Có thể nhớ ngắn gọn như sau:
+
+| Thành phần | Trả lời câu hỏi | Vai trò |
+|---|---|---|
+| `spec.selector` | “Pod nào có label phù hợp?” | Bộ lọc để ReplicaSet đếm và tìm Pods trong cùng Namespace |
+| `metadata.ownerReferences` trên Pod | “Pod này thuộc controller nào?” | Quan hệ lifecycle để controller và garbage collector biết ai quản lý Pod |
+| Pod adoption | “Pod có sẵn này có thể được ReplicaSet nhận quản lý không?” | Cơ chế nhận Pod khớp selector khi Pod chưa có controller owner khác |
+
+Pod do ReplicaSet tạo sẽ có `ownerReferences` trỏ về ReplicaSet:
 
 ```bash
 kubectl get pod <pod> -n workloads-lab \
   -o jsonpath='{.metadata.ownerReferences[0].kind}{"/"}{.metadata.ownerReferences[0].name}{"\n"}'
 ```
 
-### 3.1 Selector không đồng nghĩa ownership
+Kết quả dạng sau nghĩa là Pod đang thuộc ReplicaSet `web`:
 
-Selector tìm candidates; ownerReference mô tả ownership/lifecycle. ReplicaSet có thể **adopt** Pod trần khớp selector nếu Pod chưa có controller owner phù hợp.
+```text
+ReplicaSet/web
+```
 
-Tình huống nguy hiểm:
+### 3.1 Selector là bộ lọc, không phải bằng chứng ownership
 
-1. Có Pod trần `app=web`.
-2. Tạo ReplicaSet selector `app=web`, replicas=3.
-3. ReplicaSet tính Pod trần là một replica và có thể adopt nó.
+Giả sử ReplicaSet có selector:
 
-Vì vậy selector phải cụ thể, không overlap với workload khác.
+```yaml
+selector:
+  matchLabels:
+    app: web
+    track: stable
+```
 
-### 3.2 Sửa label có thể tạo replacement
+ReplicaSet sẽ tìm các Pod có đủ hai label `app=web` và `track=stable`. Một Pod khớp selector chưa chắc ban đầu do ReplicaSet tạo; nó chỉ là một candidate mà controller nhìn thấy.
 
-Nếu xóa label match khỏi một Pod do ReplicaSet quản lý, Pod không còn được đếm. Controller tạo Pod mới để đủ desired. Pod cũ có thể vẫn tồn tại nhưng tách khỏi tập selection, gây dư workload ngoài ý muốn.
+Ví dụ, Pod thủ công sau khớp selector nhưng không có controller owner:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: manual-web
+  namespace: workloads-lab
+  labels:
+    app: web
+    track: stable
+spec:
+  containers:
+    - name: nginx
+      image: nginx:latest
+```
+
+Nếu sau đó tạo ReplicaSet `web` với `replicas: 3` và selector `app=web,track=stable`, ReplicaSet có thể **adopt** Pod `manual-web`. Khi đó controller tính Pod này là một replica đã có và chỉ cần tạo thêm hai Pod nữa.
+
+```text
+Trước khi tạo ReplicaSet:
+manual-web      labels app=web,track=stable      owner=<none>
+
+Sau khi ReplicaSet reconcile:
+manual-web      labels app=web,track=stable      owner=ReplicaSet/web
+web-xxxxx       labels app=web,track=stable      owner=ReplicaSet/web
+web-yyyyy       labels app=web,track=stable      owner=ReplicaSet/web
+```
+
+Điểm quan trọng: adoption không bảo đảm Pod được nhận nuôi giống `spec.template` của ReplicaSet. Pod `manual-web` ở ví dụ trên dùng `nginx:latest`, trong khi template ReplicaSet có thể dùng `nginx:1.27-alpine`. ReplicaSet vẫn có thể đếm Pod đó nếu label khớp và Pod chưa thuộc controller khác.
+
+> [!WARNING]
+> Không dùng selector quá chung như chỉ `app: web` nếu trong Namespace có thể tồn tại nhiều workload web khác nhau. Selector overlap có thể làm ReplicaSet đếm nhầm hoặc adopt nhầm Pod.
+
+### 3.2 Thiết kế selector đủ cụ thể
+
+Selector nên đại diện cho identity ổn định của workload, không chỉ một label trang trí. Thay vì chỉ dùng:
+
+```yaml
+selector:
+  matchLabels:
+    app: web
+```
+
+nên dùng tập label ít có khả năng trùng với workload khác:
+
+```yaml
+selector:
+  matchLabels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/instance: web-prod
+    app.kubernetes.io/component: frontend
+```
+
+Các label trong `spec.selector.matchLabels` phải xuất hiện trong `spec.template.metadata.labels`; nếu không, ReplicaSet sẽ không tạo được Pod hợp lệ vì Pods mới không khớp chính selector của nó.
+
+```yaml
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: web
+      app.kubernetes.io/instance: web-prod
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: web
+        app.kubernetes.io/instance: web-prod
+        app.kubernetes.io/component: frontend
+```
+
+### 3.3 Sửa label có thể tạo replacement
+
+Nếu xóa một label nằm trong selector khỏi Pod đang do ReplicaSet quản lý, Pod đó không còn được ReplicaSet đếm. Controller sẽ tạo Pod mới để đạt lại `spec.replicas`.
+
+Ví dụ ban đầu ReplicaSet muốn 3 Pods và cả 3 đều khớp selector `app=web,track=stable`:
+
+```text
+web-abc   app=web,track=stable   owner=ReplicaSet/web
+web-def   app=web,track=stable   owner=ReplicaSet/web
+web-ghi   app=web,track=stable   owner=ReplicaSet/web
+```
+
+Nếu bạn xóa label `track` khỏi `web-abc`:
+
+```bash
+kubectl label pod web-abc track- -n workloads-lab
+```
+
+ReplicaSet chỉ còn thấy hai Pod khớp selector, nên nó tạo thêm một Pod mới:
+
+```text
+web-abc   app=web                không còn được selector đếm
+web-def   app=web,track=stable   được selector đếm
+web-ghi   app=web,track=stable   được selector đếm
+web-new   app=web,track=stable   Pod replacement mới
+```
+
+Tổng số Pod chạy có thể thành 4, nhưng ReplicaSet chỉ xem 3 Pod còn khớp selector là tập mong muốn. Vì vậy không sửa label identity của Pod thủ công trong production; hãy sửa manifest của controller hoặc rollout workload mới nếu cần đổi selector.
 
 ---
 
@@ -165,53 +275,183 @@ Khi Pod template thay đổi, Deployment tạo ReplicaSet mới và scale giữa
 | Rollback | Không | Có |
 | Khuyến nghị cho stateless app | Hiếm | Có |
 
-Không sửa ReplicaSet do Deployment quản lý trực tiếp. Deployment controller có thể ghi đè thay đổi hoặc tạo state khó hiểu.
+### 4.1 Vì sao không sửa ReplicaSet con trực tiếp?
+
+Khi ReplicaSet được tạo bởi Deployment, ReplicaSet đó là **object con**. Source of truth lúc này là Deployment, không phải ReplicaSet. Bạn có thể nhận ra quan hệ này bằng `ownerReferences` của ReplicaSet:
+
+```bash
+kubectl get replicaset <rs-name> -n workloads-lab \
+  -o jsonpath='{.metadata.ownerReferences[0].kind}{"/"}{.metadata.ownerReferences[0].name}{"\n"}'
+```
+
+Nếu kết quả là `Deployment/web`, hãy sửa Deployment thay vì sửa ReplicaSet.
+
+Lý do: Deployment controller liên tục reconcile danh sách ReplicaSets con dựa trên `spec` của Deployment. Nếu bạn sửa trực tiếp ReplicaSet con, thay đổi đó không trở thành desired state chính thức của ứng dụng.
+
+Ví dụ Deployment `web` khai báo `replicas: 3`, nhưng bạn scale ReplicaSet con lên 5:
+
+```bash
+kubectl scale replicaset/web-65f... --replicas=5 -n workloads-lab
+```
+
+Trong lần reconcile tiếp theo, Deployment controller vẫn nhìn Deployment và thấy desired state là 3 replicas. Nó có thể scale ReplicaSet con về lại số mà Deployment đang tính toán. Vì vậy bạn thấy lệnh vừa chạy có vẻ thành công, nhưng trạng thái sau đó lại “tự quay về”.
+
+Một ví dụ khác là sửa Pod template trên ReplicaSet con. ReplicaSet không có cơ chế rollout an toàn như Deployment, còn Deployment lại theo dõi revision dựa trên template trong Deployment. Kết quả có thể là revision history, rollout status và số Pod thực tế không khớp với điều bạn nghĩ.
+
+Quy tắc thực hành:
+
+- Muốn đổi image, env, resource, probe hoặc label template: sửa `Deployment.spec.template`.
+- Muốn scale app: sửa `Deployment.spec.replicas` hoặc dùng `kubectl scale deployment/web`.
+- Chỉ xem ReplicaSet con để debug rollout, revision và Pods; không xem nó là nơi cấu hình ứng dụng lâu dài.
 
 ---
 
 ## 5. Scale và self-healing
 
-Scale nhanh:
+ReplicaSet luôn so sánh hai con số:
+
+```text
+spec.replicas      = số Pod mong muốn
+matching Pods      = số Pod hiện đang khớp selector và còn active
+```
+
+Nếu `matching Pods` ít hơn `spec.replicas`, ReplicaSet tạo thêm Pod từ `spec.template`. Nếu nhiều hơn, ReplicaSet xóa bớt Pod. Vì vậy scale thực chất là đổi `spec.replicas`, sau đó để controller reconcile.
+
+### 5.1 Scale là đổi số mong muốn
+
+Lệnh sau không “tạo ngay 5 Pod” theo kiểu imperative. Nó cập nhật field `spec.replicas` của ReplicaSet `web` thành `5`:
 
 ```bash
 kubectl scale replicaset/web --replicas=5 -n workloads-lab
 ```
 
-Nhưng nếu manifest/Git vẫn ghi `replicas: 3`, lần reconcile từ delivery tool có thể đưa về 3. Source of truth phải được cập nhật.
+Sau đó ReplicaSet controller thấy desired state mới:
 
-Self-healing:
+```text
+Trước khi scale:
+spec.replicas = 3
+matching Pods = 3
+
+Sau khi chạy kubectl scale --replicas=5:
+spec.replicas = 5
+matching Pods = 3
+ReplicaSet tạo thêm 2 Pod
+```
+
+Kiểm tra trạng thái bằng:
+
+```bash
+kubectl get replicaset web -n workloads-lab
+kubectl get pods -n workloads-lab -l app=web,track=stable
+```
+
+Điểm dễ nhầm là lệnh `kubectl scale` chỉ sửa live object trên cluster. Nếu file manifest hoặc GitOps tool vẫn khai báo `replicas: 3`, lần apply/reconcile tiếp theo có thể đưa ReplicaSet về lại 3.
+
+```text
+Cluster hiện tại:  replicas=5   # do kubectl scale
+Git/manifest:      replicas=3   # source of truth cũ
+Lần apply sau:     replicas quay về 3
+```
+
+Vì vậy trong môi trường dùng manifest/GitOps, hãy cập nhật source of truth thay vì chỉ scale thủ công. Scale thủ công phù hợp cho lab, xử lý tạm thời hoặc khi bạn biết rõ tool nào đang sở hữu field `spec.replicas`.
+
+### 5.2 Self-healing là tạo Pod thay thế
+
+Self-healing của ReplicaSet nghĩa là: khi một Pod thuộc tập quản lý bị xóa hoặc không còn active, ReplicaSet tạo Pod khác để đủ số lượng mong muốn.
+
+Ví dụ lấy một Pod đang khớp selector rồi xóa nó:
 
 ```bash
 POD="$(kubectl get pod -n workloads-lab -l app=web,track=stable -o jsonpath='{.items[0].metadata.name}')"
 kubectl delete pod "$POD" -n workloads-lab
-kubectl get pods -n workloads-lab -l app=web --watch
+kubectl get pods -n workloads-lab -l app=web,track=stable --watch
 ```
 
-Pod mới có name và UID khác.
+Bạn sẽ thấy Pod cũ chuyển sang `Terminating`, sau đó Pod mới xuất hiện với tên khác:
+
+```text
+web-abc     Terminating
+web-new     Pending
+web-new     Running
+```
+
+Pod mới có name và UID khác vì ReplicaSet không “sửa” Pod cũ. Nó tạo một Pod mới từ `spec.template`.
+
+Self-healing này có giới hạn quan trọng:
+
+- Nếu container trong Pod crash, kubelet thường restart container trong chính Pod đó theo `restartPolicy`; ReplicaSet không trực tiếp restart container.
+- Nếu Pod mới bị `Pending` do thiếu CPU/memory hoặc lỗi scheduling, ReplicaSet đã tạo Pod nhưng ứng dụng vẫn chưa available.
+- ReplicaSet chủ yếu duy trì **số Pod**, không bảo đảm Pod đã Ready để nhận traffic. Readiness và availability cần được kiểm tra riêng.
 
 ---
 
 ## 6. Xóa và orphan Pods
 
-Xóa mặc định dùng background cascading deletion; dependent Pods được garbage collector xóa:
+Khi xóa ReplicaSet, cần phân biệt hai lựa chọn: xóa luôn Pods con, hoặc giữ Pods lại và bỏ quan hệ ownership.
+
+### 6.1 Xóa mặc định: ReplicaSet và Pods con đều bị dọn
+
+Pod do ReplicaSet tạo có `ownerReferences` trỏ về ReplicaSet. Khi bạn xóa ReplicaSet theo cách thông thường, Kubernetes garbage collector dùng quan hệ này để xóa các dependent Pods.
 
 ```bash
 kubectl delete replicaset web -n workloads-lab
 ```
 
-Có thể orphan Pods:
+Có thể hình dung như sau:
+
+```text
+Trước khi xóa:
+ReplicaSet/web
+└── Pods owner=ReplicaSet/web
+
+Sau khi xóa mặc định:
+ReplicaSet/web bị xóa
+Pods con cũng bị garbage collector xóa
+```
+
+`kubectl delete` có thể trả về trước khi mọi Pod biến mất hoàn toàn, vì Pod còn trải qua giai đoạn graceful termination. Kiểm tra bằng:
+
+```bash
+kubectl get pods -n workloads-lab -l app=web,track=stable --watch
+```
+
+Cách này phù hợp khi bạn muốn dọn workload do ReplicaSet quản lý.
+
+### 6.2 Orphan deletion: xóa ReplicaSet nhưng giữ Pods lại
+
+`--cascade=orphan` nói với Kubernetes: “xóa ReplicaSet, nhưng đừng xóa các dependent Pods”. Kubernetes sẽ bỏ quan hệ owner khỏi Pods, còn Pods vẫn tiếp tục chạy.
 
 ```bash
 kubectl delete replicaset web -n workloads-lab --cascade=orphan
 ```
 
-Pods tiếp tục chạy nhưng không còn controller duy trì. Đây là thao tác nâng cao, dễ tạo workload “mồ côi”; chỉ dùng khi có kế hoạch adoption/migration rõ.
+Sau thao tác này, trạng thái sẽ giống như:
 
-Xem ownership trước và sau:
+```text
+Trước khi orphan:
+ReplicaSet/web
+└── web-abc   owner=ReplicaSet/web
+└── web-def   owner=ReplicaSet/web
+└── web-ghi   owner=ReplicaSet/web
+
+Sau khi orphan:
+ReplicaSet/web không còn
+web-abc   owner=<none>   vẫn chạy
+web-def   owner=<none>   vẫn chạy
+web-ghi   owner=<none>   vẫn chạy
+```
+
+Kiểm tra owner của Pods:
 
 ```bash
-kubectl get pods -n workloads-lab -o yaml
+kubectl get pods -n workloads-lab -l app=web,track=stable \
+  -o custom-columns='NAME:.metadata.name,OWNER_KIND:.metadata.ownerReferences[0].kind,OWNER_NAME:.metadata.ownerReferences[0].name'
 ```
+
+Orphan Pods không còn controller duy trì. Nếu một Pod orphan bị xóa hoặc chết hẳn, ReplicaSet cũ không còn tồn tại để tạo Pod thay thế. Nếu sau đó bạn tạo ReplicaSet mới có selector khớp các Pods orphan, ReplicaSet mới có thể adopt chúng.
+
+> [!WARNING]
+> Orphan deletion là thao tác nâng cao. Dùng sai có thể để lại workload vẫn chạy nhưng không còn controller, dễ gây nhầm khi troubleshooting hoặc migration. Chỉ dùng khi bạn có kế hoạch rõ ràng: ai sẽ quản lý Pods sau đó, khi nào dọn Pods, và rollback ra sao nếu adoption/migration không đúng.
 
 ---
 
