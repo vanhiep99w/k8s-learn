@@ -217,7 +217,7 @@ Dùng `envFrom` tốt cho một bộ config được quản lý như một contr
 
 ### 5.1 Precedence
 
-Mental model thực dụng:
+Thứ tự ưu tiên cần nhớ:
 
 1. `env` khai báo trực tiếp trong Pod có precedence cao nhất cho cùng tên.
 2. Khi nhiều nguồn `envFrom` định nghĩa cùng tên, nguồn xuất hiện sau có thể thắng.

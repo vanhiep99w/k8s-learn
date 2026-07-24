@@ -29,44 +29,77 @@ description: "Hiểu StatefulSet dùng để làm gì, khi nào chọn thay cho 
 
 ## StatefulSet giải quyết vấn đề gì?
 
-Hãy bắt đầu bằng hai ứng dụng cùng có ba replica.
+Hãy xem một website bán hàng có API và database.
 
-Ứng dụng thứ nhất là một web API. Mọi replica chạy cùng code, không lưu dữ liệu quan trọng trên disk local và dùng một database bên ngoài:
+### API web dùng Deployment
 
-```text
-api Pod A ─┐
-api Pod B ─┼─ mọi Pod đều xử lý được request như nhau
-api Pod C ─┘
-```
-
-Nếu Pod A chết, Kubernetes có thể tạo một Pod tên khác trên Node khác. Không ai quan tâm Pod mới có phải “A” hay không, vì các replica **có thể thay thế lẫn nhau**. Đây là trường hợp phù hợp với `Deployment`.
-
-Ứng dụng thứ hai là một database cluster:
+API có ba Pod:
 
 ```text
-db-0 → member ID 0 → disk chứa dữ liệu của member 0
-db-1 → member ID 1 → disk chứa dữ liệu của member 1
-db-2 → member ID 2 → disk chứa dữ liệu của member 2
+api-abc ─┐
+api-def ─┼─ cùng chạy code và xử lý request như nhau
+api-ghi ─┘
 ```
 
-Mỗi replica có danh tính và dữ liệu riêng. Nếu `db-1` chết, Pod thay thế phải tiếp tục là `db-1`, tìm lại đúng disk của `db-1` và có địa chỉ mạng mà các thành viên khác dự đoán được. Không thể lấy ngẫu nhiên disk của `db-0` gắn cho nó.
+Nếu `api-abc` chết, Kubernetes tạo một Pod API mới với tên khác. API mới vẫn làm việc bình thường vì dữ liệu đơn hàng không nằm trên disk local của Pod; nó nằm trong database. Các API Pod **có thể thay thế lẫn nhau**, nên `Deployment` phù hợp.
 
-**StatefulSet dùng để quản lý nhóm Pod không hoàn toàn thay thế lẫn nhau.** Nó gắn cho từng replica một ordinal ổn định như `0`, `1`, `2`, rồi dùng ordinal đó để giữ mối quan hệ giữa:
+### Database dùng StatefulSet
+
+Database có ba member:
 
 ```text
-Pod identity ↔ network identity ↔ storage identity
+mysql-0 → primary  → data-mysql-0
+mysql-1 → replica  → data-mysql-1
+mysql-2 → replica  → data-mysql-2
 ```
 
-Ví dụ:
+Ở đây, `mysql-0`, `mysql-1` và `mysql-2` không chỉ là ba process giống hệt nhau. Mỗi member có:
+
+- Identity riêng trong database cluster.
+- Vai trò riêng, chẳng hạn primary hoặc replica.
+- Data directory riêng.
+- Có thể cần hostname ổn định để các member gọi nhau.
+
+Khi khách hàng đặt đơn, API gửi lệnh ghi tới `mysql-0`:
 
 ```text
-Pod db-1
-├── tên ổn định: db-1
-├── DNS ổn định: db-1.db-headless.production.svc.cluster.local
-└── PVC ổn định: data-db-1
+1. mysql-0 ghi order vào data-mysql-0.
+2. mysql-0 gửi replication log cho mysql-1 và mysql-2.
+3. mysql-1 ghi bản sao vào data-mysql-1.
+4. mysql-2 ghi bản sao vào data-mysql-2.
 ```
 
-Khi Pod `db-1` được tạo lại, UID, IP, container và Node có thể thay đổi. Điều được giữ là **logical identity** `db-1` và mối liên hệ với PVC `data-db-1`.
+Ba member có thể lưu các bản sao tương ứng của dữ liệu, nhưng mỗi member ghi vào **volume riêng**. Không cho ba process cùng mở một thư mục database:
+
+```text
+mysql-0 ─┐
+mysql-1 ─┼─ cùng ghi /var/lib/mysql  ← nguy hiểm
+mysql-2 ─┘
+```
+
+Cách đó có thể làm các process cùng sửa file data/index/WAL, lock hoặc ghi đè lẫn nhau. Filesystem không tự hiểu member nào là primary, transaction nào đã commit hay dữ liệu nào cần replicate. Replication phải do MySQL hoặc database Operator thực hiện.
+
+### Vì sao `mysql-1` phải nhận lại đúng volume của mình?
+
+Giả sử `mysql-1` bị lỗi. StatefulSet tạo lại một Pod cũng có tên `mysql-1` và gắn lại PVC `data-mysql-1`:
+
+```text
+mysql-1 cũ bị xóa
+→ tạo mysql-1 mới
+→ gắn data-mysql-1
+→ tiếp tục kiểm tra và bắt kịp replication
+```
+
+Pod mới có thể có UID, IP, Node và container khác. Nhưng nó không nên nhận nhầm `data-mysql-0`, vì đó là dữ liệu và identity của primary. Quan hệ cần giữ là:
+
+```text
+mysql-1
+├── tên ổn định: mysql-1
+├── DNS ổn định: mysql-1.mysql-headless.production.svc.cluster.local
+└── PVC ổn định: data-mysql-1
+```
+
+**StatefulSet dùng để quản lý những Pod mà các replica không hoàn toàn thay thế lẫn nhau.** Nó giữ ordinal, hostname logic và PVC tương ứng. Database hoặc Operator mới chịu trách nhiệm replication, primary election, failover và backup.
 
 > [!IMPORTANT]
 > “Stateful” không chỉ có nghĩa là application có ghi dữ liệu. Câu hỏi quan trọng hơn là: **mỗi replica có cần identity hoặc storage riêng được giữ lại khi Pod bị thay thế không?**
@@ -206,39 +239,58 @@ Thứ tự này hữu ích khi member sau phụ thuộc member trước để bo
 
 ## Ví dụ thực tế: một database cluster ba thành viên
 
-Hình dung một database có một primary và hai replica:
+Tiếp tục với website bán hàng ở phần trên. Ta tách đường ghi và đường đọc:
 
 ```mermaid
 flowchart TB
-    C[Client] --> WS[Service dành cho write]
-    C --> RS[Service dành cho read]
-    WS --> D0[db-0 primary]
-    RS --> D1[db-1 replica]
-    RS --> D2[db-2 replica]
-    D0 -->|replication| D1
-    D0 -->|replication| D2
-    D0 --- V0[PVC data-db-0]
-    D1 --- V1[PVC data-db-1]
-    D2 --- V2[PVC data-db-2]
+    U[Khách hàng] --> API[API bán hàng]
+    API -->|INSERT order| WS[Service mysql-write]
+    WS --> D0[mysql-0 primary]
+    D0 -->|replication log| D1[mysql-1 replica]
+    D0 -->|replication log| D2[mysql-2 replica]
+    API -->|SELECT product/order| RS[Service mysql-read]
+    RS --> D0
+    RS --> D1
+    RS --> D2
+    D0 --- V0[PVC data-mysql-0]
+    D1 --- V1[PVC data-mysql-1]
+    D2 --- V2[PVC data-mysql-2]
 ```
 
-StatefulSet giúp cung cấp các building block:
+Một request đặt hàng có thể đi như sau:
 
-- `db-0`, `db-1`, `db-2` có identity dự đoán được.
-- `db-1` có thể tìm `db-0` qua DNS ổn định.
-- Mỗi Pod có disk riêng.
-- `db-0` có thể được tạo và Ready trước khi `db-1` bắt đầu.
+```text
+POST /orders
+→ API gửi INSERT tới mysql-0
+→ mysql-0 ghi vào data-mysql-0
+→ mysql-0 gửi replication log
+→ mysql-1 ghi bản sao vào data-mysql-1
+→ mysql-2 ghi bản sao vào data-mysql-2
+```
+
+Một request đọc danh sách sản phẩm có thể đi qua `mysql-read` tới một member ready. Nhưng `mysql-read` không tự biết member nào là primary. Nếu chỉ primary được phép ghi, `mysql-write` phải trỏ tới primary qua label, DNS hoặc cơ chế failover của database Operator.
+
+Trong ví dụ này, StatefulSet cung cấp những building block sau:
+
+- `mysql-0`, `mysql-1`, `mysql-2` có identity dự đoán được.
+- Replica có thể tìm primary qua hostname ổn định, ví dụ `mysql-0.mysql-headless`.
+- Mỗi member có PVC riêng để không có nhiều process cùng ghi một data directory.
+- Khi `mysql-1` bị thay thế, Pod mới biết phải nhận lại `data-mysql-1`.
+- `OrderedReady` có thể tạo `mysql-0` trước, rồi mới tạo các replica sau đó.
 
 Nhưng StatefulSet **không tự làm** các việc sau:
 
 - Cài đặt database replication.
-- Chọn `db-0` làm primary.
-- Promote `db-1` khi primary chết.
+- Chọn `mysql-0` làm primary.
+- Promote `mysql-1` khi primary chết.
 - Biết member nào đã đồng bộ dữ liệu.
 - Route write tới primary mới.
 - Backup hoặc kiểm tra restore.
 
 Những việc đó phải do database, script vận hành hoặc Operator thực hiện. Trong production, database Operator thường phù hợp hơn manifest StatefulSet tự viết vì Operator hiểu protocol của database: bootstrap, member replacement, failover, backup và upgrade.
+
+> [!WARNING]
+> Ba PVC không tự tạo thành ba bản sao dữ liệu. StatefulSet chỉ giữ đúng identity và volume; database replication mới là phần đồng bộ dữ liệu và duy trì cluster.
 
 ### Những workload thường cần mô hình này
 

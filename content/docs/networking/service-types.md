@@ -66,9 +66,11 @@ Ví dụ cùng một backend `api` có `targetPort: 8080`:
 
 Điểm quan trọng là Service type thay đổi **điểm vào** mà client thấy, không thay đổi bản chất backend: Kubernetes vẫn cần danh sách endpoint ready để gửi traffic tới Pod phù hợp.
 
-Sơ đồ trên là mental model phổ biến, không phải đường đi bắt buộc ở mọi cluster. Một số cloud controller hoặc CNI có thể cấu hình load balancer target thẳng Pod IP, target Node nhưng bỏ qua NodePort, hoặc dùng eBPF thay vì rule kube-proxy truyền thống. Khi vận hành production, luôn kiểm tra tài liệu của provider và trạng thái Service thực tế.
+Sơ đồ trên minh họa một đường đi phổ biến, không phải đường đi bắt buộc ở mọi cluster. Một số cloud controller hoặc CNI có thể cấu hình load balancer target thẳng Pod IP, target Node nhưng bỏ qua NodePort, hoặc dùng eBPF thay vì rule kube-proxy truyền thống. Khi vận hành production, luôn kiểm tra tài liệu của provider và trạng thái Service thực tế.
 
 Ingress và Gateway API **không phải Service type**. Chúng là API routing L7/L4 thường đứng trước một hoặc nhiều Service backend.
+
+Để so sánh chi tiết `Service type: LoadBalancer` với Ingress về routing, chi phí và cách lựa chọn, xem [Service LoadBalancer và Ingress](/networking/service-loadbalancer-vs-ingress/).
 
 ## 2. ClusterIP
 

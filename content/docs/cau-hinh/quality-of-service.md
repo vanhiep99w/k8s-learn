@@ -146,7 +146,7 @@ Request resource khác như GPU mà không có CPU/memory vẫn có thể để 
 
 ## 5. QoS ảnh hưởng eviction như thế nào?
 
-Khi Node có memory/disk/PID pressure, kubelet cố reclaim và có thể evict Pods. Mental model đơn giản:
+Khi Node có memory/disk/PID pressure, kubelet cố reclaim và có thể evict Pods. Có thể hình dung thứ tự ưu tiên đơn giản như sau:
 
 ```text
 BestEffort → Burstable → Guaranteed

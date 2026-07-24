@@ -114,7 +114,7 @@ Một plugin có thể triển khai nhiều extension point. Ví dụ một feat
 
 ## 4. Plugin mặc định phối hợp ra sao
 
-Tên plugin và tập mặc định có thể thay đổi giữa các Kubernetes release, nhưng mental model ổn định:
+Tên plugin và tập mặc định có thể thay đổi giữa các Kubernetes release, nhưng vai trò tổng quát của chúng vẫn ổn định:
 
 - `NodeResourcesFit` kiểm tra resource requests so với Node allocatable và có thể chấm điểm theo chiến lược resource.
 - `NodeAffinity` xử lý `nodeSelector` và node affinity.

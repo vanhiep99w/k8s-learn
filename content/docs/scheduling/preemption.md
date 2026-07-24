@@ -58,7 +58,7 @@ Ví dụ incoming Pod request GPU nhưng không Node nào advertise GPU. Xóa CP
 
 ## 2. Luồng chọn candidate và victims
 
-Default preemption ở `PostFilter` có mental model sau:
+Default preemption ở `PostFilter` diễn ra theo luồng khái quát sau:
 
 1. Xem xét Node đã thất bại filter.
 2. Tạm loại các Pod priority thấp hơn trong mô phỏng.

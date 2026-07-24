@@ -134,7 +134,7 @@ Tên `kube-proxy` dễ tạo hình ảnh sau:
 Client → tiến trình kube-proxy → Pod
 ```
 
-Đây không phải mental model chính xác trên Linux hiện đại. Với các mode phổ biến:
+Cách hình dung này không chính xác trên Linux hiện đại. Với các mode phổ biến:
 
 ```text
                  control flow
@@ -161,7 +161,7 @@ Hệ quả quan trọng:
 - kube-proxy bị lỗi lâu sẽ làm rule trở nên cũ khi Pod/Service thay đổi, dù một số Service cũ vẫn tạm hoạt động.
 - Restart kube-proxy không sửa được selector, readiness, `targetPort` hoặc CNI route sai.
 
-Trên Windows, mode `kernelspace` dùng Windows networking APIs thay vì iptables/nftables, nhưng mental model vẫn tương tự: kube-proxy program data plane, kernel xử lý traffic.
+Trên Windows, mode `kernelspace` dùng Windows networking APIs thay vì iptables/nftables, nhưng cơ chế tổng quát vẫn tương tự: kube-proxy program data plane, kernel xử lý traffic.
 
 ## Control flow và traffic flow
 
@@ -386,7 +386,7 @@ spec:
   externalTrafficPolicy: Cluster
 ```
 
-Connection có thể được đưa tới ready endpoint trong toàn cluster. Đây là mental model mặc định.
+Connection có thể được đưa tới ready endpoint trong toàn cluster. Đây là hành vi mặc định cần ghi nhớ.
 
 ### `sessionAffinity: ClientIP`
 
@@ -1007,7 +1007,7 @@ Không chỉnh trực tiếp rule do kube-proxy sở hữu. Control loop sẽ gh
 
 ## Tóm tắt
 
-Giữ mental model sau:
+Ghi nhớ mối quan hệ sau:
 
 ```text
 Service

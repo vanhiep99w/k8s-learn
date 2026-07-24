@@ -11,7 +11,7 @@ Một ứng dụng thường dùng cùng `Deployment`, `Service` và policy ở 
 
 Kustomize giải quyết việc này bằng cách giữ resource đầu vào và các phép tùy biến trong source tree. Một build tạo ra một danh sách Kubernetes Resource Model (KRM) object cuối cùng để review hoặc gửi đến API Server.
 
-## Mental model
+## Cách Kustomize xử lý manifest
 
 Kustomize không phải template engine. Nó không thực hiện thay thế chuỗi `${ENV}` trên toàn bộ YAML. Thay vào đó, Kustomize đọc object có cấu trúc, nhận diện `kind`, `metadata.name`, field trong Pod template và các quan hệ resource, rồi áp dụng generator/transformer theo cấu hình.
 

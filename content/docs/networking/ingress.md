@@ -60,6 +60,8 @@ Ingress phù hợp với HTTP và HTTPS. Nó không phải API chung để expos
 
 Nếu chưa rõ `port`, `targetPort`, `ClusterIP` và endpoint, nên đọc [Service](/networking/service/), [các Service type](/networking/service-types/) và [EndpointSlice](/networking/endpoints-endpointslices/) trước.
 
+Nếu cần chọn giữa việc expose trực tiếp bằng `Service type: LoadBalancer` và dùng Ingress, đọc [Service LoadBalancer và Ingress](/networking/service-loadbalancer-vs-ingress/) trước.
+
 ## Hai mảnh ghép bắt buộc
 
 Từ “Ingress” thường được dùng cho hai thứ khác nhau. Phân biệt chúng là bước quan trọng nhất để hiểu trang này.
@@ -788,7 +790,7 @@ Tiếp tục với [Gateway API](/networking/gateway-api/) để học resource 
 
 ## Tóm tắt
 
-Giữ mental model sau khi đọc và debug Ingress:
+Ghi nhớ luồng sau khi đọc và debug Ingress:
 
 ```text
 Ingress resource chỉ mô tả rule

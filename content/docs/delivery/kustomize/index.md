@@ -15,7 +15,7 @@ Sau phần này, bạn có thể tổ chức một project Kustomize có base v�
 
 ## Lộ trình học
 
-1. [Kustomize là gì?](./concepts/) — mental model, pipeline render và phạm vi của công cụ.
+1. [Kustomize là gì?](./concepts/) — cơ chế xử lý, pipeline render và phạm vi của công cụ.
 2. [Cấu trúc project Kustomize](./project-structure/) — `kustomization.yaml`, resource và layout.
 3. [Base và Overlays](./bases-and-overlays/) — tái sử dụng manifest giữa các môi trường.
 4. [Patches trong Kustomize](./patches/) — thay đổi field có chủ đích.

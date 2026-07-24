@@ -105,7 +105,7 @@ containers:
 
 ## 2. Quy tắc kết hợp command và args
 
-Bảng sau là mental model cần nhớ:
+Bảng sau là quy tắc kết hợp cần nhớ:
 
 | Pod `command` | Pod `args` | Executable | Arguments |
 |---|---|---|---|

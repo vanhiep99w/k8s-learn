@@ -53,7 +53,7 @@ Static Pod không đi qua scheduler. Do đó Node Affinity, topology spread, Pri
 
 Kubelet có thể được cấu hình với static Pod path, thường qua `staticPodPath` trong kubelet configuration hoặc flag tương ứng. Kubelet định kỳ scan directory và phản ứng khi file được thêm, sửa hoặc xóa.
 
-Mental model:
+Luồng reconciliation có thể tóm tắt như sau:
 
 1. File xuất hiện trong manifest directory.
 2. Kubelet parse Pod spec.

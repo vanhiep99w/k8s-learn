@@ -72,7 +72,7 @@ flowchart LR
     V -->|Fail| F[Reject 403/422]
 ```
 
-Thứ tự plugin chi tiết là implementation/config của API server, nhưng mental model quan trọng:
+Thứ tự plugin chi tiết phụ thuộc implementation/config của API server, nhưng cần ghi nhớ ba điểm:
 
 1. Defaults có thể được inject trước khi quota tính usage.
 2. Min/max/ratio và quota có thể từ chối request.

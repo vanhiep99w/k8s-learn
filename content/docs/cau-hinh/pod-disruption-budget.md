@@ -67,7 +67,7 @@ PDB không thể ngăn:
 
 `kubectl delete pod`, xóa Deployment, scale replicas xuống, hoặc controller rollout không nhất thiết bị PDB chặn như Eviction API. PDB không phải authorization policy chống xóa.
 
-Bảng mental model:
+Bảng sau tóm tắt phạm vi bảo vệ của PDB:
 
 | Sự kiện | PDB thường bảo vệ? |
 |---|---:|

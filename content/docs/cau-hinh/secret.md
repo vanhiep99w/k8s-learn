@@ -60,7 +60,7 @@ Secret **không tự bảo vệ** khỏi:
 - Log, crash dump, shell history hoặc debug endpoint làm lộ giá trị.
 - Node/root access trong lúc Secret được dùng.
 
-Mental model:
+Điểm cần ghi nhớ:
 
 ```text
 Secret giảm phạm vi và chuẩn hóa delivery
