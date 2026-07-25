@@ -1,242 +1,226 @@
 ---
 title: "Pod"
-description: "Hiểu Pod là đơn vị chạy nhỏ nhất của Kubernetes, cách các container chia sẻ tài nguyên và cách tạo, quan sát, debug Pod."
+description: "Hiểu Kubernetes Pod từ nền tảng: Pod bọc container như thế nào, chia sẻ network và volume ra sao, được schedule lên Node thế nào và vì sao production cần controller quản lý Pod."
 ---
 
 # Pod
 
 ## Mục lục
 
-- [Tổng quan](#tổng-quan)
-- [1. Pod giải quyết vấn đề gì?](#1-pod-giải-quyết-vấn-đề-gì)
-- [2. Những gì các container trong Pod chia sẻ](#2-những-gì-các-container-trong-pod-chia-sẻ)
-- [3. Cấu trúc manifest](#3-cấu-trúc-manifest)
-- [4. Pod được tạo và chạy như thế nào?](#4-pod-được-tạo-và-chạy-như-thế-nào)
-- [5. Pod là tài nguyên dùng một lần](#5-pod-là-tài-nguyên-dùng-một-lần)
-- [6. Static Pod và mirror Pod](#6-static-pod-và-mirror-pod)
-- [7. Thực hành](#7-thực-hành)
-- [8. Troubleshooting](#8-troubleshooting)
-- [9. Best practices](#9-best-practices)
-- [10. Tổng kết](#10-tổng-kết)
+- [Pod là gì?](#pod-là-gì)
+- [Vì sao Kubernetes cần Pod thay vì chạy container trực tiếp?](#vì-sao-kubernetes-cần-pod-thay-vì-chạy-container-trực-tiếp)
+- [Pod nằm ở đâu trong Kubernetes?](#pod-nằm-ở-đâu-trong-kubernetes)
+- [Một Pod nên có bao nhiêu container?](#một-pod-nên-có-bao-nhiêu-container)
+- [Tạo Pod đầu tiên](#tạo-pod-đầu-tiên)
+- [Đọc manifest Pod](#đọc-manifest-pod)
+- [Pod được tạo và chạy như thế nào?](#pod-được-tạo-và-chạy-như-thế-nào)
+- [Các container trong Pod chia sẻ những gì?](#các-container-trong-pod-chia-sẻ-những-gì)
+- [Pod IP, containerPort và cách truy cập Pod](#pod-ip-containerport-và-cách-truy-cập-pod)
+- [Pod là tài nguyên tạm thời](#pod-là-tài-nguyên-tạm-thời)
+- [Container restart khác Pod replacement](#container-restart-khác-pod-replacement)
+- [Vì sao production không nên tạo Pod trần?](#vì-sao-production-không-nên-tạo-pod-trần)
+- [Pod template](#pod-template)
+- [Resource requests và limits](#resource-requests-và-limits)
+- [Cấu hình bảo mật cơ bản](#cấu-hình-bảo-mật-cơ-bản)
+- [Static Pod và mirror Pod](#static-pod-và-mirror-pod)
+- [Thực hành hoàn chỉnh](#thực-hành-hoàn-chỉnh)
+- [Troubleshooting](#troubleshooting)
+- [Best practices](#best-practices)
+- [Tóm tắt](#tóm-tắt)
 - [Tài liệu tham khảo](#tài-liệu-tham-khảo)
 
 ---
 
-## Tổng quan
+## Pod là gì?
 
-Pod là đơn vị triển khai nhỏ nhất mà Kubernetes có thể tạo và quản lý. Một Pod chứa một hoặc nhiều container cần chạy cùng nhau trên **cùng một Node**, chia sẻ network namespace và có thể chia sẻ storage.
+`Pod` là đơn vị triển khai nhỏ nhất mà Kubernetes có thể tạo và quản lý.
+
+Một Pod chứa:
+
+- một hoặc nhiều container;
+- cấu hình network dùng chung;
+- các volume mà container có thể mount;
+- thông tin resource, security, health check và cách chạy container.
+
+Ví dụ phổ biến nhất là một Pod có một container:
 
 ```text
-Node
-└── Pod web-7d9f...
-    ├── network namespace: 10.244.1.12
-    ├── volume: shared-data
-    ├── container: web
-    └── container: log-agent
+Pod web
+└── container nginx
 ```
 
-Kubernetes schedule **Pod**, không schedule từng container riêng lẻ. Nếu Pod có ba container thì cả ba cùng được đặt trên một Node; Kubernetes không thể chuyển riêng một container sang Node khác.
+Một Pod cũng có thể có nhiều container phối hợp chặt chẽ:
 
-> [!IMPORTANT]
-> Pod không phải máy ảo thu nhỏ. Pod là ranh giới phối hợp cho các process gắn bó chặt chẽ. Phần lớn ứng dụng nên bắt đầu với **một application container trong mỗi Pod**.
+```text
+Pod web
+├── container application
+├── container log-sidecar
+├── Pod IP dùng chung
+└── volume dùng chung
+```
 
----
+Tất cả container trong một Pod luôn được đặt trên **cùng một Node** và có cùng vòng đời cấp Pod. Kubernetes không thể đặt container `application` ở `node-a` nhưng đặt `log-sidecar` của cùng Pod ở `node-b`.
 
-## 1. Pod giải quyết vấn đề gì?
+Điểm quan trọng nhất cần nhớ:
 
-Container runtime có thể chạy container, nhưng Kubernetes cần một abstraction để:
+> **Kubernetes schedule và quản lý Pod, không schedule từng container riêng lẻ.**
 
-- Schedule workload lên Node.
-- Gắn network identity và volume.
-- Theo dõi health và trạng thái.
-- Khai báo restart behavior.
-- Gom các process phải cùng vòng đời.
-- Làm template cho Deployment, StatefulSet, DaemonSet hoặc Job.
+Pod không phải một máy ảo thu nhỏ. Nó là một “vỏ chạy” hay “logical host” dành cho một nhóm process cần ở gần nhau.
 
-Luồng quản lý phổ biến:
+## Vì sao Kubernetes cần Pod thay vì chạy container trực tiếp?
+
+Container runtime như containerd có thể tạo container. Tuy nhiên, Kubernetes cần một đơn vị chung để gắn nhiều thông tin vận hành vào workload:
+
+```text
+Pod
+├── Container image và command
+├── Network identity
+├── Volume
+├── Resource requests/limits
+├── Security context
+├── Health probes
+├── Scheduling constraints
+└── Restart policy
+```
+
+Nếu Kubernetes chỉ quản lý từng container riêng lẻ, việc phối hợp hai container cần dùng chung network và volume sẽ phức tạp hơn. Pod tạo ra một ranh giới rõ:
+
+- Scheduler đặt toàn bộ nhóm lên một Node.
+- kubelet trên Node chạy các container của nhóm.
+- Các container có thể giao tiếp qua `localhost`.
+- Các container có thể mount chung một volume.
+- Controller tạo, thay thế và scale theo đơn vị Pod.
+
+Có thể hiểu:
+
+```text
+Container = process được đóng gói
+Pod       = môi trường Kubernetes dùng để chạy container đó
+```
+
+Một container không tự trở thành Pod. Manifest Pod nói cho Kubernetes biết cần chạy container trong context nào.
+
+## Pod nằm ở đâu trong Kubernetes?
+
+Pod là điểm nối giữa workload controller và hạ tầng Node.
 
 ```mermaid
 flowchart LR
     D[Deployment] --> RS[ReplicaSet]
-    RS --> P1[Pod]
-    RS --> P2[Pod]
+    RS --> P1[Pod 1]
+    RS --> P2[Pod 2]
     P1 --> C1[Container]
     P2 --> C2[Container]
+    P1 --> N1[Node A]
+    P2 --> N2[Node B]
 ```
 
-Trong production, bạn hiếm khi tạo Pod trần. Controller tạo và thay thế Pod để duy trì desired state. Pod trần phù hợp với thử nghiệm ngắn hoặc troubleshooting.
+Đọc sơ đồ từ trái sang phải:
 
-### 1.1 Khi nào nhiều container nên ở cùng Pod?
+1. Deployment mô tả ứng dụng mong muốn.
+2. ReplicaSet duy trì số lượng Pod.
+3. Mỗi Pod bọc một hoặc nhiều container.
+4. Scheduler chọn Node cho từng Pod.
+5. kubelet trên Node chạy container.
 
-Chỉ đặt chung khi chúng:
+Các controller khác cũng tạo Pod:
 
-1. Phải chạy trên cùng Node.
-2. Phải chia sẻ `localhost` hoặc volume rất chặt.
-3. Có vòng đời phụ thuộc nhau.
-4. Được scale như một đơn vị.
-
-Nếu frontend cần 10 replicas nhưng log processor chỉ cần 2, chúng không nên ở cùng Pod. Tách thành hai workload cho phép scale, rollout và cấp tài nguyên độc lập.
-
----
-
-## 2. Những gì các container trong Pod chia sẻ
-
-### 2.1 Network
-
-Mỗi Pod thường có một IP. Các container trong Pod:
-
-- Dùng chung IP và port space.
-- Gọi nhau qua `localhost`.
-- Không thể cùng bind một port/protocol.
-- Ra ngoài cluster với network identity của Pod.
-
-Ví dụ application lắng nghe `localhost:8080`, proxy sidecar có thể gọi trực tiếp địa chỉ đó.
-
-### 2.2 Storage
-
-Filesystem của từng container vẫn riêng. Muốn chia sẻ file, cả hai container phải mount cùng một volume:
-
-```yaml
-volumes:
-  - name: shared
-    emptyDir: {}
-```
-
-`emptyDir` tồn tại trong suốt vòng đời Pod. Container restart không xóa dữ liệu trong volume, nhưng Pod bị xóa hoặc thay thế thì dữ liệu mất.
-
-### 2.3 Linux namespaces và cgroups
-
-Container thường có process namespace và filesystem riêng, trong khi Pod chia sẻ network namespace. Resource requests/limits được khai báo theo container và Scheduler dùng tổng requests của Pod để chọn Node.
-
----
-
-## 3. Cấu trúc manifest
-
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: web
-  namespace: workloads-lab
-  labels:
-    app.kubernetes.io/name: web
-spec:
-  containers:
-    - name: nginx
-      image: nginx:1.27-alpine
-      ports:
-        - name: http
-          containerPort: 80
-      resources:
-        requests:
-          cpu: 50m
-          memory: 32Mi
-        limits:
-          memory: 64Mi
-      readinessProbe:
-        httpGet:
-          path: /
-          port: http
-        periodSeconds: 5
-  restartPolicy: Always
-```
-
-| Field | Vai trò |
+| Controller | Pod được tạo để làm gì? |
 |---|---|
-| `metadata.name` | Tên object trong Namespace |
-| `metadata.labels` | Metadata có thể được selector sử dụng |
-| `spec.containers` | Danh sách application containers |
-| `image` | Container image cần chạy |
-| `ports` | Port mang tính mô tả; không tự expose ra ngoài |
-| `resources` | Requests phục vụ scheduling, limits giới hạn runtime |
-| `readinessProbe` | Cho biết container đã sẵn sàng phục vụ chưa |
-| `restartPolicy` | Chính sách restart container trong Pod |
+| Deployment | Chạy nhiều replica stateless và rollout phiên bản mới |
+| StatefulSet | Chạy Pod có identity và storage ổn định hơn |
+| DaemonSet | Chạy một Pod trên mỗi Node phù hợp |
+| Job | Chạy Pod đến khi task hoàn thành |
+| CronJob | Tạo Job theo lịch, sau đó Job tạo Pod |
 
-`containerPort` không tạo Service, firewall rule hay port mapping trên máy local. Muốn có endpoint ổn định, cần Service.
+Pod vẫn là đơn vị runtime cuối cùng dù bạn bắt đầu từ controller nào.
 
-### 3.1 Spec gần như immutable
+## Một Pod nên có bao nhiêu container?
 
-Nhiều field trong Pod không thể sửa sau khi tạo. Controller rollout bằng cách tạo Pod mới từ template mới, không biến đổi Pod cũ tại chỗ. Đây là lý do tên, UID và IP của Pod có thể thay đổi sau update.
-
----
-
-## 4. Pod được tạo và chạy như thế nào?
-
-```mermaid
-sequenceDiagram
-    participant U as kubectl
-    participant A as API Server
-    participant S as Scheduler
-    participant K as kubelet
-    participant R as Runtime
-    U->>A: Create Pod
-    S->>A: Bind Pod to Node
-    K->>A: Watch assigned Pod
-    K->>R: Pull image, create sandbox/container
-    K->>A: Update Pod status
-```
-
-1. API Server validate và lưu Pod.
-2. Scheduler chọn Node rồi ghi binding.
-3. kubelet trên Node quan sát Pod được giao.
-4. Runtime tạo Pod sandbox, network và containers.
-5. kubelet chạy probes, restart container khi cần và cập nhật status.
-
-Đọc thêm luồng control plane tại [Declarative Model và Reconciliation Loop](/kien-truc/declarative-reconciliation/).
-
----
-
-## 5. Pod là tài nguyên dùng một lần
-
-Pod có identity cố định gồm name và UID. Khi Pod chết, controller tạo **Pod mới**, không hồi sinh object cũ:
+Mô hình phổ biến nhất là **một application container trong mỗi Pod**:
 
 ```text
-web-abc (UID 111, IP 10.0.1.5) --x
-web-def (UID 222, IP 10.0.2.9) created
+Pod api-1 → container api
+Pod api-2 → container api
+Pod api-3 → container api
 ```
 
-Hệ quả:
+Muốn có ba bản sao, hãy tạo ba Pod thay vì đặt ba container giống nhau vào một Pod.
 
-- Không lưu state quan trọng chỉ trong writable layer của container.
-- Không cấu hình client phụ thuộc Pod IP.
-- Dùng Service để tìm backend.
-- Dùng PersistentVolume cho dữ liệu cần tồn tại qua replacement.
-- Dùng controller thay vì tạo Pod trần.
+```text
+Không nên dùng để scale:
+Pod
+├── api container 1
+├── api container 2
+└── api container 3
 
-### 5.1 Restart container khác replacement Pod
+Nên dùng:
+Deployment replicas=3
+├── Pod 1 → api container
+├── Pod 2 → api container
+└── Pod 3 → api container
+```
 
-| Tình huống | Pod UID | Pod IP | Container ID |
-|---|---|---|---|
-| Container crash và kubelet restart | Giữ nguyên | Thường giữ nguyên | Thay đổi |
-| Deployment tạo Pod thay thế | Thay đổi | Có thể thay đổi | Thay đổi |
-| Pod được reschedule sang Node khác | Tạo Pod mới | Thay đổi | Thay đổi |
+### Khi nào nhiều container nên ở cùng Pod?
 
-Kubernetes không di chuyển một Pod đang tồn tại giữa các Node.
+Chỉ đặt chung khi chúng thực sự tạo thành một đơn vị:
 
----
+1. Phải chạy trên cùng Node.
+2. Phải giao tiếp qua `localhost` hoặc volume dùng chung.
+3. Có vòng đời gắn bó chặt chẽ.
+4. Cần scale và rollout cùng nhau.
+5. Không có giá trị khi chạy tách rời.
 
-## 6. Static Pod và mirror Pod
+Ví dụ hợp lý:
 
-Static Pod được kubelet quản lý trực tiếp từ manifest trên Node, không do API Server tạo. kubelet tạo mirror Pod trên API để người vận hành có thể quan sát, nhưng không thể quản lý static Pod bằng cách sửa mirror Pod.
+- application và sidecar proxy;
+- web server và container cập nhật file trong volume dùng chung;
+- application và agent chuyển đổi log có quan hệ chặt;
+- application container cùng init container chuẩn bị dữ liệu trước khi start.
 
-Static Pod thường dùng để chạy các Control Plane components trong cluster kubeadm. Application workload thông thường không nên dùng cơ chế này vì thiếu khả năng scheduling và quản lý tập trung như controller.
+Ví dụ không nên đặt chung:
 
----
+- frontend cần 10 replica nhưng worker chỉ cần 2 replica;
+- API và database có lifecycle, storage và cách scale khác nhau;
+- hai service chỉ giao tiếp qua HTTP nhưng không cần cùng Node;
+- nhiều container giống nhau chỉ để tăng capacity.
 
-## 7. Thực hành
+Nếu hai thành phần cần scale, deploy, rollback hoặc cấp quyền độc lập, hãy tách chúng thành workload riêng.
 
-Yêu cầu: có một cluster Kubernetes bất kỳ và `kubectl` đang trỏ đúng context.
+Đọc sâu hơn tại [Multi-container Pods](/workloads/multi-container-pods/) và [Init Containers](/workloads/init-containers/).
 
-### 7.1 Tạo Namespace và Pod
+## Tạo Pod đầu tiên
+
+Ví dụ đầu tiên chạy một Nginx container. Mục tiêu là quan sát rõ chuỗi `Pod → container` trước khi dùng Deployment.
+
+### Điều kiện trước khi bắt đầu
+
+Bạn cần:
+
+- một Kubernetes cluster đang hoạt động;
+- `kubectl` đã kết nối tới cluster;
+- quyền tạo Namespace và Pod.
+
+Kiểm tra context:
 
 ```bash
-kubectl create namespace workloads-lab
-cat <<'EOF' > pod.yaml
+kubectl config current-context
+kubectl get nodes -o wide
+```
+
+> [!WARNING]
+> Các lệnh trong bài tạo và xóa Namespace. Không chạy trên cluster dùng chung hoặc production nếu chưa kiểm tra đúng context.
+
+### Tạo manifest
+
+Lưu nội dung sau vào file `pod.yaml`:
+
+```yaml
 apiVersion: v1
 kind: Pod
 metadata:
   name: web
-  namespace: workloads-lab
+  namespace: pod-lab
   labels:
     app: web
 spec:
@@ -252,111 +236,1089 @@ spec:
           memory: 32Mi
         limits:
           memory: 64Mi
-EOF
+  restartPolicy: Always
+```
+
+Tạo Namespace, kiểm tra manifest tại API Server rồi apply:
+
+```bash
+kubectl create namespace pod-lab
 kubectl apply --dry-run=server -f pod.yaml
 kubectl apply -f pod.yaml
 ```
 
-### 7.2 Quan sát
+Kết quả:
 
-```bash
-kubectl get pod web -n workloads-lab -o wide
-kubectl describe pod web -n workloads-lab
-kubectl get pod web -n workloads-lab -o yaml
-kubectl logs web -n workloads-lab
+```text
+pod/web created
 ```
 
-Xem Node, Pod IP, phase, conditions, container state và Events.
+`created` chỉ nghĩa là API Server đã lưu Pod object. Nó chưa chứng minh container đã chạy hoặc Nginx đã sẵn sàng.
 
-### 7.3 Truy cập và chạy command
+### Chờ Pod sẵn sàng
 
 ```bash
-kubectl port-forward pod/web 8080:80 -n workloads-lab
+kubectl wait --for=condition=Ready pod/web \
+  -n pod-lab --timeout=120s
+```
+
+Nếu thành công:
+
+```text
+pod/web condition met
+```
+
+Kiểm tra nhanh:
+
+```bash
+kubectl get pod web -n pod-lab -o wide
+```
+
+Output minh họa:
+
+```text
+NAME   READY   STATUS    RESTARTS   AGE   IP           NODE
+web    1/1     Running   0          20s   10.244.1.8   node-a
+```
+
+Cách đọc:
+
+- `READY 1/1`: một container trên tổng một container đã Ready.
+- `STATUS Running`: Pod đã bind vào Node và container đang chạy.
+- `RESTARTS 0`: container chưa bị kubelet restart.
+- `IP`: địa chỉ của Pod trong cluster.
+- `NODE`: Node đang chạy Pod.
+
+## Đọc manifest Pod
+
+Manifest Pod có hai phần lớn:
+
+```text
+metadata → Pod này là ai?
+spec     → Pod này phải chạy như thế nào?
+```
+
+### `apiVersion`, `kind` và `metadata`
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web
+  namespace: pod-lab
+  labels:
+    app: web
+```
+
+- `apiVersion: v1` là API của Pod.
+- `kind: Pod` xác định loại resource.
+- `metadata.name` là tên Pod trong Namespace.
+- `metadata.namespace` xác định phạm vi chứa Pod.
+- `metadata.labels` là metadata dùng để truy vấn và làm selector.
+
+Tên Pod chỉ cần unique trong cùng Namespace. Hai Namespace khác nhau có thể cùng có Pod tên `web`.
+
+### `spec.containers`
+
+```yaml
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.27-alpine
+```
+
+`containers` là danh sách application container trong Pod.
+
+- `name` phải unique trong Pod.
+- `image` xác định container image cần chạy.
+
+Nếu Pod có nhiều container, command `kubectl logs` và `kubectl exec` cần chỉ rõ container bằng `-c` khi Kubernetes không thể tự chọn:
+
+```bash
+kubectl logs <pod-name> -c <container-name> -n <namespace>
+kubectl exec <pod-name> -c <container-name> -n <namespace> -- <command>
+```
+
+### `ports.containerPort`
+
+```yaml
+ports:
+  - name: http
+    containerPort: 80
+```
+
+Field này mô tả container lắng nghe port `80` và cho phép đặt tên port là `http`.
+
+> [!IMPORTANT]
+> `containerPort` không tự tạo Service, không public ứng dụng ra Internet và không map port ra máy local.
+
+Container vẫn có thể lắng nghe port dù không khai báo `containerPort`. Field này chủ yếu làm manifest rõ hơn và cho resource khác tham chiếu port theo tên.
+
+### `resources`
+
+```yaml
+resources:
+  requests:
+    cpu: 50m
+    memory: 32Mi
+  limits:
+    memory: 64Mi
+```
+
+- Scheduler dùng `requests` để chọn Node có đủ capacity.
+- kubelet và container runtime áp dụng `limits` theo cơ chế của resource.
+- Vượt memory limit có thể làm container bị `OOMKilled`.
+- CPU limit, nếu cấu hình, thường được thực thi bằng throttling thay vì kill process.
+
+Không có một giá trị đúng cho mọi ứng dụng. Hãy đo workload và điều chỉnh theo dữ liệu.
+
+### `restartPolicy`
+
+```yaml
+restartPolicy: Always
+```
+
+`restartPolicy` nói cho kubelet biết phải làm gì khi application container kết thúc:
+
+| Policy | Exit code `0` | Exit code khác `0` |
+|---|---|---|
+| `Always` | Restart | Restart |
+| `OnFailure` | Không restart | Restart |
+| `Never` | Không restart | Không restart |
+
+Pod chạy server lâu dài thường dùng `Always`. Job thường dùng `Never` hoặc `OnFailure`.
+
+Restart policy áp dụng cho việc restart container trong **cùng Pod trên cùng Node**. Nó không tạo Pod mới trên Node khác.
+
+## Pod được tạo và chạy như thế nào?
+
+Khi chạy `kubectl apply`, nhiều thành phần phối hợp để đưa Pod từ YAML thành container đang chạy.
+
+```mermaid
+sequenceDiagram
+    participant U as kubectl
+    participant A as API Server
+    participant S as Scheduler
+    participant K as kubelet
+    participant R as Container runtime
+    U->>A: Gửi Pod manifest
+    A->>A: Validate và lưu Pod
+    S->>A: Quan sát Pod chưa có Node
+    S->>A: Bind Pod vào một Node
+    K->>A: Quan sát Pod được giao
+    K->>R: Tạo sandbox, pull image, chạy container
+    K->>A: Cập nhật Pod status
+```
+
+Luồng theo từng bước:
+
+1. `kubectl` gửi manifest tới API Server.
+2. API Server kiểm tra schema, admission policy và quyền rồi lưu Pod.
+3. Scheduler tìm Pod chưa có Node.
+4. Scheduler lọc và chấm điểm các Node dựa trên requests, taints, affinity, volume và constraint khác.
+5. Scheduler bind Pod vào một Node.
+6. kubelet trên Node đó phát hiện Pod mới.
+7. Container runtime tạo Pod sandbox, network và container.
+8. kubelet chạy health probes, restart container khi cần và cập nhật status.
+
+Có thể nhớ trách nhiệm:
+
+```text
+API Server → lưu desired state
+Scheduler  → chọn Node
+kubelet    → làm Pod chạy trên Node đã chọn
+Runtime    → tạo và chạy container
+```
+
+Kubernetes schedule một Pod đúng một lần trong lifecycle của Pod đó. Sau khi đã bind vào Node, cùng Pod không được “chuyển” sang Node khác. Nếu cần chạy ở Node khác, controller tạo Pod thay thế có UID mới.
+
+Đọc sâu hơn về control loop tại [Declarative Model và Reconciliation Loop](/kien-truc/declarative-reconciliation/).
+
+## Các container trong Pod chia sẻ những gì?
+
+Các container trong cùng Pod gần nhau hơn container ở hai Pod khác nhau, nhưng chúng không chia sẻ mọi thứ.
+
+### Chia sẻ network namespace
+
+Các container trong Pod:
+
+- dùng chung Pod IP;
+- dùng chung port space;
+- gọi nhau qua `localhost`;
+- có cùng network identity khi giao tiếp ra ngoài Pod.
+
+Ví dụ:
+
+```text
+Pod IP: 10.244.1.8
+
+container app   lắng nghe localhost:8080
+container proxy gọi        localhost:8080
+```
+
+Vì dùng chung port space, hai container trong cùng Pod không thể cùng bind `0.0.0.0:8080` với cùng protocol.
+
+Hai Pod khác nhau thường có hai IP khác nhau và không dùng `localhost` để gọi nhau:
+
+```text
+Pod A: localhost chỉ trỏ về Pod A
+Pod B: localhost chỉ trỏ về Pod B
+```
+
+### Có thể chia sẻ volume
+
+Filesystem writable của mỗi container vẫn riêng. Muốn chia sẻ file, các container phải mount cùng một Pod volume.
+
+Ví dụ volume `shared-data`:
+
+```yaml
+spec:
+  volumes:
+    - name: shared-data
+      emptyDir: {}
+  containers:
+    - name: writer
+      image: busybox:1.36
+      volumeMounts:
+        - name: shared-data
+          mountPath: /data
+    - name: reader
+      image: busybox:1.36
+      volumeMounts:
+        - name: shared-data
+          mountPath: /shared
+```
+
+`/data` trong container `writer` và `/shared` trong container `reader` trỏ tới cùng volume dù mount path khác nhau.
+
+`emptyDir` được tạo cùng Pod:
+
+- container restart không làm mất `emptyDir` vì Pod vẫn là Pod cũ;
+- Pod bị xóa hoặc thay thế thì `emptyDir` cũ mất theo Pod;
+- dữ liệu cần tồn tại qua Pod replacement phải dùng storage bền vững phù hợp.
+
+### Không mặc định chia sẻ process namespace
+
+Mỗi container thường thấy process namespace riêng. Nếu có nhu cầu đặc biệt, Pod hỗ trợ `shareProcessNamespace`, nhưng đây không phải mặc định và làm giảm isolation giữa các container.
+
+Không bật chỉ để debug tiện hơn. Dùng ephemeral container hoặc công cụ debug phù hợp khi cần.
+
+### Resource được khai báo theo container
+
+Mỗi container có requests/limits riêng. Scheduler dùng tổng requests của các container để đánh giá Pod có fit trên Node không.
+
+Ví dụ:
+
+```text
+container app:     200m CPU + 256Mi
+container sidecar:  50m CPU +  64Mi
+----------------------------------
+Pod request:       250m CPU + 320Mi
+```
+
+Hai container trong cùng Pod cũng được schedule cùng nhau. Kubernetes không thể đặt sidecar sang Node khác để giải quyết thiếu capacity.
+
+## Pod IP, `containerPort` và cách truy cập Pod
+
+Mỗi Pod thường nhận một IP trong cluster. IP này thuộc về **Pod**, không thuộc riêng một container.
+
+```text
+Pod web
+├── Pod IP: 10.244.1.8
+└── nginx lắng nghe port 80
+```
+
+### Pod IP không phải endpoint ổn định
+
+Pod có thể bị thay thế và nhận IP mới:
+
+```text
+Pod cũ: UID 111, IP 10.244.1.8  → bị xóa
+Pod mới: UID 222, IP 10.244.2.9 → được tạo
+```
+
+Client không nên lưu cứng Pod IP. Dùng `Service` để cung cấp endpoint ổn định và chọn các Pod backend bằng label.
+
+### `containerPort` không expose ứng dụng
+
+Manifest:
+
+```yaml
+ports:
+  - containerPort: 80
+```
+
+không tạo những thứ sau:
+
+- không tạo Service;
+- không mở NodePort;
+- không tạo LoadBalancer;
+- không forward tới `localhost` của máy bạn;
+- không thay firewall rule bên ngoài cluster.
+
+### Dùng port-forward trong lab
+
+Để truy cập Pod từ máy local khi học:
+
+```bash
+kubectl port-forward pod/web 8080:80 -n pod-lab
+```
+
+Luồng:
+
+```text
+localhost:8080 → kubectl port-forward → Pod web port 80
 ```
 
 Ở terminal khác:
 
 ```bash
 curl -I http://localhost:8080
-kubectl exec -n workloads-lab web -- nginx -v
 ```
 
-### 7.4 Quan sát replacement
+`port-forward` là kết nối tạm thời dành cho debug và development. Khi command dừng, tunnel biến mất. Không dùng nó làm cách expose production.
 
-```bash
-OLD_UID="$(kubectl get pod web -n workloads-lab -o jsonpath='{.metadata.uid}')"
-kubectl delete pod web -n workloads-lab
-kubectl apply -f pod.yaml
-NEW_UID="$(kubectl get pod web -n workloads-lab -o jsonpath='{.metadata.uid}')"
-printf 'old=%s\nnew=%s\n' "$OLD_UID" "$NEW_UID"
-```
+Để học endpoint ổn định, tiếp tục với [Service](/networking/service/).
 
-Cùng tên nhưng UID mới chứng minh đây là object khác.
+## Pod là tài nguyên tạm thời
 
----
+Pod được thiết kế là resource tương đối ngắn hạn và có thể thay thế.
 
-## 8. Troubleshooting
+Mỗi Pod có identity gồm:
 
-Đi từ ngoài vào trong:
+- name;
+- Namespace;
+- UID;
+- creation timestamp;
+- Pod IP trong lúc chạy;
+- Node đã được bind.
 
-```bash
-kubectl get pod web -n workloads-lab -o wide
-kubectl describe pod web -n workloads-lab
-kubectl logs web -n workloads-lab
-kubectl logs web -n workloads-lab --previous
-kubectl get events -n workloads-lab --sort-by=.metadata.creationTimestamp
-```
-
-| Triệu chứng | Kiểm tra đầu tiên |
-|---|---|
-| `Pending` | Scheduling Events, requests, taints, PVC |
-| `ImagePullBackOff` | Image name, tag, registry credentials |
-| `CrashLoopBackOff` | Logs hiện tại và `--previous`, command, config |
-| `Running` nhưng `0/1 Ready` | Readiness probe và dependency |
-| `Terminating` lâu | Finalizers, preStop, volume detach, Node health |
-| Không có logs | Chọn đúng container bằng `-c`, container đã start chưa |
-
-Đừng chỉ nhìn `STATUS`. `status.phase`, Pod conditions và `containerStatuses` trả lời các câu hỏi khác nhau.
-
----
-
-## 9. Best practices
-
-- Dùng Deployment, StatefulSet, DaemonSet hoặc Job làm owner của Pod.
-- Pin image bằng tag bất biến hoặc digest; tránh `latest` trong production.
-- Khai báo resource requests và memory limit phù hợp.
-- Tách startup, readiness và liveness probe theo đúng mục đích.
-- Ghi log ra `stdout`/`stderr`.
-- Không lưu state cần bền vững trong container writable layer hoặc `emptyDir`.
-- Chỉ ghép nhiều container khi chúng thật sự cần cùng lifecycle và scale unit.
-- Dùng labels chuẩn để truy vấn, vận hành và phân bổ chi phí.
-- Thiết kế graceful shutdown vì Pod có thể bị thay thế bất kỳ lúc nào.
-
----
-
-## 10. Tổng kết
-
-Pod là runtime envelope của một nhóm container:
+UID mới là identity duy nhất của object. Một Pod mới có thể dùng lại cùng name sau khi Pod cũ bị xóa, nhưng đó vẫn là object khác.
 
 ```text
-controller tạo Pod → Scheduler chọn Node → kubelet chạy containers
-→ probes báo health → controller thay Pod khi desired state thay đổi
+Pod web
+name = web
+UID  = aaa-111
+IP   = 10.244.1.8
+        │
+        └── bị xóa
+
+Pod web mới
+name = web
+UID  = bbb-222
+IP   = 10.244.2.9
 ```
 
-Điểm cần nhớ:
+Hệ quả thực tế:
 
-- Pod là đơn vị scheduling và replacement.
-- Container trong Pod chia sẻ network và có thể chia sẻ volume.
-- Pod có tính tạm thời; Service và PersistentVolume cung cấp identity/state ổn định hơn.
-- Production workload nên được quản lý bởi controller.
+- không phụ thuộc vào Pod IP;
+- không lưu state quan trọng trong container writable layer;
+- không coi Pod name là identity nghiệp vụ lâu dài;
+- dùng PersistentVolume khi dữ liệu phải sống qua replacement;
+- dùng Service để tìm workload qua network;
+- dùng controller để tạo Pod thay thế.
 
-Tiếp tục với [Vòng đời Pod](/workloads/pod-lifecycle/) để hiểu phase, conditions, restart và termination.
+### Pod không được reschedule sang Node khác
 
----
+Nếu `web` đã bind vào `node-a`, Kubernetes không di chuyển cùng UID đó sang `node-b`.
+
+```text
+Sai mental model:
+Pod UID 111 trên node-a → di chuyển sang node-b
+
+Đúng mental model:
+Pod UID 111 trên node-a → bị xóa
+Pod UID 222             → được tạo và schedule lên node-b
+```
+
+Từ bên ngoài, hai Pod có thể chạy cùng image và label nên trông giống nhau. Tuy nhiên, chúng có UID, IP, container ID và lifecycle khác nhau.
+
+## Container restart khác Pod replacement
+
+Đây là một trong những điểm quan trọng nhất khi học Pod.
+
+### Container restart
+
+Khi process trong container kết thúc và `restartPolicy` yêu cầu restart:
+
+```text
+Pod web, UID aaa, IP 10.244.1.8
+├── container nginx ID 1 → crash
+└── container nginx ID 2 → kubelet tạo lại trong cùng Pod
+```
+
+Những gì thường giữ nguyên:
+
+- Pod name;
+- Pod UID;
+- Pod IP;
+- Node;
+- Pod volume như `emptyDir`.
+
+Container ID và restart count thay đổi.
+
+### Pod replacement
+
+Khi Deployment rollout, Pod bị xóa hoặc Node failure cần thay workload:
+
+```text
+Pod cũ UID aaa → bị xóa
+Pod mới UID bbb → controller tạo
+```
+
+Những gì có thể thay đổi:
+
+- UID chắc chắn thay đổi;
+- IP có thể thay đổi;
+- Node có thể thay đổi;
+- container ID thay đổi;
+- `emptyDir` được tạo mới và dữ liệu cũ mất.
+
+Bảng so sánh:
+
+| Tình huống | Pod UID | Pod IP | Node | Container ID |
+|---|---|---|---|---|
+| Container restart trong cùng Pod | Giữ nguyên | Thường giữ nguyên | Giữ nguyên | Thay đổi |
+| Controller tạo Pod thay thế | Thay đổi | Có thể thay đổi | Có thể thay đổi | Thay đổi |
+| Xóa Pod trần rồi tạo lại cùng name | Thay đổi | Có thể thay đổi | Có thể thay đổi | Thay đổi |
+
+Đọc sâu về phase, condition, restart và termination tại [Vòng đời Pod](/workloads/pod-lifecycle/).
+
+## Vì sao production không nên tạo Pod trần?
+
+Pod trần là Pod được tạo trực tiếp mà không có Deployment, StatefulSet, DaemonSet hoặc Job làm owner.
+
+```text
+Bạn → tạo Pod trực tiếp
+      └── không có workload controller duy trì replacement
+```
+
+Nếu xóa Pod trần:
+
+```bash
+kubectl delete pod web -n pod-lab
+```
+
+Pod biến mất và không có controller tạo lại.
+
+Kubelet có thể restart container trong Pod theo `restartPolicy`, nhưng kubelet không tạo Pod replacement trên Node khác khi Pod object bị xóa hoặc Node không còn phù hợp.
+
+Với Deployment:
+
+```text
+Deployment desired replicas=3
+├── Pod A
+├── Pod B → bị xóa
+└── Pod C
+
+Deployment phát hiện chỉ còn 2
+└── tạo Pod D → trở lại 3
+```
+
+Dùng Pod trần cho:
+
+- học cấu trúc Pod;
+- thử một image nhanh;
+- debug ngắn hạn;
+- kiểm tra scheduling hoặc network trong lab.
+
+Dùng controller cho production:
+
+- `Deployment` cho ứng dụng stateless chạy liên tục;
+- `StatefulSet` cho workload cần identity/storage ổn định hơn;
+- `DaemonSet` cho agent trên mỗi Node;
+- `Job` cho task chạy đến khi hoàn thành;
+- `CronJob` cho Job theo lịch.
+
+## Pod template
+
+Controller không lưu một danh sách Pod cố định. Nó lưu **Pod template**, tức bản mẫu dùng để tạo Pod mới.
+
+Ví dụ một phần Deployment:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+```
+
+Phần sau là Pod template:
+
+```yaml
+template:
+  metadata:
+    labels:
+      app: web
+  spec:
+    containers:
+      - name: nginx
+        image: nginx:1.27-alpine
+```
+
+Nó gần giống Pod manifest nhưng không có `apiVersion`, `kind` và `metadata.name` riêng. Controller tự tạo tên cho mỗi Pod.
+
+Khi template thay đổi, controller thường tạo Pod mới theo strategy của workload. Nó không biến mọi field của Pod cũ tại chỗ.
+
+### Pod spec phần lớn không nên được sửa trực tiếp
+
+Một số field của Pod có thể cập nhật qua API hoặc subresource, nhưng nhiều field cấu trúc là immutable. Ví dụ, không thể tùy ý đổi Node, volume hoặc phần lớn scheduling configuration của Pod đang chạy.
+
+Trong production, hãy sửa Pod template của controller và để controller rollout replacement. Nếu sửa trực tiếp Pod do controller quản lý, controller có thể ghi đè thay đổi hoặc tạo lại Pod theo template cũ.
+
+## Resource requests và limits
+
+Resource configuration ảnh hưởng cả scheduling lẫn runtime.
+
+```yaml
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+```
+
+### Requests dùng để schedule
+
+Scheduler cộng requests của các container trong Pod rồi tìm Node đủ capacity.
+
+```text
+Pod request 500m CPU, 512Mi memory
+        │
+        ├── node-a còn 200m → không fit
+        ├── node-b còn 1 CPU, 1Gi → có thể fit
+        └── node-c bị taint → còn phải kiểm tra toleration
+```
+
+Request quá cao có thể làm Pod `Pending`. Request quá thấp khiến Scheduler đặt quá nhiều workload lên Node so với nhu cầu thật.
+
+### Memory limit
+
+Khi container vượt memory limit, kernel có thể kill process và Kubernetes hiển thị `OOMKilled`.
+
+```bash
+kubectl describe pod <pod-name> -n <namespace>
+kubectl get pod <pod-name> -n <namespace> \
+  -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}{"\n"}'
+```
+
+Không tự động tăng memory limit trước khi kiểm tra memory leak, traffic, cache và usage thực tế.
+
+### CPU limit có trade-off
+
+CPU limit có thể ngăn một container chiếm CPU của workload khác, nhưng cũng có thể gây throttling ngay cả khi Node còn CPU rảnh. Quyết định dùng CPU limit phụ thuộc workload, latency target và mô hình multi-tenancy.
+
+Resource sizing cần dựa trên metric và load test, không dựa trên giá trị copy từ ví dụ lab.
+
+## Cấu hình bảo mật cơ bản
+
+Pod và container chạy trong kernel của Node, vì vậy image và quyền runtime ảnh hưởng trực tiếp tới blast radius.
+
+Security context có thể giới hạn quyền:
+
+```yaml
+spec:
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: example.com/app:1.0.0
+      securityContext:
+        runAsNonRoot: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+```
+
+Manifest này chỉ chạy nếu image hỗ trợ non-root và không cần Linux capabilities đã bỏ. Không copy nguyên xi cho image chưa được kiểm tra.
+
+Các nguyên tắc cơ bản:
+
+- chạy non-root khi ứng dụng hỗ trợ;
+- không dùng `privileged` nếu không bắt buộc;
+- tắt privilege escalation;
+- drop capabilities rồi chỉ thêm capability cần thiết;
+- dùng seccomp profile phù hợp;
+- không mount host path hoặc container runtime socket tùy tiện;
+- dùng ServiceAccount và RBAC với quyền tối thiểu;
+- pin image version hoặc digest và scan image;
+- không đặt Secret trực tiếp trong image hoặc plaintext manifest.
+
+Pod security không chỉ là một field. Nó còn phụ thuộc image, admission policy, ServiceAccount, volume, Node và runtime configuration.
+
+## Static Pod và mirror Pod
+
+Đây là phần nâng cao; application workload thông thường không cần tạo Static Pod.
+
+### Static Pod
+
+Static Pod được kubelet trên một Node quản lý trực tiếp từ manifest local, không do API Server hoặc Scheduler tạo.
+
+```text
+File manifest trên node-a
+└── kubelet node-a
+    └── chạy Static Pod trên chính node-a
+```
+
+Static Pod luôn gắn với kubelet đó. Use case phổ biến là chạy các control-plane component trong cluster được bootstrap theo mô hình như kubeadm.
+
+### Mirror Pod
+
+Kubelet tạo một mirror Pod object trên API Server để người vận hành có thể nhìn thấy Static Pod bằng `kubectl`.
+
+```text
+Static Pod thật trên Node
+└── mirror Pod trên API Server để quan sát
+```
+
+Sửa hoặc xóa mirror Pod không thay đổi source manifest local đang được kubelet quản lý. Kubelet có thể tạo lại mirror Pod.
+
+Application thông thường nên dùng Deployment, StatefulSet, DaemonSet hoặc Job vì chúng có scheduling và quản lý tập trung tốt hơn.
+
+## Thực hành hoàn chỉnh
+
+Lab này chứng minh:
+
+1. Pod được schedule lên một Node.
+2. Nginx chạy bên trong container của Pod.
+3. `containerPort` không tự expose ứng dụng.
+4. `port-forward` tạo đường truy cập tạm thời.
+5. Xóa Pod trần không có controller tự tạo lại.
+6. Tạo lại cùng name vẫn sinh UID mới.
+
+### 1. Tạo Namespace và Pod
+
+Lưu file `pod.yaml` từ phần đầu bài, sau đó chạy:
+
+```bash
+kubectl get namespace pod-lab >/dev/null 2>&1 || \
+  kubectl create namespace pod-lab
+
+kubectl apply --dry-run=server -f pod.yaml
+kubectl apply -f pod.yaml
+```
+
+Chờ Ready:
+
+```bash
+kubectl wait --for=condition=Ready pod/web \
+  -n pod-lab --timeout=120s
+```
+
+### 2. Quan sát Pod từ tổng quan đến chi tiết
+
+```bash
+kubectl get pod web -n pod-lab -o wide
+kubectl describe pod web -n pod-lab
+kubectl get pod web -n pod-lab -o yaml
+```
+
+Tìm các thông tin:
+
+- Pod UID;
+- Node name;
+- Pod IP;
+- phase;
+- `Ready` condition;
+- container state;
+- image và image ID;
+- resource requests/limits;
+- Events ở cuối `kubectl describe`.
+
+Lấy một số field bằng JSONPath:
+
+```bash
+kubectl get pod web -n pod-lab \
+  -o jsonpath='name={.metadata.name}{"\n"}uid={.metadata.uid}{"\n"}node={.spec.nodeName}{"\n"}ip={.status.podIP}{"\n"}phase={.status.phase}{"\n"}'
+```
+
+### 3. Xem logs và chạy command trong container
+
+Nginx ghi access log ra `stdout` và error log ra `stderr`.
+
+```bash
+kubectl logs web -n pod-lab
+```
+
+Kiểm tra version Nginx trong container:
+
+```bash
+kubectl exec web -n pod-lab -- nginx -v
+```
+
+Kiểm tra filesystem và hostname:
+
+```bash
+kubectl exec web -n pod-lab -- sh -c \
+  'echo "hostname=$HOSTNAME"; cat /etc/os-release | head'
+```
+
+`kubectl exec` phù hợp cho debug ngắn hạn. Không sửa filesystem container thủ công rồi coi đó là cấu hình production; thay đổi sẽ mất khi container hoặc Pod bị thay.
+
+### 4. Truy cập Nginx bằng port-forward
+
+Mở tunnel:
+
+```bash
+kubectl port-forward pod/web 8080:80 -n pod-lab
+```
+
+Giữ terminal này chạy. Trong terminal khác:
+
+```bash
+curl -I http://localhost:8080
+```
+
+Kết quả đúng có HTTP response từ Nginx, thường gồm status `200 OK`.
+
+Xem access log sau request:
+
+```bash
+kubectl logs web -n pod-lab --tail=20
+```
+
+Dừng port-forward bằng `Ctrl+C`. Sau đó `localhost:8080` không còn đường tới Pod.
+
+### 5. Chứng minh Pod trần không self-heal
+
+Lưu UID, IP và Node hiện tại:
+
+```bash
+OLD_UID="$(kubectl get pod web -n pod-lab \
+  -o jsonpath='{.metadata.uid}')"
+OLD_IP="$(kubectl get pod web -n pod-lab \
+  -o jsonpath='{.status.podIP}')"
+OLD_NODE="$(kubectl get pod web -n pod-lab \
+  -o jsonpath='{.spec.nodeName}')"
+
+printf 'old_uid=%s\nold_ip=%s\nold_node=%s\n' \
+  "$OLD_UID" "$OLD_IP" "$OLD_NODE"
+```
+
+Xóa Pod:
+
+```bash
+kubectl delete pod web -n pod-lab
+kubectl get pods -n pod-lab
+```
+
+Danh sách không còn `web`. Chờ thêm cũng không làm Pod xuất hiện vì không có controller quản lý.
+
+### 6. Tạo lại cùng name và so sánh identity
+
+```bash
+kubectl apply -f pod.yaml
+kubectl wait --for=condition=Ready pod/web \
+  -n pod-lab --timeout=120s
+
+NEW_UID="$(kubectl get pod web -n pod-lab \
+  -o jsonpath='{.metadata.uid}')"
+NEW_IP="$(kubectl get pod web -n pod-lab \
+  -o jsonpath='{.status.podIP}')"
+NEW_NODE="$(kubectl get pod web -n pod-lab \
+  -o jsonpath='{.spec.nodeName}')"
+
+printf 'new_uid=%s\nnew_ip=%s\nnew_node=%s\n' \
+  "$NEW_UID" "$NEW_IP" "$NEW_NODE"
+```
+
+`NEW_UID` phải khác `OLD_UID`. IP và Node có thể giống hoặc khác tùy Scheduler và networking, nên không dùng chúng làm bằng chứng duy nhất.
+
+### 7. Xem owner của Pod
+
+Pod trần không có `ownerReferences`:
+
+```bash
+kubectl get pod web -n pod-lab \
+  -o jsonpath='{.metadata.ownerReferences}{"\n"}'
+```
+
+Output thường trống. Pod do Deployment, StatefulSet, DaemonSet hoặc Job tạo sẽ có owner reference tương ứng hoặc owner trung gian.
+
+### 8. Cleanup
+
+Kiểm tra context rồi xóa Namespace:
+
+```bash
+kubectl config current-context
+kubectl delete namespace pod-lab
+```
+
+Xóa Namespace sẽ xóa Pod và resource khác bên trong.
+
+## Troubleshooting
+
+Debug Pod theo thứ tự:
+
+```text
+Pod đã được schedule chưa?
+├── Chưa → xem Scheduling Events
+└── Rồi
+    ├── Container chưa tạo → xem image, volume, Secret, CNI
+    ├── Container crash → xem logs và exit code
+    ├── Container chạy nhưng chưa Ready → xem probes và dependency
+    └── Pod hoạt động nhưng client không truy cập được → xem port, Service, NetworkPolicy
+```
+
+Bộ command nền tảng:
+
+```bash
+kubectl get pod <pod-name> -n <namespace> -o wide
+kubectl describe pod <pod-name> -n <namespace>
+kubectl logs <pod-name> -n <namespace>
+kubectl logs <pod-name> -n <namespace> --previous
+kubectl get events -n <namespace> \
+  --sort-by=.metadata.creationTimestamp
+```
+
+### Pod `Pending`
+
+`Pending` có thể nghĩa là Pod chưa được schedule hoặc đang chờ container setup.
+
+```bash
+kubectl describe pod <pod-name> -n <namespace>
+kubectl get events -n <namespace> \
+  --sort-by=.metadata.creationTimestamp
+```
+
+Tìm các nguyên nhân:
+
+- `Insufficient cpu` hoặc `Insufficient memory`;
+- Pod không tolerate taint;
+- node selector/affinity không match;
+- PVC chưa bind;
+- quota hoặc admission policy chặn;
+- Pod đang chờ image hoặc volume setup.
+
+Đọc `PodScheduled` condition để phân biệt đã có Node hay chưa:
+
+```bash
+kubectl get pod <pod-name> -n <namespace> \
+  -o custom-columns='NAME:.metadata.name,NODE:.spec.nodeName,SCHEDULED:.status.conditions[?(@.type=="PodScheduled")].status'
+```
+
+### `ErrImagePull` hoặc `ImagePullBackOff`
+
+```bash
+kubectl describe pod <pod-name> -n <namespace>
+```
+
+Kiểm tra:
+
+- repository và tag có đúng không;
+- registry có truy cập được từ Node không;
+- image có hỗ trợ architecture của Node không;
+- `imagePullSecrets` có đúng không;
+- registry có rate limit hoặc certificate lỗi không.
+
+`ImagePullBackOff` là cơ chế chờ giữa các lần pull, không phải root cause. Root cause nằm trong Events gần đó.
+
+### `CrashLoopBackOff`
+
+Container start rồi liên tục exit hoặc bị kill.
+
+```bash
+kubectl logs <pod-name> -n <namespace>
+kubectl logs <pod-name> -n <namespace> --previous
+kubectl describe pod <pod-name> -n <namespace>
+```
+
+`--previous` rất quan trọng vì nó đọc log của lần container trước.
+
+Kiểm tra:
+
+- command/arguments sai;
+- thiếu environment variable hoặc config file;
+- application không kết nối được dependency;
+- liveness/startup probe kill container;
+- container bị `OOMKilled`;
+- permission hoặc filesystem lỗi.
+
+Không sửa bằng cách tăng restart count; cần sửa lý do process kết thúc.
+
+### Pod `Running` nhưng `0/1 Ready`
+
+`Running` không đồng nghĩa sẵn sàng nhận traffic.
+
+```bash
+kubectl describe pod <pod-name> -n <namespace>
+kubectl get pod <pod-name> -n <namespace> \
+  -o jsonpath='{.status.conditions}'
+```
+
+Kiểm tra readiness probe, startup probe, readiness gates và dependency. Nếu Pod thuộc Service, Pod chưa Ready thường không được dùng như endpoint sẵn sàng.
+
+### Không xem được logs
+
+Nếu Pod có nhiều container, chỉ rõ container:
+
+```bash
+kubectl logs <pod-name> -c <container-name> -n <namespace>
+```
+
+Nếu container chưa từng start, có thể chưa có logs. Xem Events và container waiting reason:
+
+```bash
+kubectl describe pod <pod-name> -n <namespace>
+```
+
+Nếu Pod cũ đã bị xóa, `kubectl logs` không lấy lại log từ API. Production cần hệ thống log tập trung.
+
+### `kubectl exec` thất bại
+
+Các nguyên nhân thường gặp:
+
+- container chưa Running;
+- chọn sai container;
+- image không có shell `sh` hoặc command cần chạy;
+- RBAC không cho phép `pods/exec`;
+- kubelet hoặc network tới Node có vấn đề.
+
+Không giả định mọi image đều có Bash:
+
+```bash
+kubectl exec <pod-name> -n <namespace> -- sh
+```
+
+Distroless image có thể không có cả `sh`. Khi đó cân nhắc ephemeral debug container theo policy của cluster.
+
+### Không truy cập được ứng dụng
+
+Kiểm tra theo đường đi:
+
+```text
+Process có listen đúng port/address?
+→ Pod có Ready không?
+→ Service selector có chọn Pod không?
+→ EndpointSlice có endpoint không?
+→ NetworkPolicy có chặn không?
+→ Ingress/Gateway/LoadBalancer có đúng không?
+```
+
+Trong Pod:
+
+```bash
+kubectl exec <pod-name> -n <namespace> -- \
+  sh -c 'wget -qO- http://127.0.0.1:<port> || true'
+```
+
+Từ local, test tạm bằng port-forward:
+
+```bash
+kubectl port-forward pod/<pod-name> 8080:<port> -n <namespace>
+```
+
+Nếu port-forward hoạt động nhưng Service không hoạt động, tập trung kiểm tra selector, target port, readiness và EndpointSlice.
+
+### Pod `Terminating` quá lâu
+
+```bash
+kubectl get pod <pod-name> -n <namespace> -o yaml
+kubectl describe pod <pod-name> -n <namespace>
+```
+
+Kiểm tra:
+
+- `deletionTimestamp`;
+- finalizers;
+- `preStop` hook;
+- `terminationGracePeriodSeconds`;
+- application không xử lý `SIGTERM`;
+- Node mất kết nối;
+- volume detach/unmount bị kẹt.
+
+Không force delete ngay trước khi thu thập evidence và hiểu rủi ro. Force delete object khỏi API không đảm bảo process trên Node mất kết nối đã dừng ngay.
+
+### `kubectl apply` báo field immutable
+
+Nhiều field của Pod không thể đổi sau khi Pod đã tạo. Với Pod lab, có thể xóa rồi tạo lại:
+
+```bash
+kubectl delete pod web -n pod-lab
+kubectl apply -f pod.yaml
+```
+
+Với production, sửa Pod template của controller và dùng rollout phù hợp. Không xóa Pod thủ công nếu workload không có đủ replica hoặc chưa đánh giá availability.
+
+## Best practices
+
+- Hiểu Pod là đơn vị scheduling và replacement, không phải máy ảo thu nhỏ.
+- Mặc định dùng một application container trong mỗi Pod.
+- Chỉ dùng multi-container Pod khi các container cần cùng Node, network, volume và lifecycle.
+- Dùng Deployment, StatefulSet, DaemonSet hoặc Job thay vì tạo Pod trần trong production.
+- Không phụ thuộc vào Pod IP; dùng Service cho endpoint ổn định.
+- Không lưu dữ liệu cần bền vững trong container writable layer hoặc `emptyDir`.
+- Khai báo resource requests dựa trên usage thực tế; đặt limits theo trade-off của workload.
+- Tách đúng `startupProbe`, `readinessProbe` và `livenessProbe`.
+- Ghi logs ra `stdout`/`stderr` và gửi tới hệ thống tập trung.
+- Xử lý `SIGTERM` và graceful shutdown vì Pod có thể bị thay thế.
+- Dùng labels nhất quán để selector, truy vấn và phân bổ chi phí.
+- Pin image bằng tag bất biến hoặc digest; tránh `latest` trong production.
+- Chạy non-root, giảm capabilities và privilege khi image hỗ trợ.
+- Không sửa trực tiếp Pod do controller quản lý; sửa Pod template và rollout.
+- Khi debug, đọc status theo lớp: phase → conditions → container state → Events → logs.
+
+## Tóm tắt
+
+Mental model ngắn nhất:
+
+```text
+Controller tạo Pod
+→ Scheduler chọn Node cho Pod
+→ kubelet chạy container trên Node đó
+→ Pod giữ nguyên trên Node trong lifecycle của UID
+→ khi cần thay thế, controller tạo Pod mới có UID mới
+```
+
+Các thành phần chính:
+
+```text
+Pod
+├── metadata: name, namespace, labels, UID
+├── spec
+│   ├── containers
+│   ├── volumes
+│   ├── resources
+│   ├── security
+│   ├── probes
+│   └── restartPolicy
+└── status
+    ├── phase
+    ├── conditions
+    ├── Pod IP và Node
+    └── containerStatuses
+```
+
+Năm điều quan trọng nhất:
+
+1. Kubernetes schedule Pod, không schedule từng container riêng.
+2. Các container trong Pod dùng chung network và có thể mount chung volume.
+3. Một Pod được bind vào một Node; nó không di chuyển sang Node khác.
+4. Container restart trong cùng Pod khác với controller tạo Pod replacement.
+5. Production workload nên dùng controller vì Pod trần không tự được tạo lại sau khi bị xóa.
+
+Tiếp tục với [Vòng đời Pod](/workloads/pod-lifecycle/) để hiểu `Pending`, `Running`, `Ready`, restart, probes và graceful termination.
 
 ## Tài liệu tham khảo
 
 - [Pods](https://kubernetes.io/docs/concepts/workloads/pods/)
-- [Pod Overview](https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/)
 - [Pod Lifecycle](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/)
 - [Static Pods](https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/)
+- [Resource Management for Pods and Containers](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/)
+- [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/)

@@ -1,6 +1,6 @@
 ---
 title: "DaemonSet"
-description: "Hiểu DaemonSet qua ví dụ một Pod trên mỗi Node, cách chọn Node, taints và tolerations, rollout, tài nguyên, bảo mật và troubleshooting."
+description: "Hiểu Kubernetes DaemonSet từ mental model một Pod trên mỗi Node: cách chọn Node, xử lý taint, rollout, tài nguyên, quyền truy cập host và troubleshooting."
 ---
 
 # DaemonSet
@@ -10,12 +10,17 @@ description: "Hiểu DaemonSet qua ví dụ một Pod trên mỗi Node, cách ch
 - [DaemonSet là gì?](#daemonset-là-gì)
 - [DaemonSet khác Deployment như thế nào?](#daemonset-khác-deployment-như-thế-nào)
 - [DaemonSet hoạt động ra sao?](#daemonset-hoạt-động-ra-sao)
-- [Manifest DaemonSet tối thiểu](#manifest-daemonset-tối-thiểu)
+- [Tạo DaemonSet đầu tiên](#tạo-daemonset-đầu-tiên)
+- [Đọc manifest DaemonSet](#đọc-manifest-daemonset)
+- [Theo dõi trạng thái](#theo-dõi-trạng-thái)
+- [Điều gì xảy ra khi Node hoặc Pod thay đổi?](#điều-gì-xảy-ra-khi-node-hoặc-pod-thay-đổi)
 - [Chọn những Node được chạy Pod](#chọn-những-node-được-chạy-pod)
-- [Taints và tolerations](#taints-và-tolerations)
-- [Cập nhật và rollback](#cập-nhật-và-rollback)
-- [Tài nguyên và quyền truy cập Node](#tài-nguyên-và-quyền-truy-cập-node)
-- [Thực hành](#thực-hành)
+- [Hiểu taint và toleration](#hiểu-taint-và-toleration)
+- [Cập nhật và rollback DaemonSet](#cập-nhật-và-rollback-daemonset)
+- [Tài nguyên được nhân theo số Node](#tài-nguyên-được-nhân-theo-số-node)
+- [Quyền truy cập host và rủi ro bảo mật](#quyền-truy-cập-host-và-rủi-ro-bảo-mật)
+- [DaemonSet trong quá trình bảo trì Node](#daemonset-trong-quá-trình-bảo-trì-node)
+- [Thực hành hoàn chỉnh](#thực-hành-hoàn-chỉnh)
 - [Troubleshooting](#troubleshooting)
 - [Best practices](#best-practices)
 - [Tóm tắt](#tóm-tắt)
@@ -25,116 +30,176 @@ description: "Hiểu DaemonSet qua ví dụ một Pod trên mỗi Node, cách ch
 
 ## DaemonSet là gì?
 
-`DaemonSet` là một Kubernetes controller dùng để chạy **một Pod trên mỗi Node phù hợp**.
+`DaemonSet` là Kubernetes controller dùng để chạy **một Pod trên mỗi Node phù hợp**.
 
 Giả sử cluster có ba Node:
 
 ```text
 Cluster
-├── node-a ── node-agent-abc
-├── node-b ── node-agent-def
-└── node-c ── node-agent-ghi
+├── node-a → node-agent-abc
+├── node-b → node-agent-def
+└── node-c → node-agent-ghi
 ```
 
-Khi thêm `node-d`, DaemonSet tự tạo một Pod hướng tới `node-d`; Pod chỉ chạy được nếu vượt qua các điều kiện scheduling. Khi một Node bị xóa khỏi cluster, Pod của DaemonSet trên Node đó cũng được dọn theo. Nếu một Pod bị xóa, DaemonSet tạo Pod thay thế trên cùng Node. Nếu chỉ container bên trong bị lỗi, kubelet thường restart container trong chính Pod đó theo `restartPolicy: Always`; DaemonSet không cần tạo Pod mới cho trường hợp này.
+Mỗi Node có một Pod của DaemonSet. Nếu thêm `node-d`, DaemonSet tự tạo thêm một Pod cho Node mới:
 
-> [!IMPORTANT]
-> DaemonSet không scale bằng `spec.replicas`. Số Pod của nó phụ thuộc vào số Node thỏa điều kiện chạy. Thêm Node đồng nghĩa với thêm một bản sao của Pod và thêm chi phí CPU, memory, network hoặc storage.
+```text
+Cluster sau khi thêm Node
+├── node-a → node-agent-abc
+├── node-b → node-agent-def
+├── node-c → node-agent-ghi
+└── node-d → node-agent-jkl   ← tự được tạo
+```
 
-### Các trường hợp sử dụng phổ biến
+DaemonSet phù hợp với chương trình cần hiện diện ở cấp Node, ví dụ:
 
-DaemonSet phù hợp với workload cần hiện diện ở cấp Node, chẳng hạn:
+- log collector đọc log container trên từng Node;
+- monitoring agent thu thập CPU, memory, disk và network của từng Node;
+- CNI node agent cấu hình networking cho Node;
+- CSI node plugin gắn và mount volume trên Node;
+- security agent quan sát process hoặc runtime của Node;
+- agent quản lý GPU, thiết bị hoặc phần cứng đặc biệt;
+- cache hoặc image-preparation agent cần chạy gần workload trên Node.
 
-- **Log collection:** đọc log container hoặc log trên host rồi gửi đến hệ thống tập trung.
-- **Node monitoring:** thu thập CPU, memory, disk, network và các metric của từng Node.
-- **Networking:** chạy thành phần networking hoặc kube-proxy trên từng Node.
-- **Storage:** chạy CSI node plugin để kết nối volume với Node.
-- **Security:** chạy agent phát hiện hành vi bất thường hoặc kiểm tra runtime.
-- **Node preparation:** pre-pull image hoặc chạy một agent cấu hình trên một nhóm Node.
+Điểm quan trọng nhất cần nhớ:
 
-DaemonSet chỉ cung cấp lifecycle và placement cho Pod. Nó không tự biến ba Pod thành một cluster có replication, leader election hay failover.
+> **DaemonSet không quản lý một số lượng replica cố định. Số Pod của nó phụ thuộc vào số Node đủ điều kiện.**
+
+Bạn không cấu hình:
+
+```yaml
+spec:
+  replicas: 3
+```
+
+Thay vào đó, DaemonSet tự tính:
+
+```text
+Số Pod mong muốn = số Node phù hợp với điều kiện của Pod template
+```
+
+Nếu cluster tăng từ 10 lên 20 Node phù hợp, DaemonSet cũng tăng từ khoảng 10 lên 20 Pod. CPU, memory và chi phí của agent tăng theo.
 
 ## DaemonSet khác Deployment như thế nào?
 
-Cả `Deployment` và `DaemonSet` đều quản lý các Pod chạy lâu dài, tự tạo Pod thay thế và hỗ trợ rollout. Khác biệt là tiêu chí quyết định Pod chạy ở đâu.
+Cả `Deployment` và `DaemonSet` đều quản lý Pod chạy lâu dài. Khác biệt nằm ở câu hỏi mà mỗi controller trả lời.
+
+```text
+Deployment hỏi:
+"Toàn cluster cần bao nhiêu replica?"
+
+DaemonSet hỏi:
+"Node nào cần có một Pod của agent này?"
+```
 
 | Câu hỏi | Deployment | DaemonSet |
 |---|---|---|
-| Mục tiêu chính | Chạy một số replica của ứng dụng | Chạy một Pod trên mỗi Node phù hợp |
-| Cấu hình số Pod | `spec.replicas` | Số Node đủ điều kiện |
-| Pod có cần ở đúng Node không? | Thường không | Có, mỗi Node cần một bản sao |
+| Mục tiêu | Chạy tổng cộng một số replica | Chạy một Pod trên mỗi Node phù hợp |
+| Cấu hình số Pod | `spec.replicas` | Phụ thuộc số Node phù hợp |
+| Pod cần gắn với Node cụ thể? | Thường không | Có, mỗi Pod phục vụ một Node |
+| Khi thêm Node | Không tự tăng nếu chưa scale replicas | Tự tạo Pod cho Node mới phù hợp |
+| Khi xóa một Pod | Tạo replica thay thế ở Node bất kỳ phù hợp | Tạo Pod thay thế hướng tới chính Node đang thiếu |
 | Ví dụ | Web, API, worker stateless | Log agent, node exporter, CSI node plugin |
-| Khi thêm Node | Không tự tăng replica nếu chưa scale | Tự tạo Pod trên Node mới |
-| Khi nào nên dùng? | Các replica thay thế lẫn nhau | Workload cung cấp chức năng gần Node |
 
-Ví dụ:
+Ví dụ lựa chọn:
 
-- API web có `replicas: 3` không cần quan tâm Pod nằm trên `node-a` hay `node-b`; dùng `Deployment`.
-- Log agent cần đọc log trên **từng** Node; dùng `DaemonSet`.
-- Worker chỉ cần tổng cộng 10 bản sao, không cần phủ tất cả Node; dùng `Deployment`, không dùng DaemonSet.
+- Cần ba replica API, replica nào cũng thay thế được nhau: dùng `Deployment`.
+- Cần đọc file `/var/log/...` trên từng Node: dùng `DaemonSet`.
+- Cần tổng cộng mười worker, không quan trọng worker nằm ở Node nào: dùng `Deployment`.
+- Cần một worker trên mỗi Node có GPU: dùng `DaemonSet` kết hợp node label.
+- Cần task chạy xong rồi dừng: dùng [Job](/workloads/job/), không dùng DaemonSet.
+
+Có thể chọn nhanh:
+
+```text
+Process chạy liên tục?
+├── Không → Job hoặc CronJob
+└── Có
+    ├── Cần tổng cộng N replica → Deployment
+    └── Cần hiện diện trên từng Node phù hợp → DaemonSet
+```
 
 ## DaemonSet hoạt động ra sao?
 
-### Desired state và reconciliation
-
-Bạn khai báo rằng mỗi Node phù hợp phải có một Pod. DaemonSet controller liên tục so sánh mong muốn đó với trạng thái thực tế:
+DaemonSet controller liên tục so sánh desired state với trạng thái thật trong cluster.
 
 ```mermaid
 flowchart TD
-    S[DaemonSet spec] --> C[DaemonSet controller]
-    C --> E{Node có đủ điều kiện?}
-    E -->|Có| P[Tạo hoặc giữ một Pod trên Node]
-    E -->|Không| X[Không tạo hoặc xóa Pod không còn phù hợp]
-    P --> R[Theo dõi Pod và thay Pod khi cần]
-    R --> C
+    A[DaemonSet spec] --> B[DaemonSet controller đọc danh sách Node]
+    B --> C{Node có phù hợp?}
+    C -->|Không| D[Không cần Pod trên Node]
+    C -->|Có| E{Node đã có Pod của DaemonSet?}
+    E -->|Có| F[Giữ và theo dõi Pod]
+    E -->|Chưa| G[Tạo Pod hướng tới Node]
+    G --> H[Scheduler kiểm tra và bind Pod]
+    H --> I[Kubelet chạy container trên Node]
+    F --> B
+    I --> B
 ```
 
-DaemonSet trước hết xác định tập Node mục tiêu bằng `nodeSelector` hoặc `nodeAffinity` trong Pod template. Sau đó Scheduler mới kiểm tra các điều kiện để Pod có thể chạy thực tế, chẳng hạn:
-
-- Taints của Node và tolerations của Pod.
-- CPU, memory, volume, port và các constraint scheduling khác.
-- OS, architecture hoặc yêu cầu phần cứng của image/workload.
-
-Nếu không đặt `nodeSelector` hoặc `nodeAffinity`, DaemonSet sẽ nhắm đến mọi Node. Tuy nhiên, Pod trên một Node cụ thể vẫn có thể bị `Pending` hoặc không được schedule nếu không tolerate taint, thiếu tài nguyên hoặc vi phạm constraint khác.
-
-### Ai quyết định Pod chạy trên Node nào?
-
-DaemonSet controller xác định rằng Node nào cần có Pod và tạo một Pod hướng tới Node đó. Scheduler sau đó kiểm tra các ràng buộc scheduling rồi bind Pod vào Node. Vì vậy, DaemonSet không chỉ là “tạo nhiều Pod”; mỗi Pod được gắn với một Node cụ thể.
-
-Luồng đơn giản:
+Luồng đơn giản khi cluster có Node mới:
 
 ```text
-1. DaemonSet đọc selector/affinity và danh sách Node.
-2. Controller phát hiện node-b còn thiếu Pod.
-3. Controller tạo Pod từ spec.template cho node-b.
-4. Scheduler kiểm tra resource, taint, affinity và các constraint.
-5. Kubelet trên node-b kéo image và chạy container.
-6. DaemonSet cập nhật status: desired, current, ready, updated...
+1. node-d tham gia cluster.
+2. DaemonSet controller kiểm tra node-d có match nodeSelector/affinity không.
+3. Nếu phù hợp, controller tạo một Pod hướng tới node-d.
+4. Scheduler kiểm tra taint, resource, port, volume và các ràng buộc khác.
+5. Nếu mọi điều kiện hợp lệ, Scheduler bind Pod vào node-d.
+6. Kubelet trên node-d pull image và chạy container.
+7. DaemonSet cập nhật status.
 ```
 
-Nếu Node không đủ tài nguyên hoặc Pod không thể chạy vì taint, DaemonSet vẫn có thể đã tạo Pod nhưng Pod sẽ ở `Pending`. Điều này khác với việc DaemonSet không xem Node đó là eligible.
+Hai bước dễ bị nhầm:
 
-### Những status field cần biết
+1. **DaemonSet xác định Node nào cần Pod.**
+2. **Scheduler xác định Pod có thực sự chạy được trên Node đó không.**
+
+Vì vậy, DaemonSet có thể muốn một Pod trên `node-d`, nhưng Pod vẫn `Pending` do Node thiếu CPU, có taint không được tolerate hoặc không mount được volume.
+
+### Controller nào xử lý trường hợp nào?
+
+```text
+Container trong Pod bị lỗi
+└── kubelet restart container trong cùng Pod
+    vì restartPolicy của DaemonSet là Always
+
+Cả Pod bị xóa hoặc hỏng
+└── DaemonSet controller tạo Pod thay thế cho Node đó
+
+Node mới xuất hiện
+└── DaemonSet controller tạo Pod cho Node nếu Node phù hợp
+
+Node bị xóa khỏi cluster
+└── Pod phụ thuộc trên Node được garbage collect
+```
+
+DaemonSet không tự thêm leader election, replication dữ liệu hoặc failover logic cho chương trình bên trong. Nó chỉ đảm bảo placement và lifecycle của Pod.
+
+## Tạo DaemonSet đầu tiên
+
+Ví dụ đầu tiên chạy một agent đơn giản trên mỗi Node. Agent in tên Node và tên Pod mỗi 30 giây. Nó không dùng `hostPath`, `hostNetwork` hoặc quyền đặc biệt nên phù hợp hơn cho lab.
+
+### Điều kiện trước khi bắt đầu
+
+Bạn cần:
+
+- một Kubernetes cluster đang hoạt động;
+- `kubectl` đã kết nối tới cluster;
+- quyền tạo Namespace và DaemonSet.
+
+Kiểm tra context và danh sách Node:
 
 ```bash
-kubectl get daemonset <name> -n <namespace>
-kubectl get daemonset <name> -n <namespace> -o yaml
+kubectl config current-context
+kubectl get nodes -o wide
 ```
 
-| Field | Ý nghĩa |
-|---|---|
-| `desiredNumberScheduled` | Số Node mà DaemonSet muốn chạy Pod |
-| `currentNumberScheduled` | Số Node hiện đang có Pod của DaemonSet |
-| `numberReady` | Số Pod đang `Ready` |
-| `numberAvailable` | Số Pod đạt điều kiện `Available` |
-| `updatedNumberScheduled` | Số Pod đã dùng Pod template mới |
-| `numberMisscheduled` | Số Pod đang chạy trên Node không còn phù hợp |
+> [!WARNING]
+> Các lệnh trong bài tạo và xóa Namespace. Không chạy trên cluster dùng chung hoặc production nếu chưa kiểm tra đúng context.
 
-`desiredNumberScheduled` và `numberReady` có thể khác nhau. DaemonSet có thể đã tạo đủ Pod nhưng một số Pod đang pull image, Pending, crash hoặc chưa qua readiness probe.
+### Tạo manifest
 
-## Manifest DaemonSet tối thiểu
-
-Manifest sau chạy một agent đơn giản trên mỗi Node phù hợp. Agent chỉ in tên Node và thời gian mỗi 30 giây; nó không cần quyền truy cập host nên an toàn hơn cho lab.
+Lưu nội dung sau vào file `daemonset.yaml`:
 
 ```yaml
 apiVersion: apps/v1
@@ -142,23 +207,19 @@ kind: DaemonSet
 metadata:
   name: node-agent
   namespace: daemon-lab
-  labels:
-    app.kubernetes.io/name: node-agent
-    app.kubernetes.io/component: node-agent
 spec:
   selector:
     matchLabels:
       app: node-agent
-  updateStrategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
   template:
     metadata:
       labels:
         app: node-agent
     spec:
-      terminationGracePeriodSeconds: 10
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
       containers:
         - name: agent
           image: busybox:1.36
@@ -167,10 +228,12 @@ spec:
             - -c
             - |
               while true; do
-                echo "node=$NODE_NAME hostname=$HOSTNAME time=$(date -Iseconds)"
+                echo "version=$AGENT_VERSION node=$NODE_NAME pod=$HOSTNAME time=$(date -Iseconds)"
                 sleep 30
               done
           env:
+            - name: AGENT_VERSION
+              value: "v1"
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
@@ -183,66 +246,301 @@ spec:
               memory: 32Mi
 ```
 
-### Đọc manifest theo từng phần
+Toleration `control-plane` giúp lab có thể chạy trên cluster một Node mà Node đó mang taint control plane. Trong production, chỉ giữ toleration này nếu agent thật sự cần chạy trên control-plane Node.
 
-#### `spec.selector` và `template.metadata.labels`
-
-```yaml
-selector:
-  matchLabels:
-    app: node-agent
-template:
-  metadata:
-    labels:
-      app: node-agent
-```
-
-`selector` nói cho DaemonSet biết Pod nào thuộc về nó. Selector phải khớp với label trong Pod template. Nếu hai phần không khớp, API Server từ chối manifest.
-
-Selector của DaemonSet không thể sửa sau khi object được tạo. Hãy chọn selector cụ thể và ổn định ngay từ đầu; selector quá chung có thể overlap với workload khác.
-
-#### `spec.template`
-
-`spec.template` là mẫu của một Pod. Các field bên trong gần như giống Pod thông thường, nhưng không lặp lại `apiVersion` và `kind`:
-
-- `containers` mô tả image và process cần chạy.
-- `resources` giúp Scheduler tính capacity và giới hạn memory runtime.
-- `env.fieldRef.spec.nodeName` đưa tên Node vào container.
-- `terminationGracePeriodSeconds` cho agent thời gian dừng và flush dữ liệu.
-
-Pod do DaemonSet tạo phải có `restartPolicy: Always`, hoặc bỏ qua field này vì giá trị mặc định là `Always`. DaemonSet dành cho process chạy liên tục; task chạy xong nên dùng [Job](/workloads/job/).
-
-#### Vì sao chỉ dùng `spec.nodeName` khi thật sự cần?
-
-Trong manifest trên, container đọc `spec.nodeName` qua Downward API để in tên Node. Ứng dụng thường không nên tự gắn cứng `spec.nodeName` trong Pod template. DaemonSet controller và scheduler cần tự xử lý placement; việc gắn cứng tên Node sẽ làm mất tính linh hoạt và có thể khiến workload không chạy khi Node đó biến mất.
-
-## Chọn những Node được chạy Pod
-
-Mặc định DaemonSet nhắm đến mọi Node. Bạn có thể thu hẹp tập Node bằng `nodeSelector` hoặc `nodeAffinity`.
-
-### `nodeSelector`: lựa chọn đơn giản
-
-Trước tiên gắn label vào các Node dành cho agent:
+Tạo Namespace, kiểm tra manifest ở API Server rồi apply:
 
 ```bash
-kubectl label node node-a node-b node-role.example.com=observability
+kubectl create namespace daemon-lab
+kubectl apply --dry-run=server -f daemonset.yaml
+kubectl apply -f daemonset.yaml
 ```
 
-Sau đó thêm vào Pod template:
+Kết quả:
+
+```text
+daemonset.apps/node-agent created
+```
+
+Đây mới là xác nhận DaemonSet object đã được tạo. Phần tiếp theo sẽ kiểm tra có đủ Pod trên các Node hay chưa.
+
+## Đọc manifest DaemonSet
+
+Manifest có ba lớp chính:
+
+```text
+DaemonSet metadata
+└── DaemonSet spec
+    ├── selector              # Pod nào thuộc DaemonSet?
+    └── template              # Pod mới được tạo như thế nào?
+        ├── labels
+        └── Pod spec
+            ├── containers
+            ├── tolerations
+            └── resources
+```
+
+### `apiVersion`, `kind` và `metadata`
+
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-agent
+  namespace: daemon-lab
+```
+
+- `apps/v1` là API ổn định của DaemonSet.
+- `kind: DaemonSet` xác định loại resource.
+- `metadata.name` là tên DaemonSet.
+- `metadata.namespace` là Namespace chứa DaemonSet và Pod của nó.
+
+### `selector` phải khớp với label của Pod template
+
+```yaml
+spec:
+  selector:
+    matchLabels:
+      app: node-agent
+  template:
+    metadata:
+      labels:
+        app: node-agent
+```
+
+Hai giá trị `app: node-agent` phải khớp nhau.
+
+Có thể hiểu:
+
+```text
+selector: "Pod nào là Pod của tôi?"
+template labels: "Pod mới sẽ mang nhãn nào?"
+```
+
+Nếu selector và template labels không khớp, API Server từ chối manifest.
+
+`spec.selector` của DaemonSet không thể sửa sau khi object được tạo. Chọn selector cụ thể, ổn định và tránh trùng với workload khác. Nếu cần đổi selector, thường phải tạo DaemonSet mới và lập kế hoạch migration.
+
+### `template` là mẫu Pod
 
 ```yaml
 spec:
   template:
+    metadata:
+      labels:
+        app: node-agent
     spec:
-      nodeSelector:
-        node-role.example.com: observability
+      containers:
+        - name: agent
+          image: busybox:1.36
 ```
 
-DaemonSet chỉ tạo Pod trên Node có đúng label này. Nếu không có Node nào match, `desiredNumberScheduled` có thể bằng `0`.
+DaemonSet không chứa sẵn các Pod đang chạy. `spec.template` là mẫu để controller tạo một Pod cho từng Node phù hợp.
 
-### `nodeAffinity`: điều kiện linh hoạt hơn
+Nội dung bên trong gần giống Pod manifest thông thường, nhưng không có `apiVersion`, `kind` và `metadata.name` riêng. Kubernetes tự đặt tên Pod, ví dụ:
 
-Dùng `nodeAffinity` khi cần nhiều giá trị hoặc nhiều điều kiện:
+```text
+node-agent-k2c7n
+```
+
+### DaemonSet dùng `restartPolicy: Always`
+
+Pod của DaemonSet phải dùng:
+
+```yaml
+restartPolicy: Always
+```
+
+hoặc bỏ field này vì mặc định của Pod là `Always`.
+
+Điều này hợp lý vì agent của DaemonSet thường phải chạy liên tục. Nếu container exit, kubelet restart nó trong cùng Pod. Task cần chạy xong rồi dừng nên dùng Job.
+
+### Downward API đưa tên Node vào container
+
+```yaml
+env:
+  - name: NODE_NAME
+    valueFrom:
+      fieldRef:
+        fieldPath: spec.nodeName
+```
+
+Field này đưa tên Node vào biến môi trường `NODE_NAME`. Container có thể biết mình đang phục vụ Node nào mà không cần gọi Kubernetes API.
+
+Không nên tự gắn cứng `spec.nodeName` vào Pod template. DaemonSet controller và Scheduler cần tự xử lý placement.
+
+### Vì sao cần resource requests và limits?
+
+```yaml
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    memory: 32Mi
+```
+
+- `requests` giúp Scheduler biết cần dành bao nhiêu tài nguyên trên mỗi Node.
+- `limits` giới hạn mức sử dụng runtime theo cơ chế tương ứng.
+
+Vì Pod chạy trên nhiều Node, một request nhỏ vẫn có thể trở thành chi phí lớn trên toàn cluster. Phần sau sẽ tính cụ thể.
+
+## Theo dõi trạng thái
+
+Sau khi apply, chờ rollout:
+
+```bash
+kubectl rollout status daemonset/node-agent \
+  -n daemon-lab --timeout=180s
+```
+
+Nếu thành công:
+
+```text
+daemonset "node-agent" successfully rolled out
+```
+
+Xem DaemonSet và Pod:
+
+```bash
+kubectl get daemonset node-agent -n daemon-lab
+kubectl get pods -n daemon-lab -o wide
+```
+
+Output DaemonSet minh họa:
+
+```text
+NAME         DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR
+node-agent   3         3         3       3            3           <none>
+```
+
+Cách đọc:
+
+| Cột/status field | Ý nghĩa |
+|---|---|
+| `DESIRED` / `desiredNumberScheduled` | Số Node mà DaemonSet muốn có Pod |
+| `CURRENT` / `currentNumberScheduled` | Số Node hiện đã có Pod của DaemonSet |
+| `READY` / `numberReady` | Số Pod đang `Ready` |
+| `AVAILABLE` / `numberAvailable` | Số Pod được coi là available |
+| `UP-TO-DATE` / `updatedNumberScheduled` | Số Pod đang dùng template mới nhất |
+| `numberMisscheduled` | Số Pod đang nằm trên Node không còn phù hợp |
+
+`DESIRED=3` không có nghĩa cả ba Pod đều hoạt động tốt. Nếu `READY=2`, cần tìm Node có Pod chưa Ready hoặc Pending.
+
+### So sánh Node và Pod
+
+```bash
+kubectl get nodes \
+  -o custom-columns='NODE:.metadata.name,READY:.status.conditions[?(@.type=="Ready")].status'
+
+kubectl get pods -n daemon-lab \
+  -l app=node-agent \
+  -o custom-columns='POD:.metadata.name,NODE:.spec.nodeName,PHASE:.status.phase,READY:.status.containerStatuses[0].ready'
+```
+
+Mục tiêu là mỗi Node phù hợp xuất hiện đúng một lần trong cột `NODE` của Pod.
+
+### Xem logs của tất cả Pod
+
+```bash
+kubectl logs -n daemon-lab \
+  -l app=node-agent \
+  --prefix --tail=20
+```
+
+Output minh họa:
+
+```text
+[pod/node-agent-abc/agent] version=v1 node=node-a pod=node-agent-abc time=...
+[pod/node-agent-def/agent] version=v1 node=node-b pod=node-agent-def time=...
+```
+
+Tên Node lấy từ Downward API; `$HOSTNAME` mặc định thường là tên Pod. Hai giá trị này không phải một.
+
+## Điều gì xảy ra khi Node hoặc Pod thay đổi?
+
+DaemonSet liên tục reconcile để mỗi Node phù hợp có một Pod.
+
+### Khi thêm Node
+
+```text
+Trước: node-a ✓  node-b ✓
+Thêm:  node-c
+Sau:   node-a ✓  node-b ✓  node-c ✓
+```
+
+Controller tạo Pod cho Node mới nếu Node match selector/affinity. Pod vẫn phải vượt qua taint, resource và các điều kiện scheduling khác.
+
+### Khi xóa Node khỏi cluster
+
+Pod gắn với Node đó không còn giá trị và được garbage collect cùng lifecycle liên quan. `DESIRED` giảm theo số Node phù hợp còn lại.
+
+### Khi xóa một Pod
+
+```bash
+kubectl delete pod <pod-name> -n daemon-lab
+```
+
+DaemonSet phát hiện Node đó thiếu Pod và tạo Pod thay thế hướng tới cùng Node. Pod mới có tên và UID mới; Pod cũ không được “hồi sinh”.
+
+### Khi container bị crash
+
+Vì `restartPolicy: Always`, kubelet thường restart container trong **cùng Pod**. Bạn sẽ thấy cột `RESTARTS` tăng và có thể xem log lần container trước:
+
+```bash
+kubectl logs <pod-name> -n daemon-lab --previous
+```
+
+DaemonSet chỉ tạo Pod mới khi cần reconcile Pod, không tạo Pod mới cho mọi lần container exit.
+
+### Khi Node mất kết nối
+
+DaemonSet Pod tự có một số toleration cho trạng thái `not-ready` và `unreachable`, vì agent cấp Node có thể cần tiếp tục tồn tại khi Node gặp vấn đề. Tuy nhiên, nếu Node thực sự mất điện hoặc không liên lạc được, Kubernetes không thể làm container trên Node đó chạy tiếp bằng phép màu.
+
+DaemonSet cũng không tạo một Pod “bù” trên Node khác, vì mục tiêu của nó là một Pod trên mỗi Node cụ thể, không phải duy trì tổng số replica.
+
+## Chọn những Node được chạy Pod
+
+Mặc định, DaemonSet nhắm tới mọi Node. Bạn có thể thu hẹp bằng `nodeSelector` hoặc `nodeAffinity`.
+
+```text
+Không có selector/affinity
+└── mọi Node được xem xét
+
+Có nodeSelector/affinity
+└── chỉ Node match điều kiện được xem xét
+```
+
+### Dùng `nodeSelector` cho điều kiện đơn giản
+
+Gắn label vào Node cần chạy agent:
+
+```bash
+kubectl label node node-a node-b \
+  workload.example.com/pool=observability
+```
+
+Thêm vào `spec.template.spec`:
+
+```yaml
+nodeSelector:
+  workload.example.com/pool: observability
+```
+
+DaemonSet chỉ muốn Pod trên Node có label đó.
+
+Kiểm tra Node match:
+
+```bash
+kubectl get nodes \
+  -l workload.example.com/pool=observability
+```
+
+Nếu không có Node nào match, `DESIRED` có thể bằng `0`. Đây là kết quả đúng của selector, không nhất thiết là lỗi controller.
+
+### Dùng `nodeAffinity` cho điều kiện phức tạp
+
+`nodeSelector` chỉ phù hợp với phép so khớp label đơn giản. Dùng `nodeAffinity` khi cần nhiều giá trị hoặc nhiều biểu thức:
 
 ```yaml
 spec:
@@ -265,31 +563,53 @@ spec:
                       - observability
 ```
 
-`requiredDuringSchedulingIgnoredDuringExecution` là điều kiện bắt buộc lúc schedule. Phần `IgnoredDuringExecution` nghĩa là thay đổi label sau khi Pod đã chạy không nhất thiết evict Pod ngay.
+Điều kiện trên yêu cầu Node:
 
-Có thể dùng `preferredDuringSchedulingIgnoredDuringExecution` cho preference mềm. Với DaemonSet, nếu Node đã được xác định là eligible nhưng không đủ tài nguyên hoặc vi phạm constraint khác, Pod vẫn có thể Pending.
+1. Có architecture là `amd64` hoặc `arm64`.
+2. Đồng thời thuộc pool `general` hoặc `observability`.
 
-### Label dùng cho security placement
+`requiredDuringSchedulingIgnoredDuringExecution` là điều kiện bắt buộc lúc chọn Node. Nếu label thay đổi sau khi Pod đã chạy, phần `IgnoredDuringExecution` nghĩa là Scheduler không tự evict Pod chỉ vì thay đổi đó. Tuy nhiên, DaemonSet controller sẽ reconcile tập Node mục tiêu và có thể tạo/xóa Pod theo selector mới.
 
-Không nên tin một label tùy ý nếu label đó quyết định workload nhạy cảm chạy ở đâu. Trong threat model có Node bị compromise, kubelet trên Node có thể tự sửa một số label. Khi cần isolation, dùng label có prefix được bảo vệ bởi `NodeRestriction` và bật cơ chế đó trong cluster, ví dụ:
+### Label cho workload nhạy cảm
+
+Nếu label quyết định agent bảo mật hoặc workload nhạy cảm được chạy ở đâu, không nên tin một label tùy ý mà kubelet có thể tự sửa trong threat model của bạn.
+
+Khi cluster bật `NodeRestriction` admission plugin, có thể dùng prefix label được bảo vệ, ví dụ:
 
 ```text
 example.com.node-restriction.kubernetes.io/fips=true
 ```
 
-Label chỉ giúp chọn Node; nó không thay thế security boundary, admission policy hoặc cơ chế hardening của Node.
+Label giúp chọn Node nhưng không tự tạo security boundary. Vẫn cần admission policy, RBAC và hardening phù hợp.
 
-## Taints và tolerations
+## Hiểu taint và toleration
 
-`nodeSelector`/affinity **thu hút** Pod về Node. Taint **đẩy** Pod ra khỏi Node. Toleration cho phép Pod chịu được một taint, nhưng toleration không đảm bảo Pod chắc chắn được schedule: resource, affinity, volume và các điều kiện khác vẫn phải hợp lệ.
+`nodeSelector` và toleration thường bị nhầm vì đều liên quan tới Node placement.
 
-### Ví dụ Node có taint
+Có thể hình dung:
 
-```bash
-kubectl taint node node-a dedicated=observability:NoSchedule
+```text
+nodeSelector/affinity: Pod CHỌN Node nào
+
+taint:                Node TỪ CHỐI Pod nào
+
+toleration:           Pod được PHÉP đi qua một taint
 ```
 
-Pod không có toleration tương ứng sẽ không được schedule mới lên `node-a`. Để DaemonSet chạy trên Node này, thêm toleration vào Pod template:
+Toleration không kéo Pod tới Node. Nó chỉ gỡ một rào cản.
+
+### Ví dụ Node dành riêng cho observability
+
+Taint Node:
+
+```bash
+kubectl taint node node-a \
+  dedicated=observability:NoSchedule
+```
+
+Pod không có toleration tương ứng sẽ không được schedule mới lên `node-a`.
+
+Thêm toleration vào DaemonSet:
 
 ```yaml
 spec:
@@ -302,42 +622,9 @@ spec:
           effect: NoSchedule
 ```
 
-Ba effect thường gặp:
+Dòng này chỉ nói: “Pod được phép chạy trên Node có taint này”. Pod vẫn có thể chạy trên Node khác.
 
-| Effect | Tác dụng |
-|---|---|
-| `NoSchedule` | Không schedule Pod mới nếu Pod không tolerate taint |
-| `PreferNoSchedule` | Cố gắng tránh schedule, nhưng không phải quy tắc tuyệt đối |
-| `NoExecute` | Pod đang chạy có thể bị evict nếu không tolerate; Pod mới cũng không được schedule |
-
-### DaemonSet tự thêm một số toleration
-
-Kubernetes tự thêm một số toleration đặc biệt cho Pod của DaemonSet để node-level agent không biến mất chỉ vì Node đang có vấn đề. Các ví dụ gồm taint về `memory-pressure`, `disk-pressure`, `pid-pressure` và `unschedulable`; Pod `DaemonSet` cũng có toleration `NoExecute` cho `not-ready` và `unreachable`.
-
-Điều này **không có nghĩa DaemonSet tự tolerate mọi taint**. Taint tùy chỉnh như `dedicated=observability:NoSchedule` hoặc taint control-plane thường vẫn cần toleration rõ ràng:
-
-```yaml
-spec:
-  template:
-    spec:
-      tolerations:
-        - key: node-role.kubernetes.io/control-plane
-          operator: Exists
-          effect: NoSchedule
-```
-
-Chỉ thêm toleration control-plane nếu agent thực sự cần chạy ở đó. Toleration quá rộng như sau có thể cho phép agent chạy trên mọi Node có taint, kể cả Node dành riêng cho workload khác:
-
-```yaml
-# Tránh dùng nếu không có lý do rõ ràng.
-- operator: Exists
-```
-
-### Toleration không thay thế node selection
-
-Nếu Node có taint `dedicated=observability:NoSchedule`, thêm toleration chỉ có nghĩa “Pod được phép vào Node đó”. Nó **không** ngăn Pod chạy trên các Node khác.
-
-Nếu muốn agent chỉ chạy trong pool observability, dùng cả hai:
+Nếu muốn agent **chỉ** chạy trong observability pool, dùng cả node selector và toleration:
 
 ```yaml
 spec:
@@ -352,32 +639,77 @@ spec:
           effect: NoSchedule
 ```
 
-Có thể nhớ như sau:
+Luồng quyết định:
 
 ```text
-nodeSelector/affinity = Pod được phép hoặc muốn chạy ở đâu?
-toleration            = Pod chịu được taint nào?
-resource/scheduling   = Pod có thực sự chạy được ở đó không?
+Node có đúng label không?
+├── Không → DaemonSet không cần Pod ở đó
+└── Có
+    └── Pod có tolerate taint không?
+        ├── Không → Pod không schedule được
+        └── Có → tiếp tục kiểm tra CPU, memory, volume, port...
 ```
 
-## Cập nhật và rollback
+### Ba taint effect thường gặp
+
+| Effect | Hành vi chính |
+|---|---|
+| `NoSchedule` | Không schedule Pod mới nếu Pod không tolerate |
+| `PreferNoSchedule` | Cố tránh schedule, nhưng không phải cấm tuyệt đối |
+| `NoExecute` | Pod đang chạy có thể bị evict và Pod mới không được schedule nếu không tolerate |
+
+### DaemonSet tự có một số toleration
+
+Kubernetes tự thêm một số toleration cho DaemonSet Pod để node-level agent có thể tồn tại trong các trạng thái đặc biệt. Các key thường gồm:
+
+- `node.kubernetes.io/not-ready` với `NoExecute`;
+- `node.kubernetes.io/unreachable` với `NoExecute`;
+- `node.kubernetes.io/disk-pressure` với `NoSchedule`;
+- `node.kubernetes.io/memory-pressure` với `NoSchedule`;
+- `node.kubernetes.io/pid-pressure` với `NoSchedule`;
+- `node.kubernetes.io/unschedulable` với `NoSchedule`;
+- `node.kubernetes.io/network-unavailable` với `NoSchedule` khi Pod dùng `hostNetwork`.
+
+Nhờ toleration `unschedulable`, DaemonSet Pod có thể chạy hoặc tiếp tục được quản lý trên Node đã cordon. Điều này hữu ích cho network, storage hoặc monitoring agent.
+
+Kubernetes **không tự tolerate mọi taint tùy chỉnh**. Taint `dedicated=observability:NoSchedule` hoặc taint control plane vẫn cần toleration rõ nếu agent phải chạy ở đó.
+
+Tránh toleration quá rộng nếu không có lý do:
+
+```yaml
+# Cho phép đi qua mọi taint; blast radius rất rộng.
+tolerations:
+  - operator: Exists
+```
+
+## Cập nhật và rollback DaemonSet
+
+Khi Pod template thay đổi, DaemonSet cần thay Pod trên từng Node. Có hai update strategy chính.
 
 ### `RollingUpdate`
 
-`RollingUpdate` là strategy mặc định. Khi Pod template thay đổi, DaemonSet lần lượt thay Pod trên các Node theo giới hạn `maxUnavailable`.
+`RollingUpdate` là mặc định. Controller tự thay Pod cũ bằng Pod mới theo từng batch.
 
-Ví dụ cluster có ba Node và `maxUnavailable: 1`:
-
-```text
-Bắt đầu:  node-a old | node-b old | node-c old
-Bước 1:  node-a new | node-b old | node-c old
-Bước 2:  node-a new | node-b new | node-c old
-Kết thúc: node-a new | node-b new | node-c new
+```yaml
+spec:
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
 ```
 
-Kubernetes không nhất thiết update đúng theo thứ tự `node-a`, `node-b`, `node-c`; thứ tự cụ thể không nên là dependency của ứng dụng.
+Ví dụ ba Node với `maxUnavailable: 1`:
 
-`maxUnavailable` có thể là số Pod hoặc phần trăm. Giá trị càng lớn thì rollout nhanh hơn nhưng càng nhiều Node tạm thời không có agent. Với network, storage, security hoặc monitoring agent quan trọng, nên bắt đầu bằng batch nhỏ và kiểm tra health sau mỗi thay đổi.
+```text
+Ban đầu:   node-a v1 | node-b v1 | node-c v1
+Bước 1:    node-a v2 | node-b v1 | node-c v1
+Bước 2:    node-a v2 | node-b v2 | node-c v1
+Kết thúc:  node-a v2 | node-b v2 | node-c v2
+```
+
+Thứ tự thực tế không nhất thiết là `node-a`, rồi `node-b`, rồi `node-c`. Ứng dụng không nên phụ thuộc vào thứ tự rollout.
+
+`maxUnavailable` càng lớn, rollout càng nhanh nhưng nhiều Node có thể tạm thời không có agent. Với CNI, CSI, security hoặc log agent quan trọng, bắt đầu bằng batch nhỏ và theo dõi health.
 
 Theo dõi rollout:
 
@@ -389,11 +721,9 @@ kubectl rollout history daemonset/node-agent -n daemon-lab
 kubectl get daemonset,pods -n daemon-lab -o wide
 ```
 
-Một Pod mới chỉ được tính là sẵn sàng khi container và readiness signal của nó đáp ứng điều kiện. Nếu image lỗi, probe lỗi hoặc dependency host không hoạt động, rollout có thể dừng lâu hơn timeout của pipeline.
-
 ### `OnDelete`
 
-Với `OnDelete`, DaemonSet cập nhật template nhưng không tự thay Pod đang chạy. Pod mới chỉ xuất hiện khi Pod cũ bị xóa:
+Với `OnDelete`, cập nhật template không tự thay Pod đang chạy:
 
 ```yaml
 spec:
@@ -401,11 +731,13 @@ spec:
     type: OnDelete
 ```
 
-Strategy này cho phép operator kiểm soát từng Node, nhưng dễ để các Node chạy nhiều version khác nhau. Chỉ dùng khi có quy trình update thủ công rõ ràng.
+Pod mới chỉ dùng template mới khi Pod cũ bị xóa thủ công hoặc phải được tạo lại vì lý do khác.
+
+Strategy này cho phép kiểm soát từng Node nhưng dễ để cluster chạy nhiều version trong thời gian dài. Chỉ dùng khi có runbook update thủ công rõ.
 
 ### Rollback
 
-Rollback DaemonSet về revision trước:
+Nếu rollout mới lỗi:
 
 ```bash
 kubectl rollout undo daemonset/node-agent -n daemon-lab
@@ -413,200 +745,288 @@ kubectl rollout status daemonset/node-agent \
   -n daemon-lab --timeout=5m
 ```
 
-Rollback chỉ thay đổi desired state trong cluster. Nếu manifest trong Git hoặc hệ thống GitOps vẫn chứa image/config lỗi, lần reconcile tiếp theo có thể đưa lỗi trở lại. Sau incident, cập nhật source of truth và ghi nhận nguyên nhân.
-
-### Xóa DaemonSet
-
-Xóa DaemonSet theo cách thông thường sẽ xóa các Pod do nó tạo:
+Kiểm tra revision trước khi rollback:
 
 ```bash
-kubectl delete daemonset node-agent -n daemon-lab
+kubectl rollout history daemonset/node-agent -n daemon-lab
 ```
 
-`--cascade=orphan` có thể giữ Pod lại nhưng Pod sẽ không còn controller duy trì. Đây là thao tác migration nâng cao, không nên dùng như cleanup thông thường.
+Rollback trong cluster chưa đủ nếu manifest trong Git vẫn chứa cấu hình lỗi. GitOps controller có thể apply lại lỗi. Hãy sửa source of truth và ghi nhận nguyên nhân.
 
-## Tài nguyên và quyền truy cập Node
+### Vì sao rollout bị kẹt?
 
-### Tính overhead theo toàn bộ Node
+Một Pod mới có thể không Ready vì:
 
-Requests của DaemonSet được nhân với số Node phù hợp:
+- image không tồn tại hoặc không pull được;
+- command crash;
+- Node thiếu CPU hoặc memory;
+- taint hoặc affinity không phù hợp;
+- volume/host path không tồn tại;
+- readiness probe lỗi;
+- agent không có permission cần thiết.
+
+Không tăng `maxUnavailable` chỉ để làm rollout “đi tiếp”. Điều đó có thể khiến nhiều Node cùng mất agent mà không giải quyết nguyên nhân.
+
+## Tài nguyên được nhân theo số Node
+
+DaemonSet Pod xuất hiện trên mọi Node phù hợp, vì vậy resource requests được nhân theo số Node.
+
+Ví dụ một agent yêu cầu:
+
+```yaml
+resources:
+  requests:
+    cpu: 100m
+    memory: 200Mi
+```
+
+Trên 100 Node:
 
 ```text
-100 Node × 100m CPU   = 10 CPU request
-100 Node × 200Mi RAM  = 20,000Mi ≈ 19.5Gi RAM request
+CPU:    100 Node × 100m  = 10 CPU request
+Memory: 100 Node × 200Mi = 20,000Mi ≈ 19.5Gi request
 ```
 
-Nếu chạy năm agent trên cùng fleet, cần cộng requests của cả năm agent. Khi thêm Node, tổng overhead tự tăng. Vì vậy hãy xem DaemonSet là một phần của platform capacity, không phải một Pod nhỏ lẻ.
+Nếu có năm DaemonSet agent, cần cộng chi phí của cả năm. Thêm Node làm application capacity tăng nhưng cũng tự thêm overhead của các DaemonSet.
 
-Nên khai báo `requests` và `limits` phù hợp với mức sử dụng thật. Request quá thấp làm Node bị overcommit; request quá cao khiến Pod không schedule được dù agent thực tế dùng ít tài nguyên.
+### Request quá thấp
 
-### Host access làm tăng blast radius
+Scheduler nghĩ agent dùng ít tài nguyên hơn thực tế, làm Node dễ bị overcommit. Nhiều agent cùng vượt request có thể gây memory pressure hoặc ảnh hưởng application Pod.
 
-Agent cấp Node thường cần một hoặc nhiều quyền sau:
+### Request quá cao
 
-- `hostPath` để đọc `/var/log`, `/var/lib/...` hoặc socket của runtime.
-- `hostNetwork` để dùng network namespace của host.
-- `hostPID` để quan sát process trên host.
-- `privileged` hoặc Linux capabilities đặc biệt.
-- ServiceAccount và RBAC để đọc tài nguyên cluster.
+Pod DaemonSet có thể `Pending` trên Node nhỏ dù mức sử dụng thật thấp hơn. Một Node thiếu agent networking, storage hoặc security có thể không hoạt động đúng.
 
-Mỗi quyền mở rộng đều làm tác động của image hoặc process bị compromise lớn hơn. Ví dụ `hostPath` trỏ tới `/` với quyền ghi có thể cho phép sửa filesystem của host.
+### Limit quá thấp
 
-Giảm rủi ro bằng cách:
+Memory limit quá thấp có thể khiến container `OOMKilled` và restart liên tục trên nhiều Node. CPU limit quá chặt có thể làm agent xử lý log/metric không kịp trong giờ cao điểm.
 
-- Chỉ mount đúng path cần dùng.
-- Dùng `readOnly: true` khi agent chỉ đọc.
-- Chạy non-root và drop capabilities nếu agent hỗ trợ.
-- Tránh `privileged`, `hostPID` và `hostNetwork` nếu không bắt buộc.
-- Dùng ServiceAccount riêng với RBAC tối thiểu.
-- Scan, sign và pin image bằng digest khi phù hợp.
-- Áp admission policy để giới hạn `hostPath`, capabilities và privileged container.
-- Xác định rõ Node nào được phép chạy agent bằng label, taint và policy.
+Hãy đo mức sử dụng theo nhiều loại Node và workload, sau đó đặt request/limit theo dữ liệu thay vì copy cùng một giá trị cho mọi agent.
 
-Một DaemonSet đọc log host không nên mặc nhiên có quyền ghi toàn bộ host filesystem.
+## Quyền truy cập host và rủi ro bảo mật
 
-### Priority và drain
+DaemonSet cấp Node thường cần nhiều quyền hơn application Pod. Các quyền thường gặp:
 
-Nếu agent là thành phần cần có mặt để Node hoạt động, có thể cần `PriorityClass` cao để Pod được schedule trong lúc Node thiếu capacity. Priority cao có thể preempt application Pod, vì vậy phải cân nhắc blast radius và đặt resource request hợp lý.
+- `hostPath` để đọc file hoặc socket trên Node;
+- `hostNetwork` để dùng network namespace của host;
+- `hostPID` để quan sát process của host;
+- `privileged` hoặc Linux capabilities đặc biệt;
+- ServiceAccount và RBAC để đọc resource trong cluster;
+- `hostPort` để mở một port trên từng Node.
 
-Khi bảo trì Node:
+Mỗi quyền mở rộng đều tăng blast radius nếu image hoặc process bị compromise.
 
-```bash
-kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
+### `hostPath`
+
+Ví dụ log collector đọc `/var/log`:
+
+```yaml
+spec:
+  template:
+    spec:
+      containers:
+        - name: collector
+          volumeMounts:
+            - name: varlog
+              mountPath: /host/var/log
+              readOnly: true
+      volumes:
+        - name: varlog
+          hostPath:
+            path: /var/log
+            type: Directory
 ```
 
-`kubectl drain` thường bỏ qua Pod do DaemonSet quản lý và yêu cầu `--ignore-daemonsets` để tiếp tục. Drain không tạo ra một DaemonSet Pod trên Node khác để bù; DaemonSet chỉ đảm bảo Pod trên các Node còn đủ điều kiện. Hãy kiểm tra coverage sau khi cordon, drain và uncordon Node.
+`hostPath` đưa dữ liệu của Node vào container. Nếu mount `/` với quyền ghi, container có thể sửa filesystem host. Chỉ mount đúng path cần dùng và đặt `readOnly: true` khi agent chỉ cần đọc.
 
-## Thực hành
+### `hostNetwork` và `hostPort`
 
-Lab này chạy một `node-agent` không có host access. Vì vậy có thể thực hiện trên cluster học tập mà không cần cấp quyền đặc biệt.
+`hostNetwork: true` cho Pod dùng network namespace của Node. `hostPort` chiếm một port trên Node. Cấu hình sai có thể tạo port conflict hoặc làm agent tiếp xúc trực tiếp với network ngoài dự kiến.
 
-### Điều kiện trước khi bắt đầu
+Không bật chỉ vì “DaemonSet thường dùng host access”. Nhiều agent push metric hoặc log ra ngoài không cần client kết nối trực tiếp vào từng Node.
 
-- Có một Kubernetes cluster đang hoạt động.
-- `kubectl` đã cài đặt và trỏ đúng context.
-- Có quyền tạo Namespace và workload trong cluster.
+### `privileged` và capabilities
 
-Kiểm tra context trước khi chạy lệnh:
+`privileged: true` mở quyền rất rộng. Trước khi dùng, kiểm tra agent có thể chạy với:
+
+- non-root user;
+- `allowPrivilegeEscalation: false`;
+- filesystem chỉ đọc;
+- drop toàn bộ capabilities rồi chỉ thêm capability bắt buộc;
+- seccomp profile phù hợp.
+
+### RBAC
+
+Dùng ServiceAccount riêng cho từng agent và cấp quyền tối thiểu. Một log collector không nên mặc nhiên có quyền sửa Deployment hoặc đọc mọi Secret.
+
+Checklist giảm rủi ro:
+
+- pin image version hoặc digest;
+- scan và ký image theo quy trình của tổ chức;
+- chỉ mount host path cần thiết;
+- dùng read-only mount khi có thể;
+- tránh `hostPID`, `hostNetwork` và `privileged` nếu không bắt buộc;
+- giới hạn Node mục tiêu bằng label và policy;
+- áp admission policy cho host access;
+- giám sát thay đổi DaemonSet vì một rollout lỗi ảnh hưởng nhiều Node.
+
+## DaemonSet trong quá trình bảo trì Node
+
+### Cordon
 
 ```bash
-kubectl config current-context
-kubectl get nodes -o wide
+kubectl cordon <node-name>
 ```
 
-> [!WARNING]
-> Các lệnh dưới đây tạo và xóa tài nguyên trong context hiện tại. Luôn kiểm tra `kubectl config current-context`, đặc biệt trước khi dùng `kubectl delete namespace`.
+Cordon đánh dấu Node không nhận Pod thông thường mới. DaemonSet Pod có toleration `node.kubernetes.io/unschedulable:NoSchedule` được Kubernetes tự thêm, nên DaemonSet vẫn có behavior đặc biệt trên Node này.
 
-### 1. Tạo Namespace và áp dụng manifest
+### Drain
 
-Lưu manifest ở phần trên thành file `daemonset.yaml`, sau đó chạy:
+Khi drain:
 
 ```bash
-kubectl create namespace daemon-lab
+kubectl drain <node-name> \
+  --ignore-daemonsets \
+  --delete-emptydir-data
+```
+
+`kubectl drain` yêu cầu `--ignore-daemonsets` vì Pod DaemonSet không được xử lý giống application Pod thông thường. “Ignore” không có nghĩa xóa agent; Pod DaemonSet thường vẫn còn trên Node trong quá trình drain.
+
+DaemonSet cũng không tạo Pod bù trên Node khác, vì các Node khác đã có Pod riêng.
+
+Trước maintenance production, kiểm tra:
+
+- agent nào vẫn chạy trong lúc drain;
+- agent có ghi dữ liệu vào `emptyDir` hoặc host path không;
+- workload có phụ thuộc trực tiếp vào agent đó không;
+- Node sau reboot có tự nhận đúng label, taint và configuration không;
+- DaemonSet Pod có trở lại `Ready` trước khi uncordon không.
+
+### Priority
+
+Agent quan trọng cho networking hoặc storage có thể cần `PriorityClass` cao để được schedule khi Node thiếu tài nguyên. Priority cao có thể preempt application Pod, vì vậy phải đặt request hợp lý và đánh giá blast radius.
+
+Không dùng priority cao để che việc cluster thiếu capacity lâu dài.
+
+## Thực hành hoàn chỉnh
+
+Lab này chứng minh bốn behavior:
+
+1. Mỗi Node phù hợp có một Pod.
+2. Xóa Pod làm DaemonSet tạo Pod thay thế trên cùng Node.
+3. Thay Pod template kích hoạt rolling update.
+4. `nodeSelector` thu hẹp tập Node mục tiêu.
+
+### 1. Tạo Namespace và apply manifest
+
+Dùng file `daemonset.yaml` ở phần đầu bài:
+
+```bash
+kubectl get namespace daemon-lab >/dev/null 2>&1 || \
+  kubectl create namespace daemon-lab
+
 kubectl apply --dry-run=server -f daemonset.yaml
 kubectl apply -f daemonset.yaml
 ```
 
-`--dry-run=server` gửi manifest tới API Server để kiểm tra schema và validation nhưng không lưu object.
-
-### 2. Xác minh mỗi Node có một Pod
+Chờ rollout:
 
 ```bash
 kubectl rollout status daemonset/node-agent \
   -n daemon-lab --timeout=180s
-
-kubectl get daemonset node-agent -n daemon-lab
-kubectl get pods -n daemon-lab -o wide
 ```
 
-Output minh họa:
-
-```text
-NAME         DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE
-node-agent   3         3         3       3            3
-```
-
-Tên và số cột có thể khác theo phiên bản `kubectl`; điều quan trọng là mỗi Node phù hợp có một Pod `Ready`.
-
-So sánh Node và Pod:
+### 2. Xác minh mỗi Node phù hợp có một Pod
 
 ```bash
-kubectl get nodes --no-headers | wc -l
+kubectl get nodes
+kubectl get daemonset node-agent -n daemon-lab
+kubectl get pods -n daemon-lab -l app=node-agent -o wide
+```
+
+Nếu lab toleration phù hợp với cluster và không có ràng buộc khác, `DESIRED`, `CURRENT` và `READY` nên bằng số Node.
+
+So sánh mapping:
+
+```bash
 kubectl get pods -n daemon-lab \
   -l app=node-agent \
-  -o custom-columns='POD:.metadata.name,NODE:.spec.nodeName,READY:.status.containerStatuses[0].ready,PHASE:.status.phase'
+  -o custom-columns='POD:.metadata.name,NODE:.spec.nodeName,PHASE:.status.phase,READY:.status.containerStatuses[0].ready'
 ```
 
-Xem log từ tất cả Pod:
+Xem logs:
 
 ```bash
-kubectl logs -n daemon-lab -l app=node-agent --prefix --tail=20
+kubectl logs -n daemon-lab \
+  -l app=node-agent --prefix --tail=20
 ```
 
-Trong log, `node=...` cho biết Node mà Pod đang chạy. `hostname` của Pod thường khác tên Node; đừng dùng hai giá trị này thay thế cho nhau.
+Mỗi Node phải xuất hiện trong `node=...` của một Pod.
 
 ### 3. Quan sát self-healing
 
-Chọn một Pod và xóa nó:
+Chọn Pod đầu tiên và lưu Node hiện tại:
 
 ```bash
 POD="$(kubectl get pod -n daemon-lab -l app=node-agent \
   -o jsonpath='{.items[0].metadata.name}')"
 
+NODE="$(kubectl get pod "$POD" -n daemon-lab \
+  -o jsonpath='{.spec.nodeName}')"
+
+echo "Xóa Pod $POD trên Node $NODE"
+```
+
+Xóa Pod và theo dõi:
+
+```bash
 kubectl delete pod "$POD" -n daemon-lab
-kubectl get pods -n daemon-lab -o wide --watch
+kubectl get pods -n daemon-lab -l app=node-agent -o wide --watch
 ```
 
-Trong terminal khác, kiểm tra DaemonSet:
+DaemonSet tạo Pod mới hướng tới cùng Node. Xác minh:
 
 ```bash
-kubectl get daemonset node-agent -n daemon-lab
+kubectl get pods -n daemon-lab -l app=node-agent -o wide
 ```
 
-DaemonSet tạo Pod mới trên **cùng Node** để đưa `current` và `desired` về đúng nhau. Pod mới có tên và UID khác; đó là replacement, không phải Pod cũ được hồi sinh.
+Pod mới có tên khác nhưng cột `NODE` vẫn chứa Node vừa bị thiếu.
 
-### 4. Thử giới hạn vào một nhóm Node
+### 4. Thử rolling update
 
-Không sửa các label hệ thống quan trọng. Tạo label riêng trên một Node lab:
-
-```bash
-kubectl label node <lab-node> workload.example.com/pool=observability
-```
-
-Thêm đoạn sau vào `spec.template.spec` trong `daemonset.yaml`:
+Trong `daemonset.yaml`, đổi:
 
 ```yaml
-nodeSelector:
-  workload.example.com/pool: observability
+- name: AGENT_VERSION
+  value: "v1"
 ```
 
-Áp dụng lại và quan sát:
+thành:
 
-```bash
-kubectl apply -f daemonset.yaml
-kubectl get daemonset,pods -n daemon-lab -o wide
+```yaml
+- name: AGENT_VERSION
+  value: "v2"
 ```
 
-Bây giờ DaemonSet sẽ giữ Pod trên các Node có label đó và xóa Pod trên Node không còn match. Sau lab, xóa label thử nghiệm:
-
-```bash
-kubectl label node <lab-node> workload.example.com/pool-
-```
-
-Nếu cluster chỉ có một Node và Node đó không có label, `desiredNumberScheduled` có thể trở thành `0`; đây là kết quả đúng của selector, không nhất thiết là lỗi controller.
-
-### 5. Thử rollout và rollback
-
-Đổi image trong `daemonset.yaml`, ví dụ từ `busybox:1.36` sang một tag hợp lệ khác mà cluster có thể pull, rồi chạy:
+Thay đổi environment variable nằm trong Pod template nên kích hoạt rollout:
 
 ```bash
 kubectl apply -f daemonset.yaml
 kubectl rollout status daemonset/node-agent \
   -n daemon-lab --timeout=180s
-kubectl rollout history daemonset/node-agent -n daemon-lab
 ```
 
-Nếu muốn quay lại revision trước:
+Kiểm tra revision và logs:
+
+```bash
+kubectl rollout history daemonset/node-agent -n daemon-lab
+kubectl get pods -n daemon-lab -l app=node-agent -o wide
+kubectl logs -n daemon-lab -l app=node-agent --prefix --tail=20
+```
+
+Tất cả Pod mới phải in `version=v2`.
+
+Rollback về revision trước:
 
 ```bash
 kubectl rollout undo daemonset/node-agent -n daemon-lab
@@ -614,190 +1034,323 @@ kubectl rollout status daemonset/node-agent \
   -n daemon-lab --timeout=180s
 ```
 
-### 6. Cleanup
+Sau lab, đưa file `daemonset.yaml` về `v1` nếu muốn source local khớp trạng thái rollback.
 
-Chỉ chạy khi chắc chắn đang ở đúng lab context:
+### 5. Thử giới hạn vào một Node
+
+Lấy tên Node đầu tiên và thêm label dành riêng cho lab:
 
 ```bash
+LAB_NODE="$(kubectl get nodes \
+  -o jsonpath='{.items[0].metadata.name}')"
+
+kubectl label node "$LAB_NODE" \
+  lab.example.com/daemon=true
+```
+
+Thêm đoạn sau vào `spec.template.spec` trong `daemonset.yaml`:
+
+```yaml
+nodeSelector:
+  lab.example.com/daemon: "true"
+```
+
+Apply và quan sát:
+
+```bash
+kubectl apply -f daemonset.yaml
+kubectl get daemonset,pods -n daemon-lab -o wide --watch
+```
+
+DaemonSet giữ Pod trên Node có label và xóa Pod trên Node không còn thuộc tập mục tiêu. `DESIRED` trở thành `1` nếu chỉ một Node mang label.
+
+Xác minh selector:
+
+```bash
+kubectl get nodes -l lab.example.com/daemon=true
+kubectl get pods -n daemon-lab -l app=node-agent -o wide
+```
+
+### 6. Cleanup
+
+Xóa label thử nghiệm và Namespace:
+
+```bash
+kubectl label node "$LAB_NODE" \
+  lab.example.com/daemon-
+
+kubectl config current-context
 kubectl delete namespace daemon-lab
 ```
 
-Nếu đã thêm label thử nghiệm, xóa label trước hoặc sau cleanup:
+Xóa DaemonSet theo cách thông thường sẽ xóa các Pod do nó quản lý.
 
-```bash
-kubectl label node <lab-node> workload.example.com/pool-
-```
+`--cascade=orphan` có thể giữ Pod lại nhưng khiến Pod không còn controller duy trì. Đây là thao tác migration nâng cao, không dùng cho cleanup thông thường.
 
 ## Troubleshooting
 
-Khi DaemonSet không đạt số Pod mong muốn, trước tiên phân biệt hai câu hỏi:
+Khi DaemonSet không đạt trạng thái mong muốn, trước tiên trả lời hai câu hỏi:
 
-1. Controller có **muốn** chạy Pod trên Node đó không? Xem `desiredNumberScheduled` và selector.
-2. Pod đã được tạo nhưng **không chạy được** vì scheduling hoặc runtime? Xem Pod status, Events và logs.
+```text
+1. DaemonSet có MUỐN Pod trên Node đó không?
+   → xem DESIRED, nodeSelector, affinity, labels
 
-### 1. `DESIRED` thấp hơn số Node
+2. Nếu có, Pod có CHẠY ĐƯỢC trên Node đó không?
+   → xem Pod phase, Events, taints, resources, logs
+```
 
-Không phải mọi Node trong `kubectl get nodes` đều nhất thiết là Node phù hợp. Kiểm tra selector, affinity, label và taint:
+Decision tree:
+
+```text
+DESIRED thấp hơn số Node mong đợi?
+├── Có → kiểm tra selector, affinity và Node labels
+└── Không
+    ├── CURRENT thấp hơn DESIRED → kiểm tra Events và tạo Pod
+    ├── Pod Pending → kiểm tra taint, resource, volume, port
+    ├── Pod Running nhưng chưa Ready → kiểm tra probe và dependency
+    ├── Pod CrashLoopBackOff → kiểm tra logs, exit code, OOM
+    └── UPDATED thấp → kiểm tra rollout và Pod template mới
+```
+
+### `DESIRED` thấp hơn số Node mong đợi
 
 ```bash
+kubectl get daemonset node-agent -n daemon-lab
 kubectl get daemonset node-agent -n daemon-lab -o yaml
 kubectl get nodes --show-labels
 kubectl describe daemonset node-agent -n daemon-lab
-kubectl get events -n daemon-lab --sort-by=.metadata.creationTimestamp
-```
-
-Các nguyên nhân thường gặp:
-
-- `nodeSelector` không match label Node.
-- `required` node affinity không match.
-- Pod dùng image hoặc cấu hình chỉ hỗ trợ OS/architecture nhất định.
-- Node vừa được thêm hoặc label vừa thay đổi; controller cần một khoảng thời gian reconcile.
-
-Nếu `DESIRED` đã bao gồm Node nhưng Pod trên Node đó lại `Pending`, hãy chuyển sang kiểm tra taint, resource và Events ở mục tiếp theo. Taint thường làm Pod không schedule được chứ không nhất thiết làm `DESIRED` giảm.
-
-Nếu vừa thêm `nodeSelector`, kiểm tra trực tiếp label:
-
-```bash
-kubectl get nodes -l workload.example.com/pool=observability
-```
-
-### 2. Đã có Pod nhưng Pod ở `Pending`
-
-Lấy Pod đúng Node rồi xem Events:
-
-```bash
-kubectl get pods -n daemon-lab -o wide
-kubectl describe pod <pod> -n daemon-lab
-kubectl describe node <node>
-```
-
-Tìm các message như:
-
-- `Insufficient cpu` hoặc `Insufficient memory`.
-- `untolerated taint`.
-- Affinity/selector không còn phù hợp.
-- PVC hoặc volume không thể attach/mount.
-- `hostPort` bị trùng với Pod khác trên cùng Node.
-- Image architecture không phù hợp với Node.
-- Admission policy hoặc quota từ chối workload.
-
-Thêm toleration không sửa được lỗi thiếu CPU; đổi image không sửa được taint. Đọc Event để chọn đúng lớp cần xử lý.
-
-### 3. Pod `Running` nhưng chưa `Ready`
-
-```bash
-kubectl describe pod <pod> -n daemon-lab
-kubectl logs <pod> -n daemon-lab --all-containers
-kubectl get pod <pod> -n daemon-lab -o jsonpath='{.status.conditions}'
 ```
 
 Kiểm tra:
 
-- Readiness probe có trỏ đúng port/path không?
-- Agent có chờ file hoặc socket trên host chưa được mount không?
-- Process có bind port hoặc quyền cần thiết không?
-- Dependency của agent có sẵn sàng không?
-- Resource limit có làm container bị OOM không?
+- `nodeSelector` có match label Node không;
+- required node affinity có đúng không;
+- Node architecture/OS có phù hợp không;
+- label Node vừa bị thay đổi không;
+- DaemonSet controller đã kịp reconcile chưa.
 
-`Running` chỉ cho biết Pod đã được đặt trên Node và container đã khởi động; không đồng nghĩa Pod đã sẵn sàng cho client hoặc đã cung cấp chức năng đầy đủ.
-
-### 4. Pod `CrashLoopBackOff`
+Kiểm tra trực tiếp một selector:
 
 ```bash
-kubectl logs <pod> -n daemon-lab
-kubectl logs <pod> -n daemon-lab --previous
-kubectl describe pod <pod> -n daemon-lab
+kubectl get nodes \
+  -l workload.example.com/pool=observability
 ```
 
-`--previous` giúp xem log của lần container trước khi restart. Kiểm tra command, env, image, permission, file mount, exit code và OOMKilled. Đừng tăng `restartPolicy`; DaemonSet đã dùng `Always` và kubelet sẽ restart container theo policy đó.
+Nếu selector không match Node nào, `DESIRED=0` là đúng.
 
-### 5. Rollout bị kẹt
+### `DESIRED` đúng nhưng Pod `Pending`
+
+```bash
+kubectl get pods -n daemon-lab -l app=node-agent -o wide
+kubectl describe pod <pod-name> -n daemon-lab
+kubectl describe node <node-name>
+```
+
+Đọc phần `Events`. Các message thường gặp:
+
+- `Insufficient cpu` hoặc `Insufficient memory`;
+- `untolerated taint`;
+- volume không attach hoặc mount được;
+- `hostPort` bị trùng trên Node;
+- image architecture không phù hợp;
+- admission policy hoặc quota chặn;
+- Node không còn Ready hoặc có pressure.
+
+Thêm toleration không sửa được thiếu CPU. Tăng memory không sửa được image pull. Dùng Event để xác định đúng lớp lỗi.
+
+### Pod `Running` nhưng chưa `Ready`
+
+```bash
+kubectl describe pod <pod-name> -n daemon-lab
+kubectl logs <pod-name> -n daemon-lab --all-containers
+kubectl get pod <pod-name> -n daemon-lab \
+  -o jsonpath='{.status.conditions}'
+```
+
+Kiểm tra:
+
+- readiness probe có đúng port/path không;
+- host file hoặc socket cần thiết đã mount chưa;
+- agent có permission đọc host resource không;
+- dependency của agent có sẵn sàng không;
+- init container có hoàn thành không;
+- memory limit có gây OOM không.
+
+`Running` chỉ cho biết container đã khởi động; không chứng minh agent đã cung cấp chức năng đúng.
+
+### Pod `CrashLoopBackOff`
+
+```bash
+kubectl logs <pod-name> -n daemon-lab
+kubectl logs <pod-name> -n daemon-lab --previous
+kubectl describe pod <pod-name> -n daemon-lab
+```
+
+Kiểm tra command, arguments, environment variable, permission, host path, exit code và `OOMKilled`.
+
+Không cần tăng `restartPolicy`; DaemonSet đã dùng `Always`. Cần sửa nguyên nhân khiến process exit.
+
+### Chỉ một vài Node bị lỗi
+
+Nếu hầu hết Pod khỏe nhưng một Pod lỗi, so sánh Node đó với Node khỏe:
+
+```bash
+kubectl get pods -n daemon-lab -l app=node-agent -o wide
+kubectl describe node <problem-node>
+kubectl describe node <healthy-node>
+kubectl get node <problem-node> --show-labels
+```
+
+Khác biệt có thể nằm ở:
+
+- OS hoặc architecture;
+- label và taint;
+- capacity và pressure;
+- host path hoặc socket;
+- kernel/module/driver;
+- port đã bị chiếm;
+- image cache hoặc registry connectivity.
+
+Đừng restart toàn bộ DaemonSet nếu lỗi chỉ nằm trên một Node.
+
+### Rollout bị kẹt
 
 ```bash
 kubectl rollout status daemonset/node-agent \
   -n daemon-lab --timeout=60s
 kubectl get daemonset node-agent -n daemon-lab -o yaml
-kubectl get pods -n daemon-lab -o wide
+kubectl get pods -n daemon-lab -l app=node-agent -o wide
 kubectl describe daemonset node-agent -n daemon-lab
 ```
 
-So sánh `updatedNumberScheduled`, `numberReady` và `numberAvailable`. Thường một hoặc vài Node có Pod template mới nhưng Pod chưa Ready vì image, probe, resource, taint hoặc host dependency.
+So sánh:
 
-Không nên tiếp tục tăng `maxUnavailable` để che lỗi ứng dụng. Với agent cấp Node, rollout nhanh hơn có thể đồng nghĩa nhiều Node cùng lúc mất chức năng observability, networking hoặc security.
+- `desiredNumberScheduled`;
+- `updatedNumberScheduled`;
+- `numberReady`;
+- `numberAvailable`.
 
-### 6. `numberMisscheduled` lớn hơn 0
+Tìm Pod dùng template mới nhưng `Pending`, `ImagePullBackOff`, `CrashLoopBackOff` hoặc chưa Ready. Nếu template mới lỗi, sửa manifest hoặc rollback; không tăng batch để che lỗi.
 
-Điều này cho biết có Pod DaemonSet đang chạy trên Node không còn phù hợp với selector/affinity hiện tại. Kiểm tra label và thay đổi gần đây:
+### `numberMisscheduled` lớn hơn 0
+
+Điều này nghĩa là có Pod DaemonSet đang chạy trên Node không còn phù hợp với selector/affinity hiện tại.
 
 ```bash
 kubectl get daemonset node-agent -n daemon-lab -o yaml
-kubectl get pods -n daemon-lab -o wide --show-labels
+kubectl get pods -n daemon-lab -l app=node-agent -o wide
 kubectl get nodes --show-labels
 ```
 
-Nếu vừa đổi label Node hoặc selector, chờ controller reconcile rồi kiểm tra lại. Không xóa hàng loạt Pod trước khi hiểu vì sao chúng bị misschedule.
+Kiểm tra thay đổi label, affinity và selector gần đây. Chờ controller reconcile trước khi xóa Pod hàng loạt.
 
-### 7. `kubectl drain` báo còn DaemonSet Pod
+### `kubectl drain` báo còn DaemonSet Pod
 
-Đây thường là hành vi bảo vệ mặc định. `kubectl drain` cần `--ignore-daemonsets` để bỏ qua các Pod mà DaemonSet sẽ tự tạo lại:
+Đây thường là behavior bảo vệ mặc định. Dùng:
 
 ```bash
-kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
+kubectl drain <node-name> \
+  --ignore-daemonsets \
+  --delete-emptydir-data
 ```
 
-Trước khi drain production, xác định agent nào cần duy trì, agent nào có local data trong `emptyDir`, và Node khác có đủ capacity để chạy các workload cần thiết hay không.
+Trước production drain, xác định Pod DaemonSet nào giữ local data, Pod nào phải tiếp tục chạy và agent nào ảnh hưởng tới networking/storage của Node.
+
+### Pod không xuất hiện trên control-plane Node
+
+Kiểm tra taint:
+
+```bash
+kubectl describe node <control-plane-node> | grep -A3 Taints
+```
+
+Nếu DaemonSet thật sự cần chạy ở đó, thêm toleration cụ thể:
+
+```yaml
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+```
+
+Không thêm toleration chỉ để làm `DESIRED` bằng tổng số Node. Nhiều agent không cần và không nên chạy trên control plane.
+
+### Logs biến mất sau khi Pod được thay
+
+Rolling update hoặc self-healing tạo Pod mới và Pod cũ bị xóa. `kubectl logs` chỉ đọc được Pod còn tồn tại.
+
+Agent production phải gửi logs/metrics ra hệ thống tập trung. Đừng dựa vào lifecycle của Pod để lưu evidence lâu dài.
 
 ## Best practices
 
-- Dùng DaemonSet khi cần một bản sao trên mỗi Node phù hợp; dùng Deployment nếu chỉ cần một tổng số replica.
-- Thiết kế `selector` cụ thể, ổn định và không overlap workload khác.
+- Dùng DaemonSet khi cần một Pod trên mỗi Node phù hợp; dùng Deployment nếu chỉ cần tổng cộng N replica.
+- Giữ mental model: DaemonSet chọn Node mục tiêu, Scheduler kiểm tra Pod có chạy được trên Node đó không.
+- Dùng selector cụ thể, ổn định và không overlap workload khác.
 - Dùng `nodeSelector` cho điều kiện đơn giản, `nodeAffinity` cho điều kiện phức tạp.
-- Kết hợp label và toleration khi muốn một workload chỉ chạy trong dedicated Node pool.
-- Không thêm toleration quá rộng nếu agent không thực sự cần vào mọi loại Node.
-- Khai báo resource requests/limits và tính overhead trên toàn bộ fleet.
-- Dùng `RollingUpdate` với batch bảo thủ cho network, storage, security và observability agent.
-- Kiểm thử rollout lỗi, rollback, Node mới, cordon/drain, Node replacement và architecture khác nhau.
-- Giảm `hostPath`, `hostNetwork`, `hostPID`, `privileged` và RBAC xuống mức tối thiểu.
-- Dùng image đã scan, pin version hoặc digest và có quy trình cập nhật rõ ràng.
-- Theo dõi đồng thời `desired`, `current`, `ready`, `updated`, `misscheduled`, logs, Events và metric của agent.
-- Nhớ rằng DaemonSet không tự cung cấp replication hoặc HA cho ứng dụng bên trong Pod.
+- Kết hợp node selection và toleration nếu muốn agent chỉ chạy trong dedicated Node pool.
+- Không thêm toleration quá rộng hoặc control-plane toleration nếu agent không cần.
+- Khai báo resource requests/limits và tính tổng overhead trên toàn bộ fleet.
+- Dùng `RollingUpdate` với batch nhỏ cho network, storage, security và observability agent quan trọng.
+- Theo dõi cả `desired`, `current`, `ready`, `available`, `updated` và `misscheduled`.
+- Test rollout lỗi, rollback, Node mới, Node replacement, cordon/drain và cluster có nhiều architecture.
+- Giảm `hostPath`, `hostNetwork`, `hostPID`, `hostPort`, `privileged` và RBAC xuống mức tối thiểu.
+- Mount host path read-only nếu agent chỉ cần đọc.
+- Pin image version hoặc digest và có quy trình cập nhật rõ.
+- Dùng PriorityClass cao chỉ cho agent thật sự quan trọng và hiểu tác động preemption.
+- Gửi logs/metrics tới hệ thống tập trung trước khi Pod bị rollout hoặc xóa.
+- Nhớ rằng DaemonSet chỉ quản lý placement và lifecycle; ứng dụng bên trong vẫn phải tự xử lý health, dữ liệu và failure mode.
 
 ## Tóm tắt
 
-Có thể nhớ DaemonSet bằng mô hình sau:
+Mental model ngắn nhất:
 
 ```text
 DaemonSet
-└── mỗi Node phù hợp
-    └── đúng một Pod của DaemonSet
+└── với mỗi Node phù hợp
+    └── duy trì một Pod của DaemonSet
 ```
 
-Quy trình chọn controller:
+Ba lớp quyết định placement:
 
 ```text
-Cần tổng cộng N replica, replica thay thế lẫn nhau
-→ Deployment
+nodeSelector/affinity
+→ Node nào thuộc tập mục tiêu?
 
-Cần một agent hiện diện trên mỗi Node phù hợp
-→ DaemonSet
+Taint/toleration
+→ Pod có được phép vào Node đó không?
 
-Cần task chạy đến khi hoàn thành
-→ Job
+Resource/volume/port/scheduler constraints
+→ Pod có thực sự chạy được không?
 ```
 
-Bốn điểm quan trọng:
+Các field và status quan trọng:
 
-1. Số Pod của DaemonSet phụ thuộc vào số Node phù hợp, không phụ thuộc `replicas`.
-2. `nodeSelector`/affinity chọn Node; toleration cho phép Pod đi qua taint nhưng không đảm bảo schedule.
-3. `RollingUpdate` thay Pod theo batch; một Pod không Ready có thể làm rollout chậm hoặc kẹt.
-4. DaemonSet chỉ quản lý placement và lifecycle. Host access, security, capacity và behavior của agent vẫn phải được thiết kế riêng.
+| Field/status | Câu hỏi mà nó trả lời |
+|---|---|
+| `spec.selector` | Pod nào thuộc DaemonSet? |
+| `spec.template` | Pod trên mỗi Node chạy như thế nào? |
+| `nodeSelector` / `nodeAffinity` | Node nào cần Pod? |
+| `tolerations` | Pod được phép đi qua taint nào? |
+| `updateStrategy` | Pod được thay khi template đổi như thế nào? |
+| `desiredNumberScheduled` | DaemonSet muốn Pod trên bao nhiêu Node? |
+| `numberReady` | Bao nhiêu Pod đang Ready? |
+| `updatedNumberScheduled` | Bao nhiêu Pod đã dùng template mới? |
+| `numberMisscheduled` | Có Pod nào nằm trên Node không còn phù hợp không? |
 
-Tiếp tục với [Job](/workloads/job/) để tìm hiểu workload chạy đến khi hoàn thành thay vì chạy liên tục trên Node.
+Bốn điều quan trọng nhất:
+
+1. DaemonSet không có `replicas`; số Pod theo số Node phù hợp.
+2. Toleration chỉ cho phép đi qua taint, không chọn Node thay cho selector.
+3. Một DaemonSet nhỏ trên từng Node có thể tạo overhead lớn trên toàn cluster.
+4. Host access giúp agent làm việc ở cấp Node nhưng cũng mở rộng blast radius bảo mật.
+
+Tiếp tục với [Job](/workloads/job/) để học workload chạy đến khi hoàn thành thay vì chạy liên tục trên từng Node.
 
 ## Tài liệu tham khảo
 
 - [DaemonSet](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/)
-- [Taints and Tolerations](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/)
-- [Assigning Pods to Nodes](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/)
 - [Perform a Rolling Update on a DaemonSet](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/)
 - [Perform a Rollback on a DaemonSet](https://kubernetes.io/docs/tasks/manage-daemon/rollback-daemon-set/)
+- [Assigning Pods to Nodes](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/)
+- [Taints and Tolerations](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/)
+- [Pod Lifecycle](/workloads/pod-lifecycle/)
