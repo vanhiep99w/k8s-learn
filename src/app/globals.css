@@ -1,4 +1,9 @@
 @import 'fumadocs-ui/style.css';
+@import '@vanhiep99w/docs-kit/styles/d2.css';
+@import '@vanhiep99w/docs-kit/styles/terminal-session.css';
+@import '@vanhiep99w/docs-kit/styles/code-walkthrough.css';
+@import '@vanhiep99w/docs-kit/styles/code-diff.css';
+@import '@vanhiep99w/docs-kit/styles/protocol-exchange.css';
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {

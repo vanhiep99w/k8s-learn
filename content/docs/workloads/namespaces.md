@@ -26,14 +26,21 @@ description: "Dùng Namespace để phân vùng tên và phạm vi policy trong 
 
 Namespace là ranh giới logic trong một cluster. Nó cho phép nhiều object có cùng tên ở các Namespace khác nhau và tạo scope để áp dụng RBAC, quota, policy mạng hoặc cấu hình mặc định.
 
-```text
-Cluster
-├── namespace: team-a
-│   ├── Deployment/api
-│   └── Service/api
-└── namespace: team-b
-    ├── Deployment/api
-    └── Service/api
+```d2 title="Tổng quan"
+direction: right
+n1: "Cluster"
+n2: "namespace: team-a"
+n3: "Deployment/api"
+n4: "Service/api"
+n5: "namespace: team-b"
+n6: "Deployment/api"
+n7: "Service/api"
+n1 -> n2
+n2 -> n3
+n2 -> n4
+n1 -> n5
+n5 -> n6
+n5 -> n7
 ```
 
 `team-a/api` và `team-b/api` là hai objects khác nhau.
@@ -196,14 +203,21 @@ Dù context có default Namespace, manifest production nên khai báo `metadata.
 
 Namespace thường đi cùng baseline objects:
 
-```text
-Namespace
-├── ResourceQuota
-├── LimitRange
-├── default-deny NetworkPolicy
-├── RoleBindings
-├── ServiceAccounts
-└── labels cho Pod Security / cost / ownership
+```d2 title="7. Policy theo Namespace"
+direction: right
+n1: "Namespace"
+n2: "ResourceQuota"
+n3: "LimitRange"
+n4: "default-deny NetworkPolicy"
+n5: "RoleBindings"
+n6: "ServiceAccounts"
+n7: "labels cho Pod Security / cost /\nownership"
+n1 -> n2
+n1 -> n3
+n1 -> n4
+n1 -> n5
+n1 -> n6
+n1 -> n7
 ```
 
 Ví dụ labels:

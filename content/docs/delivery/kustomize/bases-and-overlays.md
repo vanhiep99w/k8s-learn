@@ -11,14 +11,21 @@ description: "Tái sử dụng manifest bằng Base và Overlays cho dev, stagin
 
 **Overlay** là một Kustomization nạp base rồi thêm biến đổi cho một môi trường, một tenant hoặc một deployment target. Overlay là entry point mà CI/CD hoặc GitOps thường build và apply.
 
-```mermaid
-flowchart TD
-  B[base<br/>Deployment + Service] --> D[overlays/dev<br/>replicas + image]
-  B --> S[overlays/staging<br/>replicas + domain]
-  B --> P[overlays/prod<br/>resources + policy]
-  D --> RD[dev output]
-  S --> RS[staging output]
-  P --> RP[prod output]
+```d2 title="Hai khái niệm"
+direction: down
+B: "base\nDeployment + Service"
+D: "overlays/dev\nreplicas + image"
+S: "overlays/staging\nreplicas + domain"
+P: "overlays/prod\nresources + policy"
+RD: "dev output"
+RS: "staging output"
+RP: "prod output"
+B -> D
+B -> S
+B -> P
+D -> RD
+S -> RS
+P -> RP
 ```
 
 Quan hệ này tạo ra một chiều phụ thuộc: overlay phụ thuộc base, còn base không được phụ thuộc ngược lên overlay. Nếu base bắt đầu chứa nhiều điều kiện riêng cho môi trường, ranh giới đã bị phá vỡ và việc review sẽ khó hơn.

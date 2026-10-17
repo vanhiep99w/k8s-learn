@@ -29,15 +29,29 @@ description: "Thiết kế storage cho StatefulSet và database: identity, volum
 
 Stateful workload cần nhiều hơn việc giữ file qua Pod restart. Thiết kế phải nối application identity, storage identity, replication protocol, topology, backup và recovery:
 
-```text
-StatefulSet db
-├── db-0 ↔ data-db-0 ↔ volume A
-├── db-1 ↔ data-db-1 ↔ volume B
-└── db-2 ↔ data-db-2 ↔ volume C
-
-Application protocol: leader/quorum/replication
-Storage backend: durability/zone/snapshot
-Kubernetes: identity/scheduling/attach/mount
+```d2 title="Tổng quan"
+direction: right
+sts: StatefulSet db
+p0: db-0
+p1: db-1
+p2: db-2
+c0: data-db-0
+c1: data-db-1
+c2: data-db-2
+v0: volume A
+v1: volume B
+v2: volume C
+sts -> p0
+sts -> p1
+sts -> p2
+p0 -- c0 -- v0
+p1 -- c1 -- v1
+p2 -- c2 -- v2
+responsibility: Trách nhiệm {
+  app: "Application protocol\nleader/quorum/replication"
+  storage: "Storage backend\ndurability/zone/snapshot"
+  k8s: "Kubernetes\nidentity/scheduling/attach/mount"
+}
 ```
 
 Kubernetes cung cấp building blocks. Nó không tự biến ba disk thành database cluster nhất quán, không tự backup và không quyết định member nào an toàn để xóa.
@@ -62,10 +76,17 @@ Một single-replica database dùng regional disk có durability tốt hơn loca
 
 StatefulSet gán ordinal ổn định:
 
-```text
-mysql-0 → data-mysql-0
-mysql-1 → data-mysql-1
-mysql-2 → data-mysql-2
+```d2 title="2. Identity Pod, PVC và data"
+direction: right
+n1: "mysql-0"
+n2: "data-mysql-0"
+n3: "mysql-1"
+n4: "data-mysql-1"
+n5: "mysql-2"
+n6: "data-mysql-2"
+n1 -> n2
+n3 -> n4
+n5 -> n6
 ```
 
 Khi `mysql-1` được thay, Pod mới giữ tên `mysql-1` và tham chiếu PVC cũ. Pod UID, IP, container và Node có thể đổi.

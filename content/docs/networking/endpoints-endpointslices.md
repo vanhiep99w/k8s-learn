@@ -29,14 +29,21 @@ description: "EndpointSlice deep-dive: cách Service tìm backend, ready/serving
 
 EndpointSlice là API `discovery.k8s.io/v1` mô tả các network endpoint đứng sau Service. Đây là nguồn dữ liệu để kube-proxy/service proxy, CoreDNS, Gateway/Ingress controller và service mesh biết backend nào tồn tại.
 
-```mermaid
-flowchart LR
-    P[Pods + labels + readiness] --> C[EndpointSlice controller]
-    S[Service selector + ports] --> C
-    C --> E1[EndpointSlice IPv4, port 8080]
-    C --> E2[EndpointSlice IPv6, port 8080]
-    E1 --> K[kube-proxy / data plane]
-    E1 --> D[CoreDNS]
+```d2 title="Tổng quan"
+direction: right
+P: "Pods + labels + readiness"
+C: "EndpointSlice controller"
+S: "Service selector + ports"
+E1: "EndpointSlice IPv4, port 8080"
+E2: "EndpointSlice IPv6, port 8080"
+K: "kube-proxy / data plane"
+D: "CoreDNS"
+P -> C
+S -> C
+C -> E1
+C -> E2
+E1 -> K
+E1 -> D
 ```
 
 EndpointSlice không forward packet. Nó là **discovery/control-plane state** để data plane được program.
@@ -174,16 +181,16 @@ Với `publishNotReadyAddresses: true`, ready semantics được điều chỉnh
 
 ### 4.4 Rollout flow
 
-```mermaid
-sequenceDiagram
-    participant P as Pod old
-    participant E as EndpointSlice
-    participant K as Service proxy
-    P->>P: deletionTimestamp set
-    E->>E: terminating=true, ready=false
-    K->>K: tránh connection mới tới old endpoint
-    P->>P: preStop + SIGTERM + drain
-    E->>E: remove endpoint khi Pod gone
+```d2 title="4.4 Rollout flow"
+shape: sequence_diagram
+P: "Pod old"
+E: "EndpointSlice"
+K: "Service proxy"
+P -> P: "deletionTimestamp set"
+E -> E: "terminating=true, ready=false"
+K -> K: "tránh connection mới tới old\nendpoint"
+P -> P: "preStop + SIGTERM + drain"
+E -> E: "remove endpoint khi Pod gone"
 ```
 
 Kube-proxy có thể route tới terminating endpoint trong trường hợp đặc biệt khi traffic policy Local và mọi local endpoint đều terminating, nhằm hỗ trợ graceful drain. Không dựa vào chi tiết này thay cho termination design đúng.

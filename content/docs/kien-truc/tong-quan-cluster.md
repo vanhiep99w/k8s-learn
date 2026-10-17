@@ -28,23 +28,21 @@ description: "Giải thích cấu trúc Kubernetes Cluster, luồng triển khai
 
 Kubernetes Cluster là một hệ thống phân tán gồm các máy và tiến trình phối hợp để duy trì **desired state** của workload. Người dùng mô tả điều muốn có qua Kubernetes API; Control Plane lưu, phân tích và ra quyết định; các Node thực thi quyết định đó bằng cách chạy Container.
 
-```text
-                    ┌────────────────────────────┐
-Developer / CI/CD ─▶│       Kubernetes API       │
-                    └──────────────┬─────────────┘
-                                   │ desired state
-                ┌──────────────────┴──────────────────┐
-                │            Control Plane            │
-                │  storage │ scheduling │ controllers │
-                └──────────────────┬──────────────────┘
-                                   │ assigned Pods
-                  ┌────────────────┴────────────────┐
-                  │                                 │
-          ┌───────▼────────┐                ┌───────▼────────┐
-          │ Worker Node A  │                │ Worker Node B  │
-          │ kubelet/runtime│                │ kubelet/runtime│
-          │ Pods           │                │ Pods           │
-          └────────────────┘                └────────────────┘
+```d2 title="Các miền chính của Kubernetes Cluster"
+direction: right
+client: "Developer / CI/CD"
+cp: "Control Plane\nKubernetes API\nstorage | scheduling | controllers" {
+  icon: https://icons.d2lang.com/azure/_Companies/Kubernetes.svg
+}
+a: "Worker Node A\nkubelet / runtime\nPods" {
+  icon: https://icons.d2lang.com/essentials/112-server.svg
+}
+b: "Worker Node B\nkubelet / runtime\nPods" {
+  icon: https://icons.d2lang.com/essentials/112-server.svg
+}
+client -> cp: desired state
+cp -> a: assigned Pods
+cp -> b
 ```
 
 > [!IMPORTANT]
@@ -112,13 +110,19 @@ Control Plane cũng có thể là Node và chạy Pod, đặc biệt trong local
 
 Hầu hết component không gọi trực tiếp lẫn nhau để truyền lệnh nghiệp vụ. Chúng đọc và ghi object qua API Server.
 
-```mermaid
-flowchart LR
-    Client[kubectl / CI/CD] --> API[kube-apiserver]
-    API <--> ETCD[(etcd)]
-    Controller[Controllers] <-->|watch / update| API
-    Scheduler[kube-scheduler] <-->|watch / bind| API
-    Kubelet[kubelet] <-->|watch / status| API
+```d2 title="3. Kubernetes API là trung tâm"
+direction: right
+Client: "kubectl / CI/CD"
+API: "kube-apiserver"
+ETCD: "etcd" {shape: cylinder}
+Controller: "Controllers"
+Scheduler: "kube-scheduler"
+Kubelet: "kubelet"
+Client -> API
+API <-> ETCD
+Controller <-> API: "watch / update"
+Scheduler <-> API: "watch / bind"
+Kubelet <-> API: "watch / status"
 ```
 
 Ví dụ Scheduler không gửi lệnh trực tiếp đến kubelet. Scheduler ghi binding của Pod vào API. Kubelet trên Node tương ứng quan sát thay đổi rồi thực thi Pod.
@@ -138,30 +142,29 @@ Thiết kế này mang lại:
 
 Giả sử người dùng apply một Deployment ba replica:
 
-```mermaid
-sequenceDiagram
-    participant User as Người dùng
-    participant API as kube-apiserver
-    participant ETCD as etcd
-    participant DC as Deployment Controller
-    participant RC as ReplicaSet Controller
-    participant S as Scheduler
-    participant K as kubelet
-    participant R as Container Runtime
-
-    User->>API: Apply Deployment replicas=3
-    API->>API: Authn, authz, admission, validation
-    API->>ETCD: Persist object
-    DC->>API: Watch Deployment
-    DC->>API: Create ReplicaSet
-    RC->>API: Watch ReplicaSet
-    RC->>API: Create 3 Pod objects
-    S->>API: Watch unscheduled Pods
-    S->>API: Bind mỗi Pod vào một Node
-    K->>API: Watch Pods assigned to Node
-    K->>R: Pull image, create sandbox, start containers
-    K->>API: Update Pod status
-    DC->>API: Update rollout status
+```d2 title="4. Luồng triển khai workload từ đầu đến cuối"
+shape: sequence_diagram
+User: "Người dùng"
+API: "kube-apiserver"
+ETCD: "etcd"
+DC: "Deployment Controller"
+RC: "ReplicaSet Controller"
+S: "Scheduler"
+K: "kubelet"
+R: "Container Runtime"
+User -> API: "Apply Deployment replicas=3"
+API -> API: "Authn, authz, admission, validation"
+API -> ETCD: "Persist object"
+DC -> API: "Watch Deployment"
+DC -> API: "Create ReplicaSet"
+RC -> API: "Watch ReplicaSet"
+RC -> API: "Create 3 Pod objects"
+S -> API: "Watch unscheduled Pods"
+S -> API: "Bind mỗi Pod vào một Node"
+K -> API: "Watch Pods assigned to Node"
+K -> R: "Pull image, create sandbox, start\ncontainers"
+K -> API: "Update Pod status"
+DC -> API: "Update rollout status"
 ```
 
 ### 4.1 Request được chấp nhận
@@ -172,8 +175,13 @@ API Server xác thực identity, kiểm tra quyền, chạy admission và valida
 
 Deployment controller tạo ReplicaSet. ReplicaSet controller tạo Pod để đạt số replica mong muốn. Quan hệ ownership hình thành chuỗi:
 
-```text
-Deployment → ReplicaSet → Pod
+```d2 title="4.2 Controllers tạo resource con"
+direction: right
+n1: "Deployment"
+n2: "ReplicaSet"
+n3: "Pod"
+n1 -> n2
+n2 -> n3
 ```
 
 ### 4.3 Scheduler quyết định placement
@@ -239,13 +247,17 @@ Kubernetes dùng CSI để tích hợp storage system. PVC mô tả nhu cầu, S
 
 CRD thêm resource type mới; custom controller thêm hành vi reconciliation. Operator kết hợp hai phần để quản lý lifecycle của hệ thống phức tạp bằng Kubernetes API.
 
-```text
-Built-in API + built-in controllers
-              │
-              ├── CNI: networking
-              ├── CSI: storage
-              ├── CRI: container runtime
-              └── CRD + controller: domain-specific automation
+```d2 title="6.3 Extensibility"
+direction: right
+n1: "Built-in API + built-in controllers"
+n2: "CNI: networking"
+n3: "CSI: storage"
+n4: "CRI: container runtime"
+n5: "CRD + controller: domain-specific\nautomation"
+n1 -> n2
+n1 -> n3
+n1 -> n4
+n1 -> n5
 ```
 
 ---
@@ -411,14 +423,21 @@ kubectl get events -n <namespace> --sort-by=.metadata.creationTimestamp
 
 Hãy ghi nhớ flow cốt lõi:
 
-```text
-Manifest
-  → API Server chấp nhận và lưu desired state
-  → Controllers tạo hoặc điều chỉnh resources
-  → Scheduler chọn Node
-  → kubelet và runtime chạy Container
-  → status phản hồi về API
-  → controllers tiếp tục reconcile
+```d2 title="12. Tổng kết"
+direction: right
+n1: "Manifest"
+n2: "API Server chấp nhận và lưu desired\nstate"
+n3: "Controllers tạo hoặc điều chỉnh\nresources"
+n4: "Scheduler chọn Node"
+n5: "kubelet và runtime chạy Container"
+n6: "status phản hồi về API"
+n7: "controllers tiếp tục reconcile"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
 ```
 
 Tiếp theo, đọc [Các thành phần trong Cluster](/kien-truc/cluster-components/) để xây bản đồ trách nhiệm chi tiết trước khi đi sâu vào từng component.

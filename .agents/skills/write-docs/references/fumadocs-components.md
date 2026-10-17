@@ -11,7 +11,7 @@ Chỉ dùng component nếu repository đã đăng ký nó trong MDX renderer, t
 - [Tabs](#tabs)
 - [Accordion](#accordion)
 - [TypeTable](#typetable)
-- [Mermaid](#mermaid)
+- [D2 và docs-kit](#d2-và-docs-kit)
 
 ## Nguyên tắc chọn component
 
@@ -23,7 +23,11 @@ Chỉ dùng component nếu repository đã đăng ký nó trong MDX renderer, t
 | Biến thể tương đương theo platform/tool | `Tabs` + `Tab` |
 | Nội dung phụ hoặc FAQ | `Accordions` + `Accordion` |
 | Mô tả config/type | `TypeTable` |
-| Flow, sequence, state, architecture | Mermaid code block |
+| Flow, sequence, state, architecture | `d2` code block |
+| Đọc manifest theo vùng/dòng | `code-walkthrough` |
+| Quy trình command với context và expected result | `terminal-session` |
+| So sánh hai phiên bản config | `code-diff` |
+| Minh họa HTTP request/response | `protocol-exchange` |
 
 Không dùng component để trang trông “phong phú”. Dùng khi nó giúp người đọc hiểu cấu trúc hoặc thao tác nhanh hơn.
 
@@ -138,25 +142,43 @@ Dùng cho tập field có schema ổn định. Với behavior phức tạp, thê
 
 Xác minh default và type theo version. Không copy default từ trí nhớ.
 
-## Mermaid
+## D2 và docs-kit
+
+Website dùng `@vanhiep99w/docs-kit` để compile D2 thành SVG light/dark lúc build. Không cài D2 CLI hoặc đưa compiler/WASM vào client. Mermaid không còn được đăng ký.
 
 ````mdx
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant S as Service
-    participant P as Pod
-    C->>S: Request
-    S->>P: Forward to ready endpoint
-    P-->>C: Response
+```d2 title="Luồng request"
+direction: right
+client: Client
+service: Service
+pod: Ready Pod
+client -> service: Request
+service -> pod: Forward
 ```
 ````
 
-Chọn diagram type theo câu hỏi:
+- Luôn đặt `title` mô tả diagram; dùng ID ngắn, ổn định, không dùng reserved keyword như `class`.
+- Dùng `shape: sequence_diagram` cho tương tác theo thời gian; khai báo actor trước message. Response có thể dùng `{style.stroke-dash: 4}`.
+- Dùng container cho boundary, `shape: diamond` cho quyết định, `shape: cylinder` cho storage. Không biến quan hệ ownership thành đường đi traffic.
+- Viewer tương tác đã bật mặc định: Explore, zoom/pan, fit, mở rộng, xem/copy D2 và tải SVG. Có thể dùng `interactive=false` cho diagram rất nhỏ.
+- Dùng `mode=steps` với `steps` cho diễn tiến kế thừa, `mode=tabs` với `scenarios` cho các trường hợp độc lập, `mode=explorer` với `layers` cho drill-down. Không biểu diễn hai nhánh loại trừ nhau như hai thao tác tuần tự.
+- Icon có thể lấy từ [D2 Icons](https://icons.d2lang.com/), ví dụ `icon: https://icons.d2lang.com/essentials/112-server.svg`. Xác minh URL; không suy đoán đường dẫn icon. Icon remote vẫn cần mạng khi đọc.
+- Giữ cây thư mục, command output, log, công thức và cú pháp dựa vào vị trí dưới dạng text. Không chuyển một phép ánh xạ field đơn giản thành diagram chỉ để trang trí.
+- Tách luồng dài khi cần; nhãn ngắn, dùng `\n` trong chuỗi D2 để ngắt dòng. SVG có thể cuộn ngang trên mobile mà không gây tràn toàn trang.
 
-- `flowchart`: thành phần và hướng dữ liệu.
-- `sequenceDiagram`: thứ tự tương tác theo thời gian.
-- `stateDiagram-v2`: lifecycle/state transition.
-- `graph`: quan hệ topology đơn giản.
+### Chọn component bổ sung
 
-Giải thích diagram trong prose và chạy build để kiểm tra remark transform cùng Mermaid syntax.
+Các fence sau đã có plugin trong `source.config.ts`, component trong page renderer và CSS global. Descriptor là YAML được validate lúc build, không phải code được thực thi.
+
+| Fence | Dữ liệu chính | Trang mẫu |
+|---|---|---|
+| `code-walkthrough` | `title`, `language`, `snapshots[{id,title,code}]`, `steps[{id,snapshot,title,description,ranges}]` | `gioi-thieu/yaml-manifest.md` |
+| `terminal-session` | `title`, `context{kind,label?,cwd?}`, `steps[{id,command,expected?,warning?,outputs?}]` | `gioi-thieu/first-application.md` |
+| `code-diff` | `title`, `language`, `before{code}`, `after{code}`, `wordDiff?` | `gioi-thieu/first-application.md` |
+| `protocol-exchange` | `title`, `variants[{id,title,request,response}]` | `kien-truc/kube-apiserver.md` |
+
+Ranges tính từ 1, inclusive, theo snapshot gốc. Copy giữ code/command gốc; không thêm prompt hoặc số dòng. Nêu rõ output/transcript minh họa; không gán exit code hay số đo giả như kết quả kiểm chứng thật. Viết cảnh báo và bối cảnh quan trọng ở prose bên ngoài viewer; không giấu prerequisite trong disclosure.
+
+Chỉ compile nội dung tin cậy trong repository; mọi snapshot, output và scenario đều được publish công khai. Không đưa secrets vào descriptor. Chưa đăng ký Source Explorer hoặc Span Waterfall: chỉ tích hợp khi có source project hoặc trace dữ liệu phù hợp, không thêm để trang trông phong phú.
+
+API đầy đủ: [docs-kit](https://www.npmjs.com/package/@vanhiep99w/docs-kit) và [tài liệu D2](https://github.com/vanhiep99w/docs-kit/blob/main/docs/d2.md). Chạy build để kiểm tra cả cú pháp D2 và descriptor; kiểm tra browser cho tương tác, theme và mobile.

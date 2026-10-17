@@ -34,16 +34,23 @@ readinessProbe thất bại           → Pod NotReady, ngừng nhận traffic p
 livenessProbe thất bại quá ngưỡng → restart container
 ```
 
-```mermaid
-flowchart TD
-    C[Container start] --> S{startupProbe pass?}
-    S -- Chưa --> S
-    S -- Quá ngưỡng --> R[Restart container]
-    S -- Có --> L{liveness pass?}
-    S -- Có --> D{readiness pass?}
-    L -- Không quá ngưỡng --> R
-    D -- Không --> N[Pod NotReady]
-    D -- Có --> Y[Pod Ready]
+```d2 title="Tổng quan"
+direction: down
+C: "Container start"
+S: "startupProbe pass?" {shape: diamond}
+R: "Restart container"
+L: "liveness pass?" {shape: diamond}
+D: "readiness pass?" {shape: diamond}
+N: "Pod NotReady"
+Y: "Pod Ready"
+C -> S
+S -> S: "Chưa"
+S -> R: "Quá ngưỡng"
+S -> L: "Có"
+S -> D: "Có"
+L -> R: "Không quá ngưỡng"
+D -> N: "Không"
+D -> Y: "Có"
 ```
 
 > [!IMPORTANT]
@@ -87,8 +94,13 @@ Nếu database bên ngoài down, restart mọi Pod thường không sửa đư�
 
 Probe không đi qua Service/Ingress. Kubelet thường kiểm tra trực tiếp Pod IP/container:
 
-```text
-kubelet → Pod IP:containerPort → handler
+```d2 title="2. Kubelet thực thi probe như thế nào?"
+direction: right
+n1: "kubelet"
+n2: "Pod IP:containerPort"
+n3: "handler"
+n1 -> n2
+n2 -> n3
 ```
 
 Hệ quả:
@@ -266,13 +278,19 @@ Hàng nghìn Pods probe cùng period có thể đồng bộ và tạo load. Endp
 
 Deployment xem Pod available dựa trên readiness và `minReadySeconds`. Probe false positive cho traffic vào quá sớm; false negative làm rollout kẹt và dùng cả old/new capacity.
 
-```text
-Pod mới start
-→ startup pass
-→ readiness pass
-→ EndpointSlice ready
-→ Deployment tính available
-→ Pod cũ được scale down theo strategy
+```d2 title="7. Probe trong rollout và shutdown"
+direction: right
+n1: "Pod mới start"
+n2: "startup pass"
+n3: "readiness pass"
+n4: "EndpointSlice ready"
+n5: "Deployment tính available"
+n6: "Pod cũ được scale down theo strategy"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
 ```
 
 Trong shutdown:

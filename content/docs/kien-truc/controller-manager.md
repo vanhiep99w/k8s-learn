@@ -28,21 +28,17 @@ description: "Giải thích kube-controller-manager, các built-in controller, i
 
 `kube-controller-manager` là binary chạy nhiều controller cốt lõi. Mỗi controller là một control loop quan sát cluster state, so sánh actual state với desired state và thực hiện action để giảm sai lệch.
 
-```text
-Desired state trong API
-         │
-         ▼
-Controller observes objects
-         │
-         ▼
-Compare desired vs actual
-         │
-    ┌────┴────┐
-    │ equal?  │
-    └────┬────┘
-      yes│no
-         │ └──▶ create/update/delete external or API resource
-         └────▶ wait/watch next event
+```d2 title="Tổng quan"
+direction: down
+api: Desired state trong API
+observe: Controller observes objects
+compare: Compare desired vs actual
+equal: equal? {shape: diamond}
+act: "create/update/delete\nexternal or API resource"
+wait: wait/watch next event
+api -> observe -> compare -> equal
+equal -> act: no
+equal -> wait: yes
 ```
 
 > [!IMPORTANT]
@@ -103,14 +99,18 @@ Tất cả cùng dùng Kubernetes API nhưng không nhất thiết nằm trong c
 
 ## 3. Kiến trúc một reconciliation loop
 
-```mermaid
-flowchart LR
-    API[Kubernetes API] -->|LIST/WATCH| INF[Informer + local cache]
-    INF -->|event key| Q[Rate-limited work queue]
-    Q --> W[Reconcile worker]
-    W -->|read cached/current state| INF
-    W -->|create/update/delete/status| API
-    W -->|error: retry with backoff| Q
+```d2 title="3. Kiến trúc một reconciliation loop"
+direction: right
+API: "Kubernetes API"
+INF: "Informer + local cache"
+Q: "Rate-limited work queue"
+W: "Reconcile worker"
+API -> INF: "LIST/WATCH"
+INF -> Q: "event key"
+Q -> W
+W -> INF: "read cached/current state"
+W -> API: "create/update/delete/status"
+W -> Q: "error: retry with backoff"
 ```
 
 ### 3.1 Informer và cache
@@ -186,10 +186,13 @@ Phối hợp binding PV/PVC và lifecycle liên quan. Dynamic provisioning thư�
 
 Resource con có `metadata.ownerReferences` trỏ đến owner bằng UID, không chỉ name.
 
-```text
-Deployment
-  └── ReplicaSet
-        └── Pods
+```d2 title="5.1 Owner references"
+direction: right
+n1: "Deployment"
+n2: "ReplicaSet"
+n3: "Pods"
+n1 -> n2
+n2 -> n3
 ```
 
 Kiểm tra:
@@ -263,18 +266,17 @@ User thường không nên sửa status để “đánh dấu healthy”. Contro
 
 Finalizer là key yêu cầu cleanup trước khi xóa object hoàn toàn.
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant API as API Server
-    participant C as Controller
-
-    U->>API: DELETE object
-    API->>API: Set deletionTimestamp
-    API-->>C: Watch terminating object
-    C->>C: Cleanup external/dependent state
-    C->>API: Remove its finalizer
-    API->>API: Delete object when finalizers empty
+```d2 title="7. Finalizers và deletion"
+shape: sequence_diagram
+U: "User"
+API: "API Server"
+C: "Controller"
+U -> API: "DELETE object"
+API -> API: "Set deletionTimestamp"
+API -> C: "Watch terminating object" {style.stroke-dash: 4}
+C -> C: "Cleanup external/dependent state"
+C -> API: "Remove its finalizer"
+API -> API: "Delete object when finalizers empty"
 ```
 
 ### 7.1 Vì sao object kẹt `Terminating`

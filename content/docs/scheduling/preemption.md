@@ -26,20 +26,17 @@ description: "Cơ chế scheduler chọn preemption victims cho Pod priority cao
 
 Preemption là cơ chế scheduler tạo cơ hội cho Pod priority cao bằng cách loại một hoặc nhiều Pod priority thấp hơn khỏi Node candidate. Nó chỉ được cân nhắc khi Pod không schedule được theo cách thông thường và việc loại victims có thể làm một Node trở nên phù hợp.
 
-```text
-Pod priority cao Pending
-        │ không có feasible Node
-        ▼
-PostFilter / DefaultPreemption
-        │ mô phỏng loại Pod priority thấp
-        ▼
-Chọn Node + victim set
-        │ delete victims
-        ▼
-Chờ resource được giải phóng
-        │
-        ▼
-Pod cao thử schedule lại
+```d2 title="Tổng quan"
+direction: down
+n1: "Pod priority cao Pending"
+n2: "PostFilter / DefaultPreemption"
+n3: "Chọn Node + victim set"
+n4: "Chờ resource được giải phóng"
+n5: "Pod cao thử schedule lại"
+n1 -> n2: "không có feasible Node"
+n2 -> n3: "mô phỏng loại Pod priority thấp"
+n3 -> n4: "delete victims"
+n4 -> n5
 ```
 
 Preemption là phản ứng khi capacity đang tranh chấp, không phải cơ chế autoscaling, live migration hay guarantee rằng Pod cao sẽ chạy ngay.
@@ -69,16 +66,25 @@ Default preemption ở `PostFilter` diễn ra theo luồng khái quát sau:
 
 Mục tiêu không đơn giản là “xóa Pod thấp nhất”. Scheduler cân nhắc tập victims, priority, PDB impact và các tiêu chí chọn candidate. Behavior chi tiết có thể đổi theo implementation/version; không xây SLO dựa vào thứ tự victim nội bộ không được API cam kết.
 
-```mermaid
-flowchart TD
-    P[Incoming Pod] --> N[Node từng bị filter]
-    N --> L[Loại lower-priority Pods trong mô phỏng]
-    L --> F{Incoming Pod fit?}
-    F -->|Không| X[Bỏ candidate]
-    F -->|Có| R[Reprieve victims nếu có thể]
-    R --> C[Candidate Node + victims]
-    C --> B[Chọn candidate tốt hơn]
-    B --> D[Delete victims]
+```d2 title="2. Luồng chọn candidate và victims"
+direction: down
+P: "Incoming Pod"
+N: "Node từng bị filter"
+L: "Loại lower-priority Pods trong mô\nphỏng"
+F: "Incoming Pod fit?" {shape: diamond}
+X: "Bỏ candidate"
+R: "Reprieve victims nếu có thể"
+C: "Candidate Node + victims"
+B: "Chọn candidate tốt hơn"
+D: "Delete victims"
+P -> N
+N -> L
+L -> F
+F -> X: "Không"
+F -> R: "Có"
+R -> C
+C -> B
+B -> D
 ```
 
 ## 3. nominatedNodeName không phải binding

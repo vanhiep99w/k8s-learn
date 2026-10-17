@@ -39,14 +39,21 @@ Một rule được đánh giá theo ba lớp:
 2. Namespace scope giới hạn nơi tìm các Pod đó.
 3. `topologyKey` đọc label trên Node chứa Pod liên quan để tạo topology domain.
 
-```mermaid
-flowchart LR
-    I[Incoming Pod] --> S[labelSelector chọn peer Pods]
-    S --> N[Đọc Node của peer Pods]
-    N --> T[Nhóm theo topologyKey]
-    T --> D{Candidate Node thuộc domain nào?}
-    D -->|Affinity| A[Muốn/cần domain có peer]
-    D -->|Anti-affinity| X[Muốn/cần domain không có peer]
+```d2 title="1. Cách scheduler hiểu Pod affinity"
+direction: right
+I: "Incoming Pod"
+S: "labelSelector chọn peer Pods"
+N: "Đọc Node của peer Pods"
+T: "Nhóm theo topologyKey"
+D: "Candidate Node thuộc domain nào?" {shape: diamond}
+A: "Muốn/cần domain có peer"
+X: "Muốn/cần domain không có peer"
+I -> S
+S -> N
+N -> T
+T -> D
+D -> A: "Affinity"
+D -> X: "Anti-affinity"
 ```
 
 Với `topologyKey: kubernetes.io/hostname`, domain là từng Node. Với `topology.kubernetes.io/zone`, domain là từng zone có label tương ứng.

@@ -29,15 +29,23 @@ description: "Cấu hình container bằng env, envFrom, ConfigMap, Secret và D
 
 Environment variable là giao diện cấu hình phổ biến giữa container image và môi trường chạy. Image giữ code bất biến; Pod cung cấp endpoint, feature flag, log level hoặc credential tại thời điểm tạo container.
 
-```mermaid
-flowchart LR
-    I[Image defaults] --> E[Environment của process]
-    V[Pod env trực tiếp] --> E
-    C[ConfigMap] --> E
-    S[Secret] --> E
-    D[Downward API] --> E
-    L[Service links] --> E
-    E --> P[Application process]
+```d2 title="Tổng quan"
+direction: right
+I: "Image defaults"
+E: "Environment của process"
+V: "Pod env trực tiếp"
+C: "ConfigMap"
+S: "Secret"
+D: "Downward API"
+L: "Service links"
+P: "Application process"
+I -> E
+V -> E
+C -> E
+S -> E
+D -> E
+L -> E
+E -> P
 ```
 
 Kubernetes cung cấp hai field chính trong container spec:
@@ -266,9 +274,18 @@ Headless Service (`clusterIP: None`) và Service không có ClusterIP không t�
 
 Các biến này là snapshot tại lúc container start. Service phải tồn tại và kubelet phải nhìn thấy Service đó trước khi container được tạo. Nếu bạn tạo Service sau khi Pod đã chạy, environment trong container cũ không tự cập nhật.
 
-```text
-Service tồn tại trước → Pod/container start → env có biến Service
-Pod/container start trước → Service tạo sau → env của container cũ không đổi
+```d2 title="6.1 Điều kiện xuất hiện"
+direction: right
+n1: "Service tồn tại trước"
+n2: "Pod/container start"
+n3: "env có biến Service"
+n4: "Pod/container start trước"
+n5: "Service tạo sau"
+n6: "env của container cũ không đổi"
+n1 -> n2
+n2 -> n3
+n4 -> n5
+n5 -> n6
 ```
 
 Cơ chế này cũng có race nhỏ khi kubelet thấy Pod trước khi cache Service đồng bộ. Vì vậy Kubernetes documentation khuyến nghị dùng DNS nếu bạn không muốn phụ thuộc thứ tự tạo resource.
@@ -485,19 +502,25 @@ Không nên âm thầm fallback khi một biến bắt buộc bị sai; Pod có 
 
 ### 9.1 Phân nhóm nguồn
 
-```text
-ConfigMap app-runtime
-├── LOG_LEVEL
-├── FEATURE_CHECKOUT_V2
-└── DATABASE_HOST
-
-Secret app-credentials
-├── DATABASE_USERNAME
-└── DATABASE_PASSWORD
-
-Downward API
-├── POD_NAME
-└── POD_NAMESPACE
+```d2 title="9.1 Phân nhóm nguồn"
+direction: right
+n1: "ConfigMap app-runtime"
+n2: "LOG_LEVEL"
+n3: "FEATURE_CHECKOUT_V2"
+n4: "DATABASE_HOST"
+n5: "Secret app-credentials"
+n6: "DATABASE_USERNAME"
+n7: "DATABASE_PASSWORD"
+n8: "Downward API"
+n9: "POD_NAME"
+n10: "POD_NAMESPACE"
+n1 -> n2
+n1 -> n3
+n1 -> n4
+n5 -> n6
+n5 -> n7
+n8 -> n9
+n8 -> n10
 ```
 
 Không đặt dữ liệu nhạy cảm vào ConfigMap. Không đặt mọi config của nhiều ứng dụng vào một object khổng lồ.

@@ -1,6 +1,6 @@
 ---
 title: "Site architecture"
-description: "How Markdown content becomes a static Fumadocs site with routing, search, Mermaid, and Cloudflare Pages output."
+description: "How Markdown content becomes a static Fumadocs site with routing, search, build-time D2 diagrams, interactive examples, and Cloudflare Pages output."
 ---
 
 # Site architecture
@@ -80,11 +80,12 @@ The root redirect formerly targeted `gioi-thieu/lo-trinh-hoc`. Commit `f94a2e1` 
 
 ## Markdown and MDX pipeline
 
-`source.config.ts` registers three remark stages in this order:
+`source.config.ts` registers these remark stages in this order:
 
 1. `remark-github-admonitions-to-directives` parses GitHub-style admonitions such as `> [!NOTE]`.
 2. `remarkCalloutDirectives` replaces recognized directives with Fumadocs `Callout` MDX nodes. It maps `note`, `tip`, and `info` to `info`; `warning` to `warn`; and `danger` to `error`, with Vietnamese display titles.
-3. `remarkMermaid` replaces fenced `mermaid` code nodes with a `MermaidDiagram` MDX element whose `chart` property contains the diagram source.
+3. `remarkD2` from `@vanhiep99w/docs-kit/d2` compiles `d2` fences into light/dark SVG at build time. Interactive viewing is enabled by default; the viewer chunk loads only after Explore. The compiler/WASM stays in Node.js.
+4. `remarkTerminalSession`, `remarkCodeWalkthrough`, `remarkCodeDiff`, and `remarkProtocolExchange` validate their YAML fences and prepare component props. Shiki/diff preparation stays at build time.
 
 This configuration was centralized in `source.config.ts` in commit `f94a2e1`. `next.config.mjs` now calls `createMDX()` without a second remark configuration. Preserve this single ownership point to avoid transforms running inconsistently or twice.
 
@@ -98,21 +99,28 @@ This configuration was centralized in `source.config.ts` in commit `f94a2e1`. `n
 - `Tab` and `Tabs`
 - `Accordion` and `Accordions`
 - `TypeTable`
-- `MermaidDiagram`
+- `D2Diagram` and `D2InteractiveDiagram`
+- `TerminalSession`, `CodeWalkthrough`, `CodeDiff`, and `ProtocolExchange`
 
 A transform that emits a custom MDX element and the component registration that renders it are one contract. If either side changes, build a representative page that uses the syntax.
 
-### Mermaid runtime
+### D2 and docs-kit runtime
 
-`src/components/mermaid.tsx` is a client component. It:
+The Mermaid renderer and dependency have been removed. D2 source lives directly in curriculum fences, not in an automatic Mermaid/ASCII conversion layer. Keep logs, command output, formulas, positional syntax, and file trees as text.
 
-1. creates a React-stable, colon-free render ID;
-2. dynamically imports `mermaid` in `useEffect`;
-3. initializes Mermaid with `startOnLoad: false`;
-4. renders SVG and inserts it into a referenced `div`; and
-5. uses a cancellation flag to avoid updating an unmounted component.
+D2 uses ELK, non-sketch rendering at scale 1, light/dark themes, one shared worker, and a cache under `.next/cache/docs-kit/d2`. That path is ignored and can be restored with a compatible CI build cache; the package does not enable Cloudflare dashboard settings. Syntax/descriptor errors fail the build with the source location. Build requires Node.js 22+.
 
-The SVG is therefore rendered in the browser rather than embedded by the static Markdown compiler. A successful static build catches MDX integration errors, but a browser check is still needed for invalid chart syntax, hydration behavior, and layout overflow.
+All diagram SVGs and example data are statically exported. Interactive D2 supports fit/zoom/pan, native-dialog expansion, source/copy, SVG download, and optional scenario/step/layer navigation. Browser validation still matters for hydration, keyboard controls, theme, and mobile overflow. Remote D2 Icons URLs require network access while reading; labels remain meaningful without icons.
+
+The other registered fences are `terminal-session`, `code-walkthrough`, `code-diff`, and `protocol-exchange`. They only present author-provided data: no shell execution, cluster connection, HTTP requests, or benchmark verification. Treat all snapshots/scenarios as public. Only compile trusted repository content; generated SVG is embedded directly, not sanitized for arbitrary public input.
+
+Representative pages:
+- `gioi-thieu/yaml-manifest.md`: Code Walkthrough.
+- `gioi-thieu/first-application.md`: Terminal Session and Code Diff.
+- `kien-truc/kube-apiserver.md`: Protocol Exchange.
+- `cau-hinh/pod-disruption-budget.md`: mutually exclusive D2 scenario tabs.
+
+Source Explorer and Span Waterfall are not registered: add them only when a lesson has suitable source artifacts or trace data.
 
 ## Static search
 
@@ -143,7 +151,8 @@ Do not infer credentials, account selection, preview environments, or rollback a
 
 - a long prose page, such as `content/docs/gioi-thieu/container-fundamentals.md`;
 - a lesson with commands and manifests, such as `content/docs/gioi-thieu/first-application.md`;
-- a diagram-heavy architecture page, such as `content/docs/kien-truc/tong-quan-cluster.md`; and
+- a diagram-heavy architecture page, such as `content/docs/kien-truc/tong-quan-cluster.md`;
+- interactive example pages listed above; and
 - a short placeholder page, such as `content/docs/workloads/deployment.md`.
 
 ## Change impact guide

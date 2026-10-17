@@ -32,16 +32,25 @@ description: "Hiểu Pod từ lúc được tạo đến khi bị xóa: cách đ
 
 Pod không chuyển thẳng từ “đã tạo” sang “đang chạy”. Nó phải đi qua nhiều bước:
 
-```text
-Tạo object
-→ chờ Scheduler chọn Node
-→ kubelet chuẩn bị network và volume
-→ pull image
-→ chạy init container nếu có
-→ chạy application container
-→ kiểm tra startup/readiness/liveness
-→ phục vụ workload
-→ dừng và bị xóa
+```d2 title="Vòng đời Pod là gì?"
+direction: right
+n1: "Tạo object"
+n2: "chờ Scheduler chọn Node"
+n3: "kubelet chuẩn bị network và volume"
+n4: "pull image"
+n5: "chạy init container nếu có"
+n6: "chạy application container"
+n7: "kiểm tra startup/readiness/liveness"
+n8: "phục vụ workload"
+n9: "dừng và bị xóa"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
+n7 -> n8
+n8 -> n9
 ```
 
 Kubernetes ghi lại quá trình này qua nhiều lớp trạng thái. Mỗi lớp trả lời một câu hỏi khác nhau:
@@ -73,25 +82,42 @@ Nếu chưa hiểu Pod là gì, cách Pod được schedule hoặc vì sao Pod c
 
 Một Pod chạy ứng dụng web thường có lifecycle như sau:
 
-```mermaid
-flowchart TD
-    A[Pod được tạo] --> B[Pending: chờ schedule]
-    B --> C[Scheduler bind Pod vào Node]
-    C --> D[kubelet chuẩn bị sandbox, network, volume]
-    D --> E[Pull image và tạo container]
-    E --> F[Chạy init containers]
-    F --> G[Chạy application containers]
-    G --> H{Startup probe thành công?}
-    H -->|Chưa| I[Tiếp tục kiểm tra hoặc restart]
-    H -->|Có| J{Readiness probe thành công?}
-    J -->|Chưa| K[Running nhưng chưa Ready]
-    J -->|Có| L[Running và Ready]
-    L --> M{Liveness còn thành công?}
-    M -->|Không| N[kubelet restart container]
-    M -->|Có| L
-    L --> O[Pod được yêu cầu xóa]
-    O --> P[Terminating: graceful shutdown]
-    P --> Q[Pod bị xóa khỏi API]
+```d2 title="Mental model từ lúc tạo đến lúc xóa"
+direction: down
+A: "Pod được tạo"
+B: "Pending: chờ schedule"
+C: "Scheduler bind Pod vào Node"
+D: "kubelet chuẩn bị sandbox, network,\nvolume"
+E: "Pull image và tạo container"
+F: "Chạy init containers"
+G: "Chạy application containers"
+H: "Startup probe thành công?" {shape: diamond}
+I: "Tiếp tục kiểm tra hoặc restart"
+J: "Readiness probe thành công?" {shape: diamond}
+K: "Running nhưng chưa Ready"
+L: "Running và Ready"
+M: "Liveness còn thành công?" {shape: diamond}
+N: "kubelet restart container"
+O: "Pod được yêu cầu xóa"
+P: "Terminating: graceful shutdown"
+Q: "Pod bị xóa khỏi API"
+A -> B
+B -> C
+C -> D
+D -> E
+E -> F
+F -> G
+G -> H
+H -> I: "Chưa"
+H -> J: "Có"
+J -> K: "Chưa"
+J -> L: "Có"
+L -> M
+M -> N: "Không"
+M -> L: "Có"
+L -> O
+O -> P
+P -> Q
 ```
 
 Không phải Pod nào cũng đi qua tất cả bước:
@@ -154,12 +180,17 @@ kubectl get events -n <namespace> \
 
 Có thể đọc theo thứ tự:
 
-```text
-phase
-→ conditions
-→ containerStatuses
-→ Events
-→ logs
+```d2 title="Bộ command đọc trạng thái"
+direction: right
+n1: "phase"
+n2: "conditions"
+n3: "containerStatuses"
+n4: "Events"
+n5: "logs"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 ## Pod phase
@@ -185,13 +216,19 @@ kubectl get pod <pod-name> -n <namespace> \
 
 Pod có thể `Pending` trong nhiều giai đoạn:
 
-```text
-Pending
-├── Scheduler chưa tìm được Node
-├── Đã có Node nhưng đang pull image
-├── Đang tạo Pod sandbox/network
-├── Đang mount volume
-└── Đang chờ Secret, ConfigMap hoặc resource khác
+```d2 title="`Pending` không chỉ nghĩa là chưa schedule"
+direction: right
+n1: "Pending"
+n2: "Scheduler chưa tìm được Node"
+n3: "Đã có Node nhưng đang pull image"
+n4: "Đang tạo Pod sandbox/network"
+n5: "Đang mount volume"
+n6: "Đang chờ Secret, ConfigMap hoặc resource\nkhác"
+n1 -> n2
+n1 -> n3
+n1 -> n4
+n1 -> n5
+n1 -> n6
 ```
 
 Cần xem `spec.nodeName`, conditions và Events để biết đang kẹt ở đâu.
@@ -267,12 +304,14 @@ Ready=False reason=ContainersNotReady
 
 ### Cách đọc `PodScheduled`
 
-```text
-PodScheduled=False
-└── tập trung vào Scheduler, requests, taints, affinity, PVC
-
-PodScheduled=True
-└── Pod đã có Node; tập trung vào kubelet, image, volume, container
+```d2 title="Cách đọc `PodScheduled`"
+direction: right
+n1: "PodScheduled=False"
+n2: "tập trung vào Scheduler, requests,\ntaints, affinity, PVC"
+n3: "PodScheduled=True"
+n4: "Pod đã có Node; tập trung vào kubelet,\nimage, volume, container"
+n1 -> n2
+n3 -> n4
 ```
 
 Đây là cách chia đôi không gian troubleshooting rất nhanh.
@@ -312,10 +351,13 @@ Không dùng readiness gate khi readiness probe đơn giản đã đủ. Nó th�
 
 Mỗi container có một trong ba state:
 
-```text
-Waiting → Running → Terminated
-             ↑           │
-             └── restart ┘
+```d2 title="Container states"
+direction: right
+waiting: Waiting
+running: Running
+terminated: Terminated
+waiting -> running -> terminated
+terminated -> running: restart
 ```
 
 ### `Waiting`
@@ -427,10 +469,17 @@ Deployment và DaemonSet dùng semantics chạy liên tục, nên Pod template c
 
 Restart policy chỉ điều khiển kubelet tạo lại container trong **cùng Pod trên cùng Node**:
 
-```text
-Pod UID aaa trên node-a
-├── container ID 1 → exit
-└── container ID 2 → kubelet restart
+```d2 title="Restart xảy ra ở đâu?"
+direction: right
+n1: "Pod UID aaa trên node-a"
+n2: "container ID 1"
+n3: "exit"
+n4: "container ID 2"
+n5: "kubelet restart"
+n2 -> n3
+n1 -> n2
+n4 -> n5
+n1 -> n4
 ```
 
 Nó không:
@@ -459,10 +508,15 @@ Các feature container-level restart rules thay đổi theo phiên bản Kuberne
 4. Tiếp tục thất bại.
 5. kubelet tăng thời gian chờ trước lần restart tiếp theo.
 
-```text
-start → crash → chờ ngắn
-start → crash → chờ lâu hơn
-start → crash → chờ lâu hơn nữa
+```d2 title="`CrashLoopBackOff` thực sự nghĩa là gì?"
+direction: right
+first: start → crash
+short: chờ ngắn
+second: start → crash
+long: chờ lâu hơn
+third: start → crash
+longer: chờ lâu hơn nữa
+first -> short -> second -> long -> third -> longer
 ```
 
 Backoff ngăn container lỗi tạo hot loop và tiêu tốn tài nguyên. Nó không phải root cause.
@@ -506,10 +560,17 @@ kubectl get pod <pod-name> -n <namespace> \
 
 Probe là kiểm tra định kỳ do kubelet thực hiện với container. Ba probe có ba câu hỏi khác nhau:
 
-```text
-startupProbe   → Ứng dụng đã khởi động xong chưa?
-readinessProbe → Ứng dụng có nên nhận traffic lúc này không?
-livenessProbe  → Ứng dụng có bị kẹt đến mức cần restart không?
+```d2 title="Startup, readiness và liveness probe"
+direction: right
+n1: "startupProbe"
+n2: "Ứng dụng đã khởi động xong chưa?"
+n3: "readinessProbe"
+n4: "Ứng dụng có nên nhận traffic lúc này\nkhông?"
+n5: "livenessProbe"
+n6: "Ứng dụng có bị kẹt đến mức cần restart\nkhông?"
+n1 -> n2
+n3 -> n4
+n5 -> n6
 ```
 
 ### Bảng so sánh
@@ -645,21 +706,32 @@ Một Pod có init container và đủ ba probe thường đi qua:
 
 Sơ đồ:
 
-```mermaid
-flowchart TD
-    A[PodScheduled=True] --> B[Chuẩn bị sandbox, network, volume]
-    B --> C[Init containers chạy tuần tự]
-    C --> D[Application containers start]
-    D --> E{startupProbe có thành công?}
-    E -->|Chưa| F[Chưa chạy readiness/liveness]
-    F --> E
-    E -->|Có| G{readinessProbe có thành công?}
-    G -->|Không| H[Running nhưng Ready=False]
-    G -->|Có| I[Running và Ready=True]
-    I --> J{livenessProbe có thành công?}
-    J -->|Có| I
-    J -->|Không quá ngưỡng| K[Kill và restart container]
-    K --> D
+```d2 title="Luồng khởi động Pod"
+direction: down
+A: "PodScheduled=True"
+B: "Chuẩn bị sandbox, network, volume"
+C: "Init containers chạy tuần tự"
+D: "Application containers start"
+E: "startupProbe có thành công?" {shape: diamond}
+F: "Chưa chạy readiness/liveness"
+G: "readinessProbe có thành công?" {shape: diamond}
+H: "Running nhưng Ready=False"
+I: "Running và Ready=True"
+J: "livenessProbe có thành công?" {shape: diamond}
+K: "Kill và restart container"
+A -> B
+B -> C
+C -> D
+D -> E
+E -> F: "Chưa"
+F -> E
+E -> G: "Có"
+G -> H: "Không"
+G -> I: "Có"
+I -> J
+J -> I: "Có"
+J -> K: "Không quá ngưỡng"
+K -> D
 ```
 
 ### Application containers không có thứ tự start mặc định
@@ -680,20 +752,30 @@ Kubelet restart container và controller thay Pod là hai cơ chế khác nhau.
 
 ### Container restart
 
-```text
-Pod web, UID aaa, node-a, IP 10.244.1.8
-├── container ID 1 → crash
-└── container ID 2 → kubelet restart
+```d2 title="Container restart"
+direction: right
+n1: "Pod web, UID aaa, node-a, IP 10.244.1.8"
+n2: "container ID 1"
+n3: "crash"
+n4: "container ID 2"
+n5: "kubelet restart"
+n2 -> n3
+n1 -> n2
+n4 -> n5
+n1 -> n4
 ```
 
 Pod UID, Node, IP và Pod volume thường giữ nguyên. Restart count tăng.
 
 ### Pod replacement
 
-```text
-Pod UID aaa trên node-a → bị xóa
-Controller tạo Pod UID bbb
-Scheduler có thể đặt Pod mới lên node-b
+```d2 title="Pod replacement"
+direction: right
+old: Pod UID aaa trên node-a
+removed: bị xóa
+new: Controller tạo Pod UID bbb
+scheduler: Scheduler có thể đặt Pod mới lên node-b
+old -> removed -> new -> scheduler
 ```
 
 Pod mới có identity và lifecycle mới. IP, Node, container ID và `emptyDir` có thể thay đổi hoặc được tạo lại.
@@ -782,10 +864,13 @@ spec:
 
 `preStop` chạy trong cùng grace period, không có một khoảng thời gian riêng vô hạn.
 
-```text
-terminationGracePeriodSeconds = 45s
-├── preStop dùng 20s
-└── application còn khoảng thời gian còn lại để shutdown
+```d2 title="`preStop` hook"
+direction: right
+n1: "terminationGracePeriodSeconds = 45s"
+n2: "preStop dùng 20s"
+n3: "application còn khoảng thời gian còn lại\nđể shutdown"
+n1 -> n2
+n1 -> n3
 ```
 
 Nếu hook cần quá lâu, Pod có thể bị force kill. Ưu tiên để application tự xử lý signal; dùng `preStop` khi cần hành động bổ sung rõ ràng.
@@ -825,12 +910,17 @@ Trước khi force delete:
 
 Nếu Node mất kết nối:
 
-```text
-Control plane không còn nhận status từ kubelet
-→ Node chuyển NotReady/Unknown theo cơ chế liên quan
-→ Pod trên Node không còn được coi khỏe
-→ sau timeout/policy, Pod được đánh dấu/xử lý để xóa
-→ controller tạo Pod replacement nếu cần
+```d2 title="Khi Node gặp sự cố"
+direction: right
+n1: "Control plane không còn nhận status từ\nkubelet"
+n2: "Node chuyển NotReady/Unknown theo cơ chế\nliên quan"
+n3: "Pod trên Node không còn được coi khỏe"
+n4: "sau timeout/policy, Pod được đánh dấu/xử\nlý để xóa"
+n5: "controller tạo Pod replacement nếu cần"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Đây không phải failover tức thời. Control plane cần phân biệt gián đoạn mạng ngắn với Node thật sự chết.
@@ -1078,14 +1168,31 @@ kubectl delete namespace lifecycle-lab
 
 Bắt đầu bằng cây quyết định:
 
-```text
-PodScheduled=False?
-├── Có → scheduling: requests, taints, affinity, PVC
-└── Không
-    ├── Container Waiting → image, volume, config, runtime
-    ├── Container crash → logs, exit code, OOM, probes
-    ├── Running nhưng Ready=False → readiness, startup, dependency
-    └── Terminating lâu → preStop, SIGTERM, finalizer, Node, volume
+```d2 title="Troubleshooting theo trạng thái"
+direction: right
+n1: "PodScheduled=False?"
+n2: "Có"
+n3: "scheduling: requests, taints, affinity,\nPVC"
+n4: "Không"
+n5: "Container Waiting"
+n6: "image, volume, config, runtime"
+n7: "Container crash"
+n8: "logs, exit code, OOM, probes"
+n9: "Running nhưng Ready=False"
+n10: "readiness, startup, dependency"
+n11: "Terminating lâu"
+n12: "preStop, SIGTERM, finalizer, Node,\nvolume"
+n2 -> n3
+n1 -> n2
+n1 -> n4
+n5 -> n6
+n4 -> n5
+n7 -> n8
+n4 -> n7
+n9 -> n10
+n4 -> n9
+n11 -> n12
+n4 -> n11
 ```
 
 ### Pod `Pending` và chưa có Node
@@ -1295,12 +1402,14 @@ liveness  = có cần restart không?
 
 Hai cơ chế phục hồi:
 
-```text
-Container crash
-→ kubelet restart container trong cùng Pod theo restartPolicy
-
-Pod bị xóa/Node lỗi/rollout
-→ workload controller tạo Pod replacement có UID mới
+```d2 title="Tóm tắt"
+direction: right
+n1: "Container crash"
+n2: "kubelet restart container trong cùng Pod\ntheo restartPolicy"
+n3: "Pod bị xóa/Node lỗi/rollout"
+n4: "workload controller tạo Pod replacement\ncó UID mới"
+n1 -> n2
+n3 -> n4
 ```
 
 Năm điều quan trọng nhất:

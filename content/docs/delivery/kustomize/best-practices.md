@@ -114,8 +114,19 @@ Giữ content hash của ConfigMap/Secret generator khi muốn thay đổi data 
 
 Pipeline nên tách các bước:
 
-```text
-lint/YAML → kustomize build → policy/schema validation → diff/review → apply/reconcile → rollout verification
+```d2 title="CI/CD và GitOps"
+direction: right
+n1: "lint/YAML"
+n2: "kustomize build"
+n3: "policy/schema validation"
+n4: "diff/review"
+n5: "apply/reconcile"
+n6: "rollout verification"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
 ```
 
 GitOps controller thường build overlay và reconcile thay vì pipeline chạy `kubectl apply` trực tiếp. Không nên để cả controller và pipeline cùng apply một entry point nếu chưa có ownership rõ ràng. Khi promotion, promote commit hoặc immutable image reference; tránh sửa trực tiếp object live rồi để Git tự ghi đè.

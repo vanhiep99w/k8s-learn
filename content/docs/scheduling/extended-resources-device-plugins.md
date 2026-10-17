@@ -30,17 +30,19 @@ Extended Resource là resource name ngoài tập built-in `cpu`, `memory`, `ephe
 
 Device Plugin là cơ chế kubelet dùng để phát hiện, theo dõi health và cấp phát thiết bị phần cứng cho Container. Vendor thường triển khai plugin dưới dạng DaemonSet trên Node có thiết bị.
 
-```text
-Hardware → Device Plugin → kubelet Node status
-                            │ capacity/allocatable
-                            ▼
-Pod requests extended resource → scheduler chọn Node
-                            │
-                            ▼
-                      kubelet Allocate
-                            │
-                            ▼
-                     Container runtime
+```d2 title="Tổng quan"
+direction: right
+hardware: Hardware
+plugin: Device Plugin
+status: kubelet Node status
+pod: Pod requests extended resource
+scheduler: scheduler chọn Node
+allocate: kubelet Allocate
+runtime: Container runtime
+hardware -> plugin -> status
+status -> scheduler: capacity/allocatable
+pod -> scheduler
+scheduler -> allocate -> runtime
 ```
 
 Kubernetes cung cấp framework; driver, runtime integration, image library và plugin cụ thể phụ thuộc vendor/platform.
@@ -110,22 +112,21 @@ Các RPC tùy chọn như `GetPreferredAllocation` hoặc `PreStartContainer` h�
 
 ## 4. Scheduling và allocation flow
 
-```mermaid
-sequenceDiagram
-    participant DP as Device Plugin
-    participant K as kubelet
-    participant API as API Server
-    participant S as Scheduler
-    participant R as Runtime
-
-    DP->>K: Register + ListAndWatch devices
-    K->>API: Update Node capacity/allocatable
-    S->>API: Watch Pod requesting resource
-    S->>S: Filter Nodes by allocatable
-    S->>API: Bind Pod to Node
-    K->>DP: Allocate selected device IDs
-    DP-->>K: Device/runtime configuration
-    K->>R: Create container
+```d2 title="4. Scheduling và allocation flow"
+shape: sequence_diagram
+DP: "Device Plugin"
+K: "kubelet"
+API: "API Server"
+S: "Scheduler"
+R: "Runtime"
+DP -> K: "Register + ListAndWatch devices"
+K -> API: "Update Node capacity/allocatable"
+S -> API: "Watch Pod requesting resource"
+S -> S: "Filter Nodes by allocatable"
+S -> API: "Bind Pod to Node"
+K -> DP: "Allocate selected device IDs"
+DP -> K: "Device/runtime configuration" {style.stroke-dash: 4}
+K -> R: "Create container"
 ```
 
 Scheduler thường chỉ thấy resource count, không biết toàn bộ topology/health chi tiết của application. Kubelet Device Manager chọn concrete device IDs sau binding. Topology Manager có thể phối hợp CPU, memory và device NUMA hints để đạt alignment theo node policy.

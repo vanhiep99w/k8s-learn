@@ -81,19 +81,15 @@ OCI = Chuẩn Image và cách chạy Container process
 
 CRI và OCI **không phải hai runtime cạnh tranh với nhau**. Chúng ở hai tầng khác nhau:
 
-```text
-Kubernetes
-    │
-    │ CRI: kubelet ra lệnh cho runtime
-    ▼
-containerd / CRI-O
-    │
-    │ OCI: chuẩn image và chuẩn khởi động process
-    ▼
-runc / crun
-    │
-    ▼
-Linux process
+```d2 title="Cách nhớ ngắn nhất"
+direction: down
+n1: "Kubernetes"
+n2: "containerd / CRI-O"
+n3: "runc / crun"
+n4: "Linux process"
+n1 -> n2: "CRI: kubelet ra lệnh cho runtime"
+n2 -> n3: "OCI: chuẩn image và chuẩn khởi động\nprocess"
+n3 -> n4
 ```
 
 ### CRI là gì?
@@ -124,10 +120,25 @@ CRI là một API dựa trên gRPC. Nó hiểu các khái niệm Kubernetes cầ
 
 Các đường đi hợp lệ có thể là:
 
-```text
-kubelet → CRI → containerd
-kubelet → CRI → CRI-O
-kubelet → CRI → cri-dockerd → Docker Engine
+```d2 title="CRI là gì?"
+direction: right
+n1: "kubelet"
+n2: "CRI"
+n3: "containerd"
+n4: "kubelet"
+n5: "CRI"
+n6: "CRI-O"
+n7: "kubelet"
+n8: "CRI"
+n9: "cri-dockerd"
+n10: "Docker Engine"
+n1 -> n2
+n2 -> n3
+n4 -> n5
+n5 -> n6
+n7 -> n8
+n8 -> n9
+n9 -> n10
 ```
 
 ### OCI là gì?
@@ -167,22 +178,22 @@ Image được tạo ra có format tương thích với Docker/OCI. Khi Pod đư
 
 Sơ đồ đầy đủ:
 
-```mermaid
-sequenceDiagram
-    participant K as kubelet
-    participant C as containerd
-    participant R as Registry
-    participant O as runc
-    participant L as Linux kernel
-    K->>C: CRI: PullImage
-    C->>R: Pull OCI-compatible image
-    R-->>C: Manifest và layers
-    K->>C: CRI: Create/Start Container
-    C->>O: OCI Runtime Spec
-    O->>L: Tạo namespaces, cgroups và process
-    L-->>O: Process đang chạy
-    O-->>C: Container started
-    C-->>K: CRI status
+```d2 title="Ví dụ từng bước"
+shape: sequence_diagram
+K: "kubelet"
+C: "containerd"
+R: "Registry"
+O: "runc"
+L: "Linux kernel"
+K -> C: "CRI: PullImage"
+C -> R: "Pull OCI-compatible image"
+R -> C: "Manifest và layers" {style.stroke-dash: 4}
+K -> C: "CRI: Create/Start Container"
+C -> O: "OCI Runtime Spec"
+O -> L: "Tạo namespaces, cgroups và process"
+L -> O: "Process đang chạy" {style.stroke-dash: 4}
+O -> C: "Container started" {style.stroke-dash: 4}
+C -> K: "CRI status" {style.stroke-dash: 4}
 ```
 
 ### So sánh bằng phép ẩn dụ nhà máy
@@ -213,12 +224,20 @@ CRI nói **phải làm gì với Pod và Container**. OCI nói **image được 
 
 ### Ba dòng cần ghi nhớ
 
-```text
-Docker/BuildKit  ──build──▶ OCI-compatible image ──push──▶ Registry
-
-kubelet ──CRI──▶ containerd hoặc CRI-O
-
-containerd/CRI-O ──OCI Runtime Spec──▶ runc/crun ──▶ Linux process
+```d2 title="Ba dòng cần ghi nhớ"
+direction: right
+build: Docker/BuildKit
+image: OCI-compatible image
+registry: Registry
+k: kubelet
+runtime: containerd hoặc CRI-O
+oci: runc/crun
+process: Linux process
+build -> image: build
+image -> registry: push
+k -> runtime: CRI
+runtime -> oci: OCI Runtime Spec
+oci -> process
 ```
 
 ---
@@ -269,17 +288,27 @@ Khi thảo luận Kubernetes runtime, thành phần quan trọng là **Docker En
 
 ### 2.1 Docker client-server architecture
 
-```mermaid
-flowchart LR
-    CLI[Docker CLI] -->|Docker REST API| D[dockerd]
-    COMPOSE[Docker Compose] -->|Docker REST API| D
-    D --> IMG[Image và Registry]
-    D --> NET[Network]
-    D --> VOL[Volume]
-    D --> CD[containerd]
-    CD --> SHIM[containerd-shim]
-    SHIM --> RUNC[runc]
-    RUNC --> PROC[Container process]
+```d2 title="2.1 Docker client-server architecture"
+direction: right
+CLI: "Docker CLI"
+D: "dockerd"
+COMPOSE: "Docker Compose"
+IMG: "Image và Registry"
+NET: "Network"
+VOL: "Volume"
+CD: "containerd"
+SHIM: "containerd-shim"
+RUNC: "runc"
+PROC: "Container process"
+CLI -> D: "Docker REST API"
+COMPOSE -> D: "Docker REST API"
+D -> IMG
+D -> NET
+D -> VOL
+D -> CD
+CD -> SHIM
+SHIM -> RUNC
+RUNC -> PROC
 ```
 
 Docker CLI là client thân thiện với con người. Khi chạy:
@@ -379,16 +408,17 @@ sudo ctr --namespace k8s.io containers list
 
 runc là low-level OCI runtime phổ biến. Nó nhận OCI bundle/spec rồi yêu cầu kernel tạo process với namespaces, cgroups, capabilities, mounts và các thiết lập isolation.
 
-```text
-Kubernetes object
-    ↓
-kubelet
-    ↓ CRI
-containerd
-    ↓ OCI runtime invocation
-runc
-    ↓ Linux kernel
-container process
+```d2 title="4. runc và low-level runtime"
+direction: down
+n1: "Kubernetes object"
+n2: "kubelet"
+n3: "containerd"
+n4: "runc"
+n5: "container process"
+n1 -> n2
+n2 -> n3: "CRI"
+n3 -> n4: "OCI runtime invocation"
+n4 -> n5: "Linux kernel"
 ```
 
 ### 4.1 Vì sao cần containerd-shim
@@ -438,12 +468,17 @@ CRI tập trung vào nhu cầu ở mức Pod:
 - Status và stats.
 - Exec, attach và port-forward streaming.
 
-```mermaid
-flowchart TD
-    K[kubelet] -->|CRI gRPC| C[CRI-compatible runtime]
-    C -->|OCI image spec| I[Container Image]
-    C -->|OCI runtime spec| R[runc hoặc runtime khác]
-    R --> L[Linux kernel]
+```d2 title="5.2 CRI"
+direction: down
+K: "kubelet"
+C: "CRI-compatible runtime"
+I: "Container Image"
+R: "runc hoặc runtime khác"
+L: "Linux kernel"
+K -> C: "CRI gRPC"
+C -> I: "OCI image spec"
+C -> R: "OCI runtime spec"
+R -> L
 ```
 
 ### 5.3 So sánh
@@ -472,17 +507,17 @@ Các phiên bản Kubernetes ban đầu chỉ hỗ trợ Docker Engine. kubelet 
 
 Kiến trúc đơn giản hóa:
 
-```text
-kubelet
-   │ Docker-specific integration
-   ▼
-Docker Engine (dockerd)
-   ▼
-containerd
-   ▼
-runc
-   ▼
-Container process
+```d2 title="6. Kubernetes từng kết nối Docker như thế nào"
+direction: down
+n1: "kubelet"
+n2: "Docker Engine (dockerd)"
+n3: "containerd"
+n4: "runc"
+n5: "Container process"
+n1 -> n2: "Docker-specific integration"
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Lựa chọn này hợp lý trong bối cảnh ban đầu:
@@ -504,12 +539,17 @@ Nhưng Docker Engine có trước CRI và không implement CRI. Kubernetes vẫn
 
 Giải pháp chuyển tiếp là **dockershim**:
 
-```mermaid
-flowchart LR
-    K[kubelet] -->|Internal CRI calls| DS[dockershim trong kubelet]
-    DS -->|Docker Engine API| D[dockerd]
-    D --> C[containerd]
-    C --> R[runc]
+```d2 title="7. Vì sao dockershim xuất hiện"
+direction: right
+K: "kubelet"
+DS: "dockershim trong kubelet"
+D: "dockerd"
+C: "containerd"
+R: "runc"
+K -> DS: "Internal CRI calls"
+DS -> D: "Docker Engine API"
+D -> C
+C -> R
 ```
 
 Dockershim dịch giữa:
@@ -525,14 +565,26 @@ containerd bên trong Docker Engine là implementation detail do `dockerd` quả
 
 Docker Engine không trở thành CRI-compatible chỉ vì nó sử dụng containerd bên dưới. Đường gọi chính thức của Docker vẫn là:
 
-```text
-client → Docker API → dockerd → containerd
+```d2 title="7.1 Tại sao không để kubelet gọi containerd bên trong Docker Engine"
+direction: right
+n1: "client"
+n2: "Docker API"
+n3: "dockerd"
+n4: "containerd"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Trong khi Kubernetes muốn:
 
-```text
-kubelet → CRI → runtime
+```d2 title="7.1 Tại sao không để kubelet gọi containerd bên trong Docker Engine"
+direction: right
+n1: "kubelet"
+n2: "CRI"
+n3: "runtime"
+n1 -> n2
+n2 -> n3
 ```
 
 ---
@@ -555,14 +607,32 @@ Mỗi tính năng Node mới phải cân nhắc cả CRI-native path lẫn docke
 
 Với Docker Engine:
 
-```text
-kubelet → dockershim → dockerd → containerd → shim → runc
+```d2 title="8.2 Thêm lớp không cần thiết"
+direction: right
+n1: "kubelet"
+n2: "dockershim"
+n3: "dockerd"
+n4: "containerd"
+n5: "shim"
+n6: "runc"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
 ```
 
 Với containerd CRI:
 
-```text
-kubelet → containerd CRI plugin → shim → runc
+```d2 title="8.2 Thêm lớp không cần thiết"
+direction: right
+n1: "kubelet"
+n2: "containerd CRI plugin"
+n3: "shim"
+n4: "runc"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Đường trực tiếp giảm daemon/layer, giảm overhead vận hành và giảm nơi có thể xảy ra lỗi.
@@ -618,52 +688,69 @@ Sau khi loại bỏ:
 
 ### 10.1 Trước Kubernetes 1.24 với Docker Engine
 
-```text
-┌──────────────── Kubernetes Node ────────────────┐
-│                                                 │
-│ kubelet                                         │
-│    │                                            │
-│    ▼                                            │
-│ dockershim (in-tree, thuộc kubelet/Kubernetes)  │
-│    │ Docker Engine API                          │
-│    ▼                                            │
-│ dockerd                                         │
-│    │                                            │
-│    ▼                                            │
-│ containerd                                      │
-│    │                                            │
-│    ▼                                            │
-│ containerd-shim → runc → application process    │
-└─────────────────────────────────────────────────┘
+```d2 title="10.1 Trước Kubernetes 1.24 với Docker Engine"
+direction: right
+node: Kubernetes Node {
+  k: kubelet
+  ds: "dockershim\nin-tree, thuộc kubelet/Kubernetes"
+  docker: dockerd {icon: https://icons.d2lang.com/dev/docker.svg}
+  cd: containerd
+  shim: containerd-shim
+  runc: runc
+  app: application process
+  k -> ds
+  ds -> docker: Docker Engine API
+  docker -> cd -> shim -> runc -> app
+}
 ```
 
 ### 10.2 Kubernetes hiện đại với containerd
 
-```text
-┌──────────────── Kubernetes Node ───────────────┐
-│                                                │
-│ kubelet                                        │
-│    │ CRI v1 qua gRPC                           │
-│    ▼                                           │
-│ containerd + CRI plugin                        │
-│    │                                           │
-│    ▼                                           │
-│ containerd-shim → runc → application process   │
-└────────────────────────────────────────────────┘
+```d2 title="10.2 Kubernetes hiện đại với containerd"
+direction: right
+node: Kubernetes Node {
+  k: kubelet
+  cd: containerd + CRI plugin
+  shim: containerd-shim
+  runc: runc
+  app: application process
+  k -> cd: CRI v1 qua gRPC
+  cd -> shim -> runc -> app
+}
 ```
 
 ### 10.3 Kubernetes hiện đại với CRI-O
 
-```text
-kubelet → CRI v1 → CRI-O → OCI runtime → process
+```d2 title="10.3 Kubernetes hiện đại với CRI-O"
+direction: right
+n1: "kubelet"
+n2: "CRI v1"
+n3: "CRI-O"
+n4: "OCI runtime"
+n5: "process"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 CRI-O được thiết kế tập trung cho Kubernetes CRI use case, trong khi containerd là runtime tổng quát hơn có CRI plugin.
 
 ### 10.4 Kubernetes hiện đại với Docker Engine
 
-```text
-kubelet → CRI v1 → cri-dockerd → Docker Engine → containerd → runc
+```d2 title="10.4 Kubernetes hiện đại với Docker Engine"
+direction: right
+n1: "kubelet"
+n2: "CRI v1"
+n3: "cri-dockerd"
+n4: "Docker Engine"
+n5: "containerd"
+n6: "runc"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
 ```
 
 Cách này vẫn khả thi nhưng có thêm adapter và layer. Chỉ nên chọn khi có yêu cầu Docker Engine cụ thể, không phải vì quen dùng `docker ps`.
@@ -716,13 +803,19 @@ docker push registry.example.com/shop/api:v1
 
 Image được lưu theo format tương thích với OCI/Docker image specifications. containerd và CRI-O có thể pull và chạy image đó.
 
-```mermaid
-flowchart LR
-    DF[Dockerfile] --> DB[docker build hoặc BuildKit]
-    DB --> OCI[OCI-compatible image]
-    OCI --> REG[Registry]
-    REG --> CTD[containerd trên Node]
-    CTD --> POD[Kubernetes Pod]
+```d2 title="12. Docker-built images có còn chạy không"
+direction: right
+DF: "Dockerfile"
+DB: "docker build hoặc BuildKit"
+OCI: "OCI-compatible image"
+REG: "Registry"
+CTD: "containerd trên Node"
+POD: "Kubernetes Pod"
+DF -> DB
+DB -> OCI
+OCI -> REG
+REG -> CTD
+CTD -> POD
 ```
 
 Kubernetes manifest không quan tâm image được build bởi công cụ nào:
@@ -914,8 +1007,15 @@ Không. Đổi từ mount Docker socket sang mount containerd socket không gi�
 
 Có, bằng external adapter **cri-dockerd**.
 
-```text
-kubelet → CRI → cri-dockerd → Docker Engine
+```d2 title="16. Có thể tiếp tục dùng Docker Engine không"
+direction: right
+n1: "kubelet"
+n2: "CRI"
+n3: "cri-dockerd"
+n4: "Docker Engine"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Mirantis và Docker duy trì `cri-dockerd` bên ngoài Kubernetes core. Socket mặc định thường là:
@@ -1180,13 +1280,19 @@ kind là ví dụ rất tốt để thấy Docker và containerd có thể cùng
 
 Kiến trúc:
 
-```text
-Host
-└── Docker Engine
-    └── kind Node Container
-        └── containerd
-            ├── Kubernetes Pod sandbox
-            └── Application Containers
+```d2 title="21. Thực hành với kind"
+direction: right
+n1: "Host"
+n2: "Docker Engine"
+n3: "kind Node Container"
+n4: "containerd"
+n5: "Kubernetes Pod sandbox"
+n6: "Application Containers"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n4 -> n6
 ```
 
 Docker chạy **Node Container**. containerd bên trong Node chạy **Kubernetes Pod Containers**.
@@ -1437,35 +1543,40 @@ kubectl get nodes -o wide
 
 ### 24.1 Tách build khỏi run
 
-```text
-Build tool                     Node runtime
-──────────                     ────────────
-Docker/BuildKit    ─image─▶    containerd
-Buildah            ─image─▶    CRI-O
-Cloud builder      ─image─▶    containerd
+```d2 title="24.1 Tách build khỏi run"
+direction: right
+build: Build tool {
+  docker: Docker/BuildKit
+  buildah: Buildah
+  cloud: Cloud builder
+}
+runtime: Node runtime {
+  cd1: containerd
+  crio: CRI-O
+  cd2: containerd
+}
+build.docker -> runtime.cd1: image
+build.buildah -> runtime.crio: image
+build.cloud -> runtime.cd2: image
 ```
 
 Chuẩn OCI tạo cầu nối giữa hai phía.
 
 ### 24.2 Tách Kubernetes API khỏi runtime API
 
-```text
-Developer
-   │ kubectl / Kubernetes API
-   ▼
-API Server
-   │ desired state
-   ▼
-Scheduler + Controllers
-   │ Pod assigned to Node
-   ▼
-kubelet
-   │ CRI
-   ▼
-containerd / CRI-O / cri-dockerd
-   │ OCI runtime
-   ▼
-runc và kernel
+```d2 title="24.2 Tách Kubernetes API khỏi runtime API"
+direction: down
+n1: "Developer"
+n2: "API Server"
+n3: "Scheduler + Controllers"
+n4: "kubelet"
+n5: "containerd / CRI-O / cri-dockerd"
+n6: "runc và kernel"
+n1 -> n2: "kubectl / Kubernetes API"
+n2 -> n3: "desired state"
+n3 -> n4: "Pod assigned to Node"
+n4 -> n5: "CRI"
+n5 -> n6: "OCI runtime"
 ```
 
 ### 24.3 Câu tóm tắt chính xác

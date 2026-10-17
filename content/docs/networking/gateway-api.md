@@ -40,13 +40,19 @@ Bốn kind stable cốt lõi:
 - `HTTPRoute`.
 - `GRPCRoute`.
 
-```mermaid
-flowchart TB
-    GC[GatewayClass<br/>platform/provider] --> G[Gateway<br/>platform team]
-    G -->|listener + allowedRoutes| R1[HTTPRoute team A]
-    G --> R2[HTTPRoute team B]
-    R1 --> S1[Service A]
-    R2 --> S2[Service B]
+```d2 title="Tổng quan"
+direction: down
+GC: "GatewayClass\nplatform/provider"
+G: "Gateway\nplatform team"
+R1: "HTTPRoute team A"
+R2: "HTTPRoute team B"
+S1: "Service A"
+S2: "Service B"
+GC -> G
+G -> R1: "listener + allowedRoutes"
+G -> R2
+R1 -> S1
+R2 -> S2
 ```
 
 > [!IMPORTANT]

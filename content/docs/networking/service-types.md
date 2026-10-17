@@ -49,11 +49,15 @@ Cách đọc dễ nhất: `spec.type` không phải bốn cơ chế hoàn toàn 
 
 Nói ngắn gọn, với ba type đầu, type “cao hơn” thường có thêm một entry point ở phía trước type “thấp hơn”:
 
-```mermaid
-flowchart TB
-    LB[LoadBalancer address\nclient ngoài cluster/VPC gọi] --> NP[NodeIP:NodePort\nport mở trên Node]
-    NP --> VIP[ClusterIP:port\nđịa chỉ ổn định trong cluster]
-    VIP --> EP[Ready endpoint\nPodIP:targetPort]
+```d2 title="1. Service type khác nhau ở điểm truy cập"
+direction: down
+LB: "LoadBalancer address\nclient ngoài cluster/VPC gọi"
+NP: "NodeIP:NodePort\nport mở trên Node"
+VIP: "ClusterIP:port\nđịa chỉ ổn định trong cluster"
+EP: "Ready endpoint\nPodIP:targetPort"
+LB -> NP
+NP -> VIP
+VIP -> EP
 ```
 
 Ví dụ cùng một backend `api` có `targetPort: 8080`:
@@ -86,13 +90,15 @@ Pod api-3: 10.244.3.13:8080
 
 Service `ClusterIP` đặt một địa chỉ ổn định ở phía trước các Pod đó:
 
-```text
-Client trong cluster
-  gọi api.production.svc.cluster.local:80
-      ↓ DNS trả về ClusterIP, ví dụ 10.96.30.40
-  gọi 10.96.30.40:80
-      ↓ service proxy chọn một endpoint ready
-  tới một Pod api-x:8080
+```d2 title="2. ClusterIP"
+direction: right
+client: Client trong cluster
+name: gọi api.production.svc.cluster.local:80
+vip: gọi 10.96.30.40:80
+pod: tới một Pod api-x:8080
+client -> name
+name -> vip: DNS trả về ClusterIP
+vip -> pod: service proxy chọn một endpoint ready
 ```
 
 Điểm dễ nhầm: `10.96.30.40` trong ví dụ trên thường **không phải IP của một Pod và cũng không phải IP gắn trên card mạng của một Node**. Nó là virtual IP của Service. kube-proxy hoặc data plane thay thế watch Service và EndpointSlice, rồi program rule để traffic tới `ClusterIP:port` được chuyển sang một `PodIP:targetPort` phù hợp.
@@ -369,11 +375,15 @@ spec:
 - Node không có local endpoint phải bị LB health check loại.
 - Pod phân bố không đều gây load imbalance.
 
-```text
-LB
-├── Node A có 3 Pod → nhận traffic
-├── Node B có 1 Pod → nhận lượng traffic theo Node, Pod này dễ quá tải
-└── Node C có 0 Pod → health check phải fail
+```d2 title="7.2 `Local`"
+direction: right
+lb: LB
+a: "Node A có 3 Pod\nnhận traffic"
+b: "Node B có 1 Pod\nnhận lượng traffic theo Node,\nPod này dễ quá tải"
+c: "Node C có 0 Pod\nhealth check phải fail"
+lb -> a
+lb -> b
+lb -- c: Không nhận traffic {style.stroke-dash: 4}
 ```
 
 Kết hợp topology spread/DaemonSet hoặc LB target mode phù hợp. Không bật `Local` chỉ vì muốn source IP mà chưa kiểm tra health check.

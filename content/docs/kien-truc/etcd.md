@@ -28,18 +28,16 @@ description: "Giải thích vai trò etcd trong Kubernetes, Raft quorum, consist
 
 etcd là distributed key-value store có consistency mạnh, được Kubernetes dùng làm storage backend cho API state. API Server chuyển object sang representation phù hợp rồi đọc/ghi etcd; component khác không nên truy cập etcd trực tiếp.
 
-```text
-kubectl / controllers / kubelet
-              │
-              ▼
-        kube-apiserver
-              │ mTLS
-              ▼
-   ┌──────────────────────┐
-   │      etcd cluster    │
-   │ leader + followers   │
-   │ replicated Raft log  │
-   └──────────────────────┘
+```d2 title="Tổng quan"
+direction: right
+clients: kubectl / controllers / kubelet
+api: kube-apiserver
+store: "etcd cluster\nleader + followers\nreplicated Raft log" {
+  shape: cylinder
+  icon: https://icons.d2lang.com/essentials/117-database.svg
+}
+clients -> api
+api -> store: mTLS
 ```
 
 > [!IMPORTANT]
@@ -85,19 +83,18 @@ Secret được encode base64 ở API representation. Nếu không cấu hình e
 
 etcd dùng Raft consensus. Một member là leader tại một thời điểm; write đi qua leader và chỉ được commit khi majority xác nhận.
 
-```mermaid
-sequenceDiagram
-    participant API as kube-apiserver
-    participant L as etcd leader
-    participant F1 as follower 1
-    participant F2 as follower 2
-
-    API->>L: Write request
-    L->>F1: Replicate log entry
-    L->>F2: Replicate log entry
-    F1-->>L: Ack
-    L->>L: Majority reached, commit
-    L-->>API: Success
+```d2 title="2. Raft, leader và quorum"
+shape: sequence_diagram
+API: "kube-apiserver"
+L: "etcd leader"
+F1: "follower 1"
+F2: "follower 2"
+API -> L: "Write request"
+L -> F1: "Replicate log entry"
+L -> F2: "Replicate log entry"
+F1 -> L: "Ack" {style.stroke-dash: 4}
+L -> L: "Majority reached, commit"
+L -> API: "Success" {style.stroke-dash: 4}
 ```
 
 ### 2.1 Công thức quorum
@@ -143,8 +140,15 @@ etcd hỗ trợ compare-and-swap transaction. Kubernetes dùng `resourceVersion`
 
 etcd watch cung cấp stream thay đổi theo revision. API Server xây Kubernetes WATCH semantics phía trên. Sau compaction, history cũ không còn; client quá trễ phải re-list.
 
-```text
-etcd revision → API storage/watch cache → Kubernetes resourceVersion → client watch
+```d2 title="3.4 Watch"
+direction: right
+n1: "etcd revision"
+n2: "API storage/watch cache"
+n3: "Kubernetes resourceVersion"
+n4: "client watch"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Không nên giả định `resourceVersion` là timestamp hoặc tự chuyển thành integer cho logic nghiệp vụ.

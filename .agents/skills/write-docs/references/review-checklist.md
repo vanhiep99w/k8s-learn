@@ -52,7 +52,7 @@ Không dùng checklist để ép mọi trang có cùng cấu trúc. Đánh dấu
 ## Validation
 
 - [ ] Link và anchor quan trọng đã kiểm tra.
-- [ ] Mermaid/MDX syntax hợp lệ.
+- [ ] D2/MDX syntax và descriptor docs-kit hợp lệ; theme và tương tác đã kiểm tra khi có thay đổi renderer.
 - [ ] Không còn placeholder, TODO hoặc câu chưa hoàn tất ngoài chủ đích.
 - [ ] Diff không chứa thay đổi ngoài phạm vi.
 - [ ] `npm run build` hoặc build command của repository thành công.

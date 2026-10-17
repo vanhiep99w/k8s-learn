@@ -42,17 +42,15 @@ Application không nên phải biết cloud disk ID, NFS server, SAN LUN, creden
 
 Kubernetes đáp ứng yêu cầu bằng cách bind PVC với một **PersistentVolume** (PV) phù hợp. Nếu cluster hỗ trợ dynamic provisioning, provisioner có thể tạo cả volume thật và PV mới dành cho PVC.
 
-```text
-Application: "cần 20Gi, ReadWriteOnce, class database-zonal"
-                              │
-                              ▼
-                  PVC production/app-data
-                              │ bind một-một
-                              ▼
-                    PV pvc-<uid>
-                              │ đại diện
-                              ▼
-                cloud disk / NFS / storage thật
+```d2 title="Tổng quan"
+direction: down
+n1: "Application: \"cần 20Gi, ReadWriteOnce,\nclass database-zonal\""
+n2: "PVC production/app-data"
+n3: "PV pvc-<uid>"
+n4: "cloud disk / NFS / storage thật"
+n1 -> n2
+n2 -> n3: "bind một-một"
+n3 -> n4: "đại diện"
 ```
 
 Pod sau đó tham chiếu PVC, không tham chiếu trực tiếp PV hay disk ID.
@@ -102,14 +100,20 @@ Các object liên quan có vai trò khác nhau:
 
 Luồng phổ biến:
 
-```mermaid
-flowchart LR
-    U[Application tạo PVC] --> C[Chọn StorageClass và yêu cầu dung lượng]
-    C --> R{Có PV phù hợp?}
-    R -->|Có| B[Bind PV với PVC]
-    R -->|Không| D[Provisioner tạo volume và PV]
-    D --> B
-    B --> P[Pod dùng PVC]
+```d2 title="2. Mental model: PVC là phiếu yêu cầu storage"
+direction: right
+U: "Application tạo PVC"
+C: "Chọn StorageClass và yêu cầu dung\nlượng"
+R: "Có PV phù hợp?" {shape: diamond}
+B: "Bind PV với PVC"
+D: "Provisioner tạo volume và PV"
+P: "Pod dùng PVC"
+U -> C
+C -> R
+R -> B: "Có"
+R -> D: "Không"
+D -> B
+B -> P
 ```
 
 ### PVC không phải là gì
@@ -175,14 +179,20 @@ Khi PVC được tạo, control plane cố đáp ứng claim theo một trong ha
 1. Tìm một PV tĩnh phù hợp.
 2. Nếu không có và StorageClass hỗ trợ, yêu cầu provisioner tạo volume/PV mới.
 
-```mermaid
-flowchart TD
-    C[PVC mới] --> M{Có PV tĩnh phù hợp?}
-    M -->|Có| B[PV và PVC Bound]
-    M -->|Không| D{Class và dynamic provisioner khả dụng?}
-    D -->|Có| V[Tạo backend volume và PV]
-    V --> B
-    D -->|Không| P[PVC Pending và có Event]
+```d2 title="4. PVC bind với PV như thế nào"
+direction: down
+C: "PVC mới"
+M: "Có PV tĩnh phù hợp?" {shape: diamond}
+B: "PV và PVC Bound"
+D: "Class và dynamic provisioner khả\ndụng?" {shape: diamond}
+V: "Tạo backend volume và PV"
+P: "PVC Pending và có Event"
+C -> M
+M -> B: "Có"
+M -> D: "Không"
+D -> V: "Có"
+V -> B
+D -> P: "Không"
 ```
 
 Binder so sánh các điều kiện chính:

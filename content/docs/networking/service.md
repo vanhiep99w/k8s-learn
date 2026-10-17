@@ -84,13 +84,19 @@ Hãy hình dung Service là một **điểm truy cập logic** có bốn phần:
 3. **Danh sách backend động**: các endpoint như `10.244.1.10:8080`.
 4. **Quy tắc chọn backend**: data plane trên Node chuyển connection tới một endpoint phù hợp.
 
-```mermaid
-flowchart LR
-    C[Client Pod] -->|api.production:80| DNS[CoreDNS]
-    DNS -->|10.96.30.40| VIP[Service ClusterIP 10.96.30.40:80]
-    VIP -->|chọn một endpoint| P1[Pod A 10.244.1.10:8080]
-    VIP -->|chọn một endpoint| P2[Pod B 10.244.2.21:8080]
-    VIP -->|chọn một endpoint| P3[Pod C 10.244.3.15:8080]
+```d2 title="Mental model: một địa chỉ ổn định đứng trước nhiều Pod"
+direction: right
+C: "Client Pod"
+DNS: "CoreDNS"
+VIP: "Service ClusterIP 10.96.30.40:80"
+P1: "Pod A 10.244.1.10:8080"
+P2: "Pod B 10.244.2.21:8080"
+P3: "Pod C 10.244.3.15:8080"
+C -> DNS: "api.production:80"
+DNS -> VIP: "10.96.30.40"
+VIP -> P1: "chọn một endpoint"
+VIP -> P2: "chọn một endpoint"
+VIP -> P3: "chọn một endpoint"
 ```
 
 Sơ đồ có thể khiến Service trông giống một proxy server riêng, nhưng đó không phải cách triển khai thông thường. Service là API object lưu **ý định**. kube-proxy hoặc một data plane thay thế, chẳng hạn implementation dựa trên eBPF, watch Service và EndpointSlice rồi program rule trên các Node.
@@ -170,12 +176,13 @@ spec:
 
 Quan hệ quan trọng nhất trong manifest là:
 
-```text
-Service selector: app=web
-              ↓ match
-Pod label:       app=web
-              ↓ endpoint port lấy từ named port "http"
-Pod port:        http = 80
+```d2 title="Ví dụ đầu tiên: Deployment và Service"
+direction: right
+selector: "Service selector\napp=web"
+pod: "Pod label\napp=web"
+port: "Pod port\nhttp = 80"
+selector -> pod: match
+pod -> port: endpoint port lấy từ named port http
 ```
 
 Deployment và Service không được nối với nhau bằng tên `web`. Chúng tình cờ có cùng tên để dễ đọc, nhưng Service thực sự tìm Pod bằng label. Nếu Service tên `frontend-entry` vẫn có selector `app: web`, nó vẫn chọn cùng tập Pod.
@@ -271,19 +278,19 @@ curl http://web.service-demo/
 
 Đường đi logic gồm các bước sau:
 
-```mermaid
-sequenceDiagram
-    participant C as Client Pod
-    participant D as CoreDNS
-    participant V as Service VIP
-    participant P as Service data plane
-    participant B as Backend Pod
-    C->>D: Resolve web.service-demo
-    D-->>C: 10.96.30.40
-    C->>V: TCP connection tới 10.96.30.40:80
-    P->>P: Chọn ready endpoint
-    P->>B: Chuyển đích tới 10.244.2.21:80
-    B-->>C: Trả response qua network path
+```d2 title="Request đi qua Service như thế nào?"
+shape: sequence_diagram
+C: "Client Pod"
+D: "CoreDNS"
+V: "Service VIP"
+P: "Service data plane"
+B: "Backend Pod"
+C -> D: "Resolve web.service-demo"
+D -> C: "10.96.30.40" {style.stroke-dash: 4}
+C -> V: "TCP connection tới 10.96.30.40:80"
+P -> P: "Chọn ready endpoint"
+P -> B: "Chuyển đích tới 10.244.2.21:80"
+B -> C: "Trả response qua network path" {style.stroke-dash: 4}
 ```
 
 Cách đọc flow này:
@@ -318,13 +325,15 @@ ports:
 
 Đường đi là:
 
-```text
-Client
-  gọi ServiceIP:80             ← port
-             ↓
-  Service chọn PodIP:8080      ← targetPort resolve từ tên "http"
-             ↓
-  process phải listen :8080    ← behavior thật của application
+```d2 title="Phân biệt port, targetPort và containerPort"
+direction: right
+client: Client
+vip: gọi ServiceIP:80
+endpoint: Service chọn PodIP:8080
+process: process phải listen :8080
+client -> vip: port
+vip -> endpoint: targetPort resolve từ tên http
+endpoint -> process: behavior thật của application
 ```
 
 | Khái niệm | Thuộc object | Ý nghĩa |
@@ -365,15 +374,23 @@ Thay `POD_IP` bằng IP thật lấy từ lệnh đầu tiên.
 
 Selector mô tả **Pod nào đủ điều kiện làm backend**. Data plane lại cần danh sách cụ thể dạng `IP:port`. Kubernetes lưu danh sách đó bằng EndpointSlice.
 
-```mermaid
-flowchart LR
-    S[Service selector app=web] --> C[EndpointSlice controller]
-    P[Pod labels, IP, readiness] --> C
-    C --> E[EndpointSlice]
-    E --> A[10.244.1.10:80 ready]
-    E --> B[10.244.2.21:80 ready]
-    E --> D[10.244.3.15:80 not ready]
-    E --> K[kube-proxy hoặc data plane khác]
+```d2 title="Selector và EndpointSlice"
+direction: right
+S: "Service selector app=web"
+C: "EndpointSlice controller"
+P: "Pod labels, IP, readiness"
+E: "EndpointSlice"
+A: "10.244.1.10:80 ready"
+B: "10.244.2.21:80 ready"
+D: "10.244.3.15:80 not ready"
+K: "kube-proxy hoặc data plane khác"
+S -> C
+P -> C
+C -> E
+E -> A
+E -> B
+E -> D
+E -> K
 ```
 
 Khi Service có selector, control plane liên tục reconcile EndpointSlice:
@@ -445,16 +462,17 @@ readinessProbe:
 
 Flow bình thường:
 
-```text
-Pod được tạo
-  ↓
-Container chạy nhưng readiness chưa pass
-  ↓
-Endpoint chưa ready, Service không gửi traffic thông thường
-  ↓
-Readiness pass
-  ↓
-Endpoint ready, Pod bắt đầu nhận connection mới
+```d2 title="Readiness quyết định Pod có nhận traffic hay không"
+direction: down
+n1: "Pod được tạo"
+n2: "Container chạy nhưng readiness chưa pass"
+n3: "Endpoint chưa ready, Service không gửi\ntraffic thông thường"
+n4: "Readiness pass"
+n5: "Endpoint ready, Pod bắt đầu nhận\nconnection mới"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Khi readiness fail trong lúc Pod đang chạy, endpoint thường chuyển sang `ready: false`. Process không nhất thiết bị restart; liveness probe mới liên quan đến quyết định restart container.
@@ -583,14 +601,16 @@ Một hiểu lầm phổ biến là ba Pod thì ba HTTP request liên tiếp ch�
 
 Ví dụ:
 
-```text
-Một TCP connection
-  ├── HTTP request 1
-  ├── HTTP request 2
-  ├── HTTP request 3
-  └── HTTP request 100
-
-Tất cả có thể đi tới cùng một Pod vì HTTP keep-alive dùng lại connection.
+```d2 title="Service phân phối traffic ở mức connection"
+direction: right
+connection: "Một TCP connection\nHTTP keep-alive" {
+  r1: HTTP request 1
+  r2: HTTP request 2
+  r3: HTTP request 3
+  r100: HTTP request 100
+}
+pod: cùng một Pod
+connection -> pod: Có thể dùng lại connection
 ```
 
 Điều này đặc biệt rõ với:
@@ -996,22 +1016,23 @@ Xóa Namespace sẽ xóa toàn bộ resource trong lab. Kiểm tra đúng contex
 
 Đừng bắt đầu bằng cách restart ngẫu nhiên CoreDNS, kube-proxy hoặc application. Hãy xác định request hỏng ở lớp nào theo thứ tự:
 
-```text
-Tên Service
-  ↓
-DNS
-  ↓
-Service object và port
-  ↓
-Selector
-  ↓
-EndpointSlice và readiness
-  ↓
-Pod IP và targetPort
-  ↓
-Process trong container
-  ↓
-Service data plane / CNI / NetworkPolicy
+```d2 title="Troubleshooting theo từng lớp"
+direction: down
+n1: "Tên Service"
+n2: "DNS"
+n3: "Service object và port"
+n4: "Selector"
+n5: "EndpointSlice và readiness"
+n6: "Pod IP và targetPort"
+n7: "Process trong container"
+n8: "Service data plane / CNI / NetworkPolicy"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
+n7 -> n8
 ```
 
 ### Bộ lệnh thu thập ban đầu
@@ -1262,20 +1283,21 @@ Service object tồn tại không chứng minh request end-to-end hoạt động
 
 Giữ chuỗi sau trong đầu khi đọc hoặc debug Service:
 
-```text
-Client gọi DNS name
-  ↓
-DNS trả ClusterIP của Service
-  ↓
-Client kết nối Service port
-  ↓
-Service data plane đọc tập backend từ EndpointSlice
-  ↓
-Chọn một endpoint ready
-  ↓
-Chuyển traffic tới Pod IP và targetPort
-  ↓
-Process trong Pod phải thật sự listen và xử lý request
+```d2 title="Tóm tắt mental model"
+direction: down
+n1: "Client gọi DNS name"
+n2: "DNS trả ClusterIP của Service"
+n3: "Client kết nối Service port"
+n4: "Service data plane đọc tập backend từ\nEndpointSlice"
+n5: "Chọn một endpoint ready"
+n6: "Chuyển traffic tới Pod IP và targetPort"
+n7: "Process trong Pod phải thật sự listen và\nxử lý request"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
 ```
 
 Năm câu hỏi thường tìm ra phần lớn lỗi Service:

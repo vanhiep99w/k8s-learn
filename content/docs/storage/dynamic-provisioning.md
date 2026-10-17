@@ -27,14 +27,21 @@ description: "Luồng cấp PersistentVolume theo yêu cầu từ PVC và Storag
 
 Dynamic provisioning tạo storage asset khi một PVC yêu cầu, thay vì administrator chuẩn bị sẵn từng PV. StorageClass chọn provisioner và policy; provisioner tạo asset rồi tạo PV đại diện và binder nối PV với PVC.
 
-```text
-Create PVC
-→ chọn StorageClass
-→ provisioner CreateVolume
-→ storage backend tạo asset
-→ tạo PV với volumeHandle
-→ bind PV ↔ PVC
-→ scheduler/kubelet attach và mount cho Pod
+```d2 title="Tổng quan"
+direction: right
+n1: "Create PVC"
+n2: "chọn StorageClass"
+n3: "provisioner CreateVolume"
+n4: "storage backend tạo asset"
+n5: "tạo PV với volumeHandle"
+n6: "bind PV ↔ PVC"
+n7: "scheduler/kubelet attach và mount cho\nPod"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
 ```
 
 Automation giảm inventory PV rỗi, nhưng mở rộng blast radius của cấu hình sai: một StorageClass sai, credential hết hạn hoặc backend quota cạn có thể chặn mọi workload mới dùng class đó.
@@ -70,19 +77,19 @@ Xem kiến trúc chi tiết tại [Container Storage Interface](/storage/csi/).
 
 StorageClass mặc định dùng `Immediate` nếu không khai báo `volumeBindingMode`:
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant A as API Server
-    participant P as CSI provisioner
-    participant B as Storage backend
-    participant C as Binder
-    U->>A: Create PVC class=fast
-    P->>A: Watch PVC
-    P->>B: CreateVolume(parameters, size)
-    B-->>P: volumeHandle + topology
-    P->>A: Create PV
-    C->>A: Bind PV ↔ PVC
+```d2 title="3. Luồng Immediate"
+shape: sequence_diagram
+U: "User"
+A: "API Server"
+P: "CSI provisioner"
+B: "Storage backend"
+C: "Binder"
+U -> A: "Create PVC class=fast"
+P -> A: "Watch PVC"
+P -> B: "CreateVolume(parameters, size)"
+B -> P: "volumeHandle + topology" {style.stroke-dash: 4}
+P -> A: "Create PV"
+C -> A: "Bind PV ↔ PVC"
 ```
 
 Ưu điểm: PVC có thể `Bound` trước khi Pod tồn tại. Nhược điểm: với zonal/local storage, provisioner chưa biết Pod constraints. Volume có thể xuất hiện ở zone mà Pod không thể chạy.
@@ -106,19 +113,19 @@ allowVolumeExpansion: true
 
 PVC ở `Pending` cho đến khi Pod cần nó. Scheduler chọn candidate Node, provisioner nhận selected topology rồi tạo Volume đúng location.
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant S as Scheduler
-    participant P as Provisioner
-    participant B as Backend
-    U->>S: Pod cần PVC chưa bind
-    S->>S: Filter CPU, taint, affinity, storage topology
-    S->>P: Chọn topology khả thi
-    P->>B: CreateVolume trong topology
-    B-->>P: volumeHandle
-    P-->>S: PV/PVC Bound
-    S-->>U: Pod bound tới Node
+```d2 title="4. Luồng WaitForFirstConsumer"
+shape: sequence_diagram
+U: "User"
+S: "Scheduler"
+P: "Provisioner"
+B: "Backend"
+U -> S: "Pod cần PVC chưa bind"
+S -> S: "Filter CPU, taint, affinity, storage\ntopology"
+S -> P: "Chọn topology khả thi"
+P -> B: "CreateVolume trong topology"
+B -> P: "volumeHandle" {style.stroke-dash: 4}
+P -> S: "PV/PVC Bound" {style.stroke-dash: 4}
+S -> U: "Pod bound tới Node" {style.stroke-dash: 4}
 ```
 
 Behavior “PVC Pending, Event waiting for first consumer” là bình thường. Chẩn đoán chỉ cần escalation nếu Pod đã tồn tại nhưng scheduler không tìm được topology/capacity phù hợp.
@@ -171,13 +178,17 @@ Controller và CSI operation phải chịu retry vì distributed system có time
 
 Deletion cũng nhiều bước:
 
-```text
-Delete PVC
-→ PVC protection chờ Pod ngừng dùng
-→ PV release
-→ reclaimPolicy
-   ├── Delete: CSI DeleteVolume → xóa PV
-   └── Retain: giữ PV/asset để xử lý thủ công
+```d2 title="7. Idempotency, retry và cleanup"
+direction: right
+delete: Delete PVC
+protect: PVC protection chờ Pod ngừng dùng
+release: PV release
+policy: reclaimPolicy {shape: diamond}
+deleteVolume: "Delete\nCSI DeleteVolume → xóa PV"
+retain: "Retain\ngiữ PV/asset để xử lý thủ công"
+delete -> protect -> release -> policy
+policy -> deleteVolume
+policy -> retain
 ```
 
 Nếu provisioner crash giữa operation, finalizer và retry giúp tiếp tục. Xóa finalizer thủ công có thể cắt ngang workflow và tạo orphan asset.

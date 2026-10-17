@@ -31,14 +31,21 @@ Kubernetes networking không phải một network implementation duy nhất. Kub
 
 Mô hình cơ bản:
 
-```mermaid
-flowchart LR
-    C[External client] --> G[Gateway / Ingress / LoadBalancer]
-    G --> S[Service VIP]
-    S --> P1[Pod IP A]
-    S --> P2[Pod IP B]
-    P1 <--> P3[Pod IP C trên node khác]
-    P1 --> E[External service]
+```d2 title="Tổng quan"
+direction: right
+C: "External client"
+G: "Gateway / Ingress / LoadBalancer"
+S: "Service VIP"
+P1: "Pod IP A"
+P2: "Pod IP B"
+P3: "Pod IP C trên node khác"
+E: "External service"
+C -> G
+G -> S
+S -> P1
+S -> P2
+P1 <-> P3
+P1 -> E
 ```
 
 Các giả định quan trọng của Kubernetes network model:
@@ -66,11 +73,17 @@ Mọi container của một Pod dùng chung:
 
 Vì vậy sidecar gọi application qua `127.0.0.1:8080`. Hai container không thể cùng bind `0.0.0.0:8080` trong cùng Pod.
 
-```text
-Pod 10.244.1.12
-├── app      :0.0.0.0:8080
-├── sidecar  → localhost:8080
-└── lo, eth0, route table dùng chung
+```d2 title="1.1 Container-to-container trong cùng Pod"
+direction: right
+n1: "Pod 10.244.1.12"
+n2: "app      :0.0.0.0:8080"
+n3: "sidecar"
+n4: "localhost:8080"
+n5: "lo, eth0, route table dùng chung"
+n1 -> n2
+n3 -> n4
+n1 -> n3
+n1 -> n5
 ```
 
 ### 1.2 Pod-to-Pod
@@ -125,12 +138,13 @@ Pod IP phải có đường đi trong cluster. Nó tồn tại cùng Pod sandbox
 
 ClusterIP thường không xuất hiện như IP được bind trên một interface. kube-proxy hoặc service proxy thay thế sẽ cài rule trong kernel để bắt packet tới `ClusterIP:port` và DNAT tới endpoint.
 
-```text
-Client Pod
-  dst=10.96.20.30:80       Service VIP
-        │ service rule chọn backend
-        ▼
-  dst=10.244.2.18:8080     Pod IP + targetPort
+```d2 title="2.2 ClusterIP là virtual IP"
+direction: right
+client: Client Pod
+vip: "dst=10.96.20.30:80\nService VIP"
+endpoint: "dst=10.244.2.18:8080\nPod IP + targetPort"
+client -> vip
+vip -> endpoint: service rule chọn backend
 ```
 
 ### 2.3 Node IP có vai trò riêng
@@ -150,12 +164,19 @@ Khi kubelet yêu cầu container runtime tạo Pod sandbox:
 
 Trên Linux, một thiết kế phổ biến dùng cặp `veth`:
 
-```text
-Pod network namespace                 Node network namespace
-┌────────────────────┐                ┌────────────────────────┐
-│ eth0 10.244.1.12   │◀── veth pair ─▶│ vethXYZ → bridge/route │
-│ lo 127.0.0.1       │                │ physical NIC / tunnel  │
-└────────────────────┘                └────────────────────────┘
+```d2 title="3. Network namespace của Pod"
+direction: right
+pod: Pod network namespace {
+  eth: eth0 10.244.1.12
+  lo: lo 127.0.0.1
+}
+node: Node network namespace {
+  veth: vethXYZ
+  route: bridge/route
+  nic: physical NIC / tunnel
+  veth -> route
+}
+pod.eth <-> node.veth: veth pair
 ```
 
 Tên interface và bridge là implementation detail; không giả định mọi CNI có `cni0` hay VXLAN.
@@ -182,28 +203,33 @@ Chỉ dùng cho system component thực sự cần Node network.
 
 Một flow điển hình:
 
-```text
-Pod A eth0
-  → veth phía Node
-  → bridge/eBPF/routing table
-  → veth phía Pod B
-  → Pod B eth0
+```d2 title="4.1 Cùng Node"
+direction: right
+n1: "Pod A eth0"
+n2: "veth phía Node"
+n3: "bridge/eBPF/routing table"
+n4: "veth phía Pod B"
+n5: "Pod B eth0"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Packet không cần rời physical NIC. NetworkPolicy có thể được enforce tại veth, eBPF hook, bridge hoặc netfilter tùy CNI.
 
 ### 4.2 Khác Node
 
-```mermaid
-sequenceDiagram
-    participant A as Pod A 10.244.1.10
-    participant N1 as Node 1
-    participant N2 as Node 2
-    participant B as Pod B 10.244.2.20
-    A->>N1: dst 10.244.2.20
-    N1->>N2: Route native hoặc encapsulate overlay
-    N2->>B: Decapsulate/route tới veth
-    B-->>A: Reply theo reverse route
+```d2 title="4.2 Khác Node"
+shape: sequence_diagram
+A: "Pod A 10.244.1.10"
+N1: "Node 1"
+N2: "Node 2"
+B: "Pod B 10.244.2.20"
+A -> N1: "dst 10.244.2.20"
+N1 -> N2: "Route native hoặc encapsulate\noverlay"
+N2 -> B: "Decapsulate/route tới veth"
+B -> A: "Reply theo reverse route" {style.stroke-dash: 4}
 ```
 
 Hai model chính:
@@ -231,21 +257,21 @@ kubectl exec POD_NAME -- ping -M do -s 1400 DESTINATION_IP
 
 Control plane và data plane phối hợp:
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant A as API Server
-    participant E as EndpointSlice controller
-    participant K as kube-proxy/CNI proxy
-    participant C as Client
-    participant P as Ready Pod
-    U->>A: Create Service selector app=api
-    E->>A: Watch Service và Pods
-    E->>A: Publish EndpointSlice
-    K->>A: Watch Service + EndpointSlice
-    K->>K: Program node data plane
-    C->>K: Connect ClusterIP:port
-    K->>P: DNAT/forward PodIP:targetPort
+```d2 title="5. Service và virtual IP"
+shape: sequence_diagram
+U: "User"
+A: "API Server"
+E: "EndpointSlice controller"
+K: "kube-proxy/CNI proxy"
+C: "Client"
+P: "Ready Pod"
+U -> A: "Create Service selector app=api"
+E -> A: "Watch Service và Pods"
+E -> A: "Publish EndpointSlice"
+K -> A: "Watch Service + EndpointSlice"
+K -> K: "Program node data plane"
+C -> K: "Connect ClusterIP:port"
+K -> P: "DNAT/forward PodIP:targetPort"
 ```
 
 Chỉ Pod match selector **và đủ điều kiện serving/ready** mới thường nhận traffic. Readiness probe vì thế là một phần của network routing, không chỉ monitoring.
@@ -270,14 +296,21 @@ DNS giải quyết **discovery**, còn Service proxy giải quyết **traffic st
 
 ### 7.1 North-south traffic
 
-```text
-Internet/VPC client
-  → external DNS
-  → cloud/edge load balancer
-  → Gateway/Ingress controller hoặc NodePort
-  → Service
-  → EndpointSlice
-  → Pod
+```d2 title="7.1 North-south traffic"
+direction: right
+n1: "Internet/VPC client"
+n2: "external DNS"
+n3: "cloud/edge load balancer"
+n4: "Gateway/Ingress controller hoặc NodePort"
+n5: "Service"
+n6: "EndpointSlice"
+n7: "Pod"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
 ```
 
 Mỗi hop có health check, timeout và log riêng. Khi lỗi, xác định packet dừng ở hop nào thay vì chỉ nhìn Pod log.
@@ -286,8 +319,15 @@ Mỗi hop có health check, timeout và log riêng. Khi lỗi, xác định pack
 
 Traffic giữa service nội bộ thường là:
 
-```text
-Client Pod → CoreDNS → Service VIP → backend Pod
+```d2 title="7.2 East-west traffic"
+direction: right
+n1: "Client Pod"
+n2: "CoreDNS"
+n3: "Service VIP"
+n4: "backend Pod"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Có service mesh thì sidecar/ambient data plane thêm hop logic, nhưng Kubernetes Service và Pod network vẫn là nền tảng.

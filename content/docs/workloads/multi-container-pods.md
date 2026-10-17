@@ -26,11 +26,15 @@ description: "Thiết kế Pod nhiều container với các pattern sidecar, ada
 
 Pod có thể chạy nhiều container. Pattern này hữu ích khi một process chính cần process phụ trợ chạy cùng Node, chia sẻ `localhost`, volume và vòng đời triển khai.
 
-```text
-Pod
-├── app: tạo /var/log/app/events.log
-├── sidecar: đọc file và gửi log
-└── emptyDir: /var/log/app
+```d2 title="Tổng quan"
+direction: right
+n1: "Pod"
+n2: "app: tạo /var/log/app/events.log"
+n3: "sidecar: đọc file và gửi log"
+n4: "emptyDir: /var/log/app"
+n1 -> n2
+n1 -> n3
+n1 -> n4
 ```
 
 Số container không làm Pod trở thành microservice platform thu nhỏ. Ranh giới Pod quyết định scheduling, scale, rollout và failure domain; ghép sai container tạo coupling khó vận hành.
@@ -109,12 +113,17 @@ Sidecar mở rộng chức năng của app mà không thay source app. Ví dụ:
 - Certificate/config reloader.
 - Metrics exporter cho ứng dụng legacy.
 
-```mermaid
-flowchart LR
-    C[Client] --> P[Proxy sidecar :8443]
-    P -->|localhost:8080| A[Application]
-    A --> V[(Shared volume)]
-    L[Log sidecar] --> V
+```d2 title="3. Sidecar pattern"
+direction: right
+C: "Client"
+P: "Proxy sidecar :8443"
+A: "Application"
+V: "Shared volume" {shape: cylinder}
+L: "Log sidecar"
+C -> P
+P -> A: "localhost:8080"
+A -> V
+L -> V
 ```
 
 ### 3.1 Sidecar là container thông thường
@@ -158,8 +167,15 @@ Adapter phù hợp khi không thể sửa app. Nếu có thể thay code dễ d�
 
 Ambassador đại diện app giao tiếp với external service:
 
-```text
-application → localhost:5432 → database proxy → remote database
+```d2 title="5. Ambassador pattern"
+direction: right
+n1: "application"
+n2: "localhost:5432"
+n3: "database proxy"
+n4: "remote database"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Proxy có thể xử lý TLS, service discovery, retry hoặc credential rotation. App chỉ biết endpoint local.

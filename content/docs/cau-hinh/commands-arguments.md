@@ -49,13 +49,19 @@ Khả năng override hữu ích khi:
 
 Luồng khởi chạy rút gọn:
 
-```mermaid
-flowchart LR
-    A[Pod spec được lưu] --> B[kubelet nhận Pod]
-    B --> C[Runtime pull image]
-    C --> D[Kết hợp image config với command và args]
-    D --> E[Runtime tạo container]
-    E --> F[Executable trở thành process PID 1]
+```d2 title="1. Từ container image đến process PID 1"
+direction: right
+A: "Pod spec được lưu"
+B: "kubelet nhận Pod"
+C: "Runtime pull image"
+D: "Kết hợp image config với command và\nargs"
+E: "Runtime tạo container"
+F: "Executable trở thành process PID 1"
+A -> B
+B -> C
+C -> D
+D -> E
+E -> F
 ```
 
 Image metadata có hai thành phần:
@@ -338,9 +344,11 @@ Chỉ dùng cho debug/lab. Với production, ưu tiên ephemeral containers đ�
 
 Khi Pod terminate, runtime gửi signal đến process chính của container. Nếu command là shell wrapper không `exec`, application con có thể không nhận `SIGTERM` đúng lúc:
 
-```text
-PID 1: /bin/sh -c /app/server
-└── PID 7: /app/server
+```d2 title="8. Signal, PID 1 và graceful shutdown"
+direction: right
+n1: "PID 1: /bin/sh -c /app/server"
+n2: "PID 7: /app/server"
+n1 -> n2
 ```
 
 Tốt hơn:

@@ -45,12 +45,33 @@ Ví dụ, bạn cần chạy một chương trình để:
 
 Bạn không cần tự tạo Job vào từng thời điểm. CronJob controller đọc lịch và tạo một Job mới khi đến giờ.
 
-```text
-CronJob: chạy mỗi ngày lúc 02:00
-│
-├── Thứ Hai 02:00  → Job A → Pod → Complete
-├── Thứ Ba 02:00   → Job B → Pod → Complete
-└── Thứ Tư 02:00   → Job C → Pod → Running
+```d2 title="CronJob là gì?"
+direction: right
+n1: "CronJob: chạy mỗi ngày lúc 02:00"
+n2: "Thứ Hai 02:00"
+n3: "Job A"
+n4: "Pod"
+n5: "Complete"
+n6: "Thứ Ba 02:00"
+n7: "Job B"
+n8: "Pod"
+n9: "Complete"
+n10: "Thứ Tư 02:00"
+n11: "Job C"
+n12: "Pod"
+n13: "Running"
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n1 -> n2
+n6 -> n7
+n7 -> n8
+n8 -> n9
+n1 -> n6
+n10 -> n11
+n11 -> n12
+n12 -> n13
+n1 -> n10
 ```
 
 Điểm quan trọng nhất cần nhớ:
@@ -63,11 +84,15 @@ CronJob trong Kubernetes tương tự một dòng trong `crontab` trên Linux, n
 
 Ba resource tạo thành chuỗi ownership:
 
-```text
-CronJob
-└── Job của lần chạy 10:00
-    └── Pod
-        └── Container chạy task
+```d2 title="Quan hệ giữa CronJob, Job và Pod"
+direction: right
+n1: "CronJob"
+n2: "Job của lần chạy 10:00"
+n3: "Pod"
+n4: "Container chạy task"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Mỗi tầng có một trách nhiệm riêng:
@@ -81,22 +106,38 @@ Mỗi tầng có một trách nhiệm riêng:
 
 Ví dụ CronJob chạy mỗi giờ:
 
-```text
-09:00 → CronJob tạo Job report-09h → Job tạo Pod → task exit 0
-10:00 → CronJob tạo Job report-10h → Job tạo Pod → task exit 0
-11:00 → CronJob tạo Job report-11h → Job tạo Pod → task exit 1
-                                          │
-                                          └── Job xử lý retry
+```d2 title="Quan hệ giữa CronJob, Job và Pod"
+direction: right
+cron: CronJob
+j9: Job report-09h
+j10: Job report-10h
+j11: Job report-11h
+p9: Job tạo Pod
+p10: Job tạo Pod
+p11: Job tạo Pod
+ok9: task exit 0
+ok10: task exit 0
+fail: task exit 1
+retry: Job xử lý retry
+cron -> j9: "09:00"
+cron -> j10: "10:00"
+cron -> j11: "11:00"
+j9 -> p9 -> ok9
+j10 -> p10 -> ok10
+j11 -> p11 -> fail -> retry
 ```
 
 CronJob không trực tiếp retry container. Cấu hình retry nằm trong `spec.jobTemplate.spec`, tức phần Job template.
 
 Vì vậy, khi debug cần đi từ ngoài vào trong:
 
-```text
-CronJob có tạo Job đúng lịch không?
-└── Job có tạo Pod và đạt completion không?
-    └── Container có chạy command thành công không?
+```d2 title="Quan hệ giữa CronJob, Job và Pod"
+direction: right
+n1: "CronJob có tạo Job đúng lịch không?"
+n2: "Job có tạo Pod và đạt completion không?"
+n3: "Container có chạy command thành công\nkhông?"
+n1 -> n2
+n2 -> n3
 ```
 
 Các command tương ứng:
@@ -119,12 +160,23 @@ CronJob phù hợp khi task có hai đặc điểm:
 
 Chọn controller bằng mental model sau:
 
-```text
-Process cần chạy liên tục?
-├── Có → Deployment hoặc controller chạy lâu dài khác
-└── Không
-    ├── Chỉ chạy một lần → Job
-    └── Chạy lặp theo lịch → CronJob
+```d2 title="Khi nào nên dùng CronJob?"
+direction: right
+n1: "Process cần chạy liên tục?"
+n2: "Có"
+n3: "Deployment hoặc controller chạy lâu dài\nkhác"
+n4: "Không"
+n5: "Chỉ chạy một lần"
+n6: "Job"
+n7: "Chạy lặp theo lịch"
+n8: "CronJob"
+n2 -> n3
+n1 -> n2
+n1 -> n4
+n5 -> n6
+n4 -> n5
+n7 -> n8
+n4 -> n7
 ```
 
 CronJob không phải lựa chọn tốt cho mọi bài toán liên quan đến thời gian.
@@ -240,10 +292,13 @@ kubectl get cronjob,jobs,pods -n cron-lab --watch
 
 Sau mốc phút tiếp theo, bạn sẽ thấy:
 
-```text
-CronJob hello-cron
-└── Job hello-cron-<suffix>
-    └── Pod hello-cron-<suffix>-<suffix>
+```d2 title="Chờ Job được tạo"
+direction: right
+n1: "CronJob hello-cron"
+n2: "Job hello-cron-<suffix>"
+n3: "Pod hello-cron-<suffix>-<suffix>"
+n1 -> n2
+n2 -> n3
 ```
 
 Job name khác Pod name. Không nên đoán tên đầy đủ vì Kubernetes tự thêm suffix.
@@ -464,13 +519,19 @@ jobTemplate:
 
 Hãy đọc theo từng lớp:
 
-```text
-CronJob spec
-└── jobTemplate.spec              # cấu hình của Job
-    ├── backoffLimit              # Job retry thế nào
-    └── template.spec             # cấu hình của Pod
-        ├── restartPolicy
-        └── containers
+```d2 title="`spec.jobTemplate`"
+direction: right
+n1: "CronJob spec"
+n2: "jobTemplate.spec              # cấu hình\ncủa Job"
+n3: "backoffLimit              # Job retry\nthế nào"
+n4: "template.spec             # cấu hình của\nPod"
+n5: "restartPolicy"
+n6: "containers"
+n1 -> n2
+n2 -> n3
+n2 -> n4
+n4 -> n5
+n4 -> n6
 ```
 
 Sự lồng nhau dài vì CronJob chứa Job template, còn Job template lại chứa Pod template.
@@ -523,10 +584,18 @@ Policy chỉ áp dụng giữa các Job do **cùng một CronJob** tạo ra. Nó
 
 ### `Allow`: cho phép chạy chồng
 
-```text
-10:00 → Job A bắt đầu ─────────────── xong 10:08
-10:05 →      Job B bắt đầu ─────────────── xong 10:13
-10:10 →           Job C bắt đầu ─────────────── xong 10:18
+```d2 title="`Allow`: cho phép chạy chồng"
+shape: sequence_diagram
+cron: CronJob
+A: Job A
+B: Job B
+C: Job C
+cron -> A: "10:00 bắt đầu"
+cron -> B: "10:05 bắt đầu"
+A -> cron: "10:08 xong" {style.stroke-dash: 4}
+cron -> C: "10:10 bắt đầu"
+B -> cron: "10:13 xong" {style.stroke-dash: 4}
+C -> cron: "10:18 xong" {style.stroke-dash: 4}
 ```
 
 Dùng khi:
@@ -540,10 +609,15 @@ Rủi ro là số Job active có thể tăng nếu task chậm hơn tần suất
 
 ### `Forbid`: không chạy chồng
 
-```text
-10:00 → Job A bắt đầu ─────────────── xong 10:08
-10:05 → lần chạy bị bỏ qua vì Job A còn active
-10:10 → Job B bắt đầu
+```d2 title="`Forbid`: không chạy chồng"
+shape: sequence_diagram
+cron: CronJob
+A: Job A
+B: Job B
+cron -> A: "10:00 bắt đầu"
+cron -> cron: "10:05 bỏ qua vì Job A còn active"
+A -> cron: "10:08 xong" {style.stroke-dash: 4}
+cron -> B: "10:10 bắt đầu"
 ```
 
 Dùng khi task không được overlap, ví dụ một script maintenance chỉ cho phép một phiên chạy.
@@ -552,10 +626,17 @@ Dùng khi task không được overlap, ví dụ một script maintenance chỉ 
 
 ### `Replace`: ưu tiên lần chạy mới
 
-```text
-10:00 → Job A bắt đầu ───── bị dừng lúc 10:05
-10:05 → Job B bắt đầu ───── bị dừng lúc 10:10
-10:10 → Job C bắt đầu ...
+```d2 title="`Replace`: ưu tiên lần chạy mới"
+shape: sequence_diagram
+cron: CronJob
+A: Job A
+B: Job B
+C: Job C
+cron -> A: "10:00 bắt đầu"
+cron -> A: "10:05 dừng Job A"
+cron -> B: "10:05 bắt đầu"
+cron -> B: "10:10 dừng Job B"
+cron -> C: "10:10 bắt đầu…"
 ```
 
 Dùng khi kết quả mới làm kết quả cũ không còn giá trị, ví dụ task liên tục tính snapshot mới nhất.
@@ -564,12 +645,23 @@ Dùng khi kết quả mới làm kết quả cũ không còn giá trị, ví d�
 
 ### Cách chọn policy
 
-```text
-Hai lần chạy có thể an toàn cùng tồn tại?
-├── Có → Allow
-└── Không
-    ├── Muốn lần cũ chạy xong, chấp nhận bỏ/trễ kỳ mới → Forbid
-    └── Kết quả mới quan trọng hơn kết quả cũ → Replace
+```d2 title="Cách chọn policy"
+direction: right
+n1: "Hai lần chạy có thể an toàn cùng tồn\ntại?"
+n2: "Có"
+n3: "Allow"
+n4: "Không"
+n5: "Muốn lần cũ chạy xong, chấp nhận bỏ/trễ\nkỳ mới"
+n6: "Forbid"
+n7: "Kết quả mới quan trọng hơn kết quả cũ"
+n8: "Replace"
+n2 -> n3
+n1 -> n2
+n1 -> n4
+n5 -> n6
+n4 -> n5
+n7 -> n8
+n4 -> n7
 ```
 
 Nếu nghiệp vụ bắt buộc singleton trên toàn hệ thống, `Forbid` chưa đủ. Bạn vẫn cần idempotency hoặc distributed lock ở tầng dữ liệu vì có thể tồn tại CronJob thứ hai, manual Job hoặc scheduler bên ngoài.
@@ -599,10 +691,17 @@ spec:
 
 CronJob chạy đầu mỗi giờ và cho phép bắt đầu trễ tối đa 300 giây, tức 5 phút.
 
-```text
-Lịch dự kiến:      10:00
-Controller trở lại: 10:03  → còn trong 5 phút → có thể tạo Job
-Controller trở lại: 10:07  → đã quá 5 phút   → bỏ qua lần 10:00
+```d2 title="Lịch bị lỡ và `startingDeadlineSeconds`"
+direction: right
+schedule: "Lịch dự kiến: 10:00\nDeadline: 5 phút"
+early: Controller trở lại 10:03
+late: Controller trở lại 10:07
+create: Còn trong 5 phút → có thể tạo Job
+skip: Đã quá 5 phút → bỏ qua lần 10:00
+schedule -- early
+schedule -- late
+early -> create
+late -> skip
 ```
 
 Lần 10:00 bị bỏ không làm mất các lịch tương lai. CronJob vẫn có thể tiếp tục xử lý lần 11:00.
@@ -672,12 +771,15 @@ Cột `SUSPEND` phải chuyển thành `True`.
 
 Suspend chỉ ảnh hưởng đến những lần chạy trong tương lai. Nó **không dừng Job đang active**:
 
-```text
-Job A đang chạy
-      │
-      ├── suspend CronJob
-      │
-      └── Job A vẫn tiếp tục; CronJob không tạo Job theo lịch mới
+```d2 title="Tạm dừng và chạy lại CronJob"
+direction: right
+job: Job A đang chạy
+suspend: suspend CronJob
+existing: Job A vẫn tiếp tục
+new: CronJob không tạo Job theo lịch mới
+job -> suspend
+suspend -> existing
+suspend -> new
 ```
 
 Muốn dừng Job đang chạy, phải xử lý Job riêng và đánh giá tác động nghiệp vụ trước khi xóa.
@@ -792,12 +894,18 @@ CronJob scheduling mang tính gần đúng trong hệ thống phân tán. Trong 
 
 Ví dụ task tạo settlement hằng ngày:
 
-```text
-Kỳ nghiệp vụ: 2026-04-15
-
-Job A → tạo settlement thành công nhưng mất phản hồi
-Job B → retry hoặc duplicate run
-      → cố tạo lại settlement cho cùng ngày
+```d2 title="Vì sao task phải idempotent?"
+direction: right
+period: "Kỳ nghiệp vụ: 2026-04-15"
+a: Job A
+b: Job B
+success: tạo settlement thành công nhưng mất phản hồi
+retry: retry hoặc duplicate run
+duplicate: cố tạo lại settlement cho cùng ngày
+period -- a
+period -- b
+a -> success
+b -> retry -> duplicate
 ```
 
 Nếu không có chống trùng, cùng một kỳ có thể bị xử lý hai lần.
@@ -838,12 +946,15 @@ Từ Kubernetes v1.32, Job do CronJob tạo có annotation `batch.kubernetes.io/
 
 Khi sửa CronJob, template mới chỉ áp dụng cho **Job được tạo sau thay đổi**.
 
-```text
-Job A đã chạy từ template v1 ───────── tiếp tục dùng v1
-                  │
-                  └── cập nhật CronJob thành template v2
-                                      │
-                                      └── Job B tạo sau đó dùng v2
+```d2 title="Cập nhật CronJob"
+shape: sequence_diagram
+cron: CronJob
+A: Job A
+B: Job B
+cron -> A: Tạo từ template v1
+cron -> cron: Cập nhật thành template v2
+A."Tiếp tục dùng v1"
+cron -> B: Tạo sau đó dùng v2
 ```
 
 CronJob không update Job hoặc Pod đã tồn tại.
@@ -956,10 +1067,13 @@ kubectl get cronjob,jobs,pods -n cron-lab --watch
 
 Chờ qua mốc phút tiếp theo. Một lần chạy thành công có luồng:
 
-```text
-scheduled-report
-└── scheduled-report-<timestamp-suffix>    Job
-    └── scheduled-report-...-<suffix>      Pod
+```d2 title="3. Quan sát CronJob tạo Job và Pod"
+direction: right
+n1: "scheduled-report"
+n2: "scheduled-report-<timestamp-suffix>\nJob"
+n3: "scheduled-report-...-<suffix>      Pod"
+n1 -> n2
+n2 -> n3
 ```
 
 Ở terminal khác, xem Jobs theo thứ tự tạo:
@@ -1046,15 +1160,33 @@ Xóa Namespace sẽ xóa CronJob, Jobs và Pods trong lab.
 
 Debug theo chuỗi `CronJob → Job → Pod → container`. Đầu tiên xác định tầng nào không tạo được resource tiếp theo.
 
-```text
-Không thấy kết quả?
-├── Không có Job → kiểm tra CronJob, schedule, timezone, suspend, deadline
-└── Có Job
-    ├── Không có Pod → kiểm tra Job Events, quota, admission
-    └── Có Pod
-        ├── Pending → kiểm tra scheduling, image, volume
-        ├── Failed → kiểm tra exit code và logs
-        └── Succeeded → kiểm tra output nghiệp vụ
+```d2 title="Troubleshooting"
+direction: right
+n1: "Không thấy kết quả?"
+n2: "Không có Job"
+n3: "kiểm tra CronJob, schedule, timezone,\nsuspend, deadline"
+n4: "Có Job"
+n5: "Không có Pod"
+n6: "kiểm tra Job Events, quota, admission"
+n7: "Có Pod"
+n8: "Pending"
+n9: "kiểm tra scheduling, image, volume"
+n10: "Failed"
+n11: "kiểm tra exit code và logs"
+n12: "Succeeded"
+n13: "kiểm tra output nghiệp vụ"
+n2 -> n3
+n1 -> n2
+n1 -> n4
+n5 -> n6
+n4 -> n5
+n4 -> n7
+n8 -> n9
+n7 -> n8
+n10 -> n11
+n7 -> n10
+n12 -> n13
+n7 -> n12
 ```
 
 ### CronJob không tạo Job
@@ -1226,10 +1358,13 @@ Nếu cần điều tra lâu hơn, tăng thời gian giữ evidence và gửi lo
 
 Mental model ngắn nhất:
 
-```text
-CronJob quyết định KHI NÀO
-└── Job quyết định CHẠY ĐẾN KHI NÀO THÌ XONG
-    └── Pod chạy IMAGE VÀ COMMAND NÀO
+```d2 title="Tóm tắt"
+direction: right
+n1: "CronJob quyết định KHI NÀO"
+n2: "Job quyết định CHẠY ĐẾN KHI NÀO THÌ XONG"
+n3: "Pod chạy IMAGE VÀ COMMAND NÀO"
+n1 -> n2
+n2 -> n3
 ```
 
 Các field chính:

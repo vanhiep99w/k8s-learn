@@ -26,14 +26,15 @@ description: "Cách PriorityClass xác định thứ tự scheduling và quyền
 
 `PriorityClass` là resource cluster-scoped ánh xạ một tên ổn định sang giá trị priority số nguyên. Pod tham chiếu tên qua `spec.priorityClassName`; admission điền giá trị vào `spec.priority`. Scheduler dùng priority để ưu tiên Pod trong queue và, nếu policy cho phép, cân nhắc preempt Pod priority thấp hơn.
 
-```text
-PriorityClass name
-      │ admission lookup
-      ▼
-Pod.spec.priority
-      │
-      ├─ thứ tự trong scheduling queue
-      └─ khả năng preempt Pod priority thấp hơn
+```d2 title="Tổng quan"
+direction: right
+priorityClass: PriorityClass name
+priority: Pod.spec.priority
+queue: thứ tự trong scheduling queue
+preempt: khả năng preempt Pod priority thấp hơn
+priorityClass -> priority: admission lookup
+priority -> queue
+priority -> preempt
 ```
 
 Priority không tạo thêm CPU, không bỏ qua affinity/taint và không bảo đảm application quan trọng sẽ `Ready`. Nó chỉ thay đổi thứ tự cạnh tranh và quyền giải phóng resource qua preemption.

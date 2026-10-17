@@ -25,13 +25,13 @@ description: "Cách kubelet trực tiếp quản lý Static Pod từ manifest tr
 
 Static Pod là Pod do **một kubelet cụ thể** quản lý trực tiếp từ manifest cục bộ hoặc nguồn cấu hình được kubelet theo dõi. API Server và scheduler không tạo hay đặt Static Pod. Kubelet bảo đảm container của manifest tiếp tục chạy và có thể tạo một **mirror Pod** trên API Server để cluster quan sát.
 
-```text
-Manifest trên Node
-      │ kubelet watch
-      ▼
-Static Pod containers ────── chạy trên chính Node đó
-      │
-      └──── mirror Pod ───── hiển thị qua API Server
+```d2 title="Tổng quan"
+direction: right
+manifest: Manifest trên Node
+static: "Static Pod containers\nchạy trên chính Node đó"
+mirror: "mirror Pod\nhiển thị qua API Server"
+manifest -> static: kubelet watch
+static -- mirror
 ```
 
 Static Pod thường xuất hiện trong control plane dựng bằng `kubeadm`, nơi `kube-apiserver`, `kube-controller-manager`, `kube-scheduler` và local etcd chạy từ manifest trong `/etc/kubernetes/manifests`.

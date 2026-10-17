@@ -51,14 +51,21 @@ order-service
 
 Cách thứ nhất là expose từng Service:
 
-```text
-Internet
-   |
-   +--> Load Balancer 1 --> frontend-service --> frontend Pods
-   |
-   +--> Load Balancer 2 --> user-service     --> user Pods
-   |
-   +--> Load Balancer 3 --> order-service    --> order Pods
+```d2 title="Mỗi Service dùng một Load Balancer"
+direction: right
+internet: Internet
+lb1: Load Balancer 1
+lb2: Load Balancer 2
+lb3: Load Balancer 3
+s1: frontend-service
+s2: user-service
+s3: order-service
+p1: frontend Pods
+p2: user Pods
+p3: order Pods
+internet -> lb1 -> s1 -> p1
+internet -> lb2 -> s2 -> p2
+internet -> lb3 -> s3 -> p3
 ```
 
 Trong manifest, phần khai báo có thể rất nhỏ:
@@ -85,18 +92,18 @@ Kubernetes hoặc controller của nền tảng sẽ xử lý yêu cầu này. T
 
 Cách thứ hai là giữ các backend là `ClusterIP` và khai báo luật HTTP/HTTPS bằng Ingress:
 
-```text
-Internet
-   |
-   v
-Một entry point public
-   |
-   v
-Ingress Controller
-   |
-   +--> /users  --> user-service
-   +--> /orders --> order-service
-   +--> /       --> frontend-service
+```d2 title="Một entry point route đến nhiều Service"
+direction: right
+internet: Internet
+entry: Một entry point public
+controller: Ingress Controller
+user: user-service
+order: order-service
+frontend: frontend-service
+internet -> entry -> controller
+controller -> user: /users
+controller -> order: /orders
+controller -> frontend: /
 ```
 
 Ví dụ rule:
@@ -149,20 +156,17 @@ spec:
 
 luồng control plane thường là:
 
-```text
-Service manifest
-      |
-      v
-Kubernetes API Server
-      |
-      v
-Cloud/LB controller
-      |
-      v
-Cloud provider API
-      |
-      v
-External Load Balancer
+```d2 title="Service type LoadBalancer hoạt động thế nào?"
+direction: down
+n1: "Service manifest"
+n2: "Kubernetes API Server"
+n3: "Cloud/LB controller"
+n4: "Cloud provider API"
+n5: "External Load Balancer"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Kiểm tra trạng thái provisioning bằng:
@@ -211,18 +215,18 @@ Cloud provider hoặc controller có thể cung cấp annotation, custom resourc
 
 Ingress tách **ý định routing** khỏi **implementation xử lý traffic**:
 
-```text
-Ingress resource
-      |
-      v
-Kubernetes API Server
-      |
-      v
-Ingress Controller watch resource
-      |
-      +--> Cấu hình NGINX/Traefik/HAProxy
-      +--> Cấu hình cloud ALB/NLB
-      +--> Cấu hình appliance hoặc proxy khác
+```d2 title="Ingress hoạt động thế nào?"
+direction: right
+resource: Ingress resource
+api: Kubernetes API Server
+controller: Ingress Controller watch resource
+proxy: Cấu hình NGINX/Traefik/HAProxy
+cloud: Cấu hình cloud ALB/NLB
+other: Cấu hình appliance hoặc proxy khác
+resource -> api -> controller
+controller -> proxy
+controller -> cloud
+controller -> other
 ```
 
 Một request ví dụ:
@@ -277,8 +281,9 @@ Nhiều host hoặc path có thể dùng chung một entry point. Đây là lý 
 
 Ingress không gửi traffic trực tiếp tới Deployment theo cách chuẩn. Backend của Ingress vẫn thường là Service:
 
-```text
-Ingress --> Service --> EndpointSlice --> Pod
+```d2 title="Ingress không thay thế Service"
+direction: right
+n1: "Ingress --> Service --> EndpointSlice\n--> Pod"
 ```
 
 Vì vậy, triển khai Ingress thường cần cả:
@@ -311,11 +316,20 @@ Ingress không làm mọi cấu hình trở thành portable. Phần `rules`, `pa
 
 Nếu mỗi Service public tạo một Load Balancer riêng:
 
-```text
-frontend-service  --> LB 1
-user-service      --> LB 2
-order-service     --> LB 3
-payment-service   --> LB 4
+```d2 title="Mô hình nhiều Load Balancer"
+direction: right
+frontend: frontend-service
+user: user-service
+order: order-service
+payment: payment-service
+lb1: LB 1
+lb2: LB 2
+lb3: LB 3
+lb4: LB 4
+frontend -- lb1
+user -- lb2
+order -- lb3
+payment -- lb4
 ```
 
 chi phí có thể tăng theo:
@@ -331,12 +345,15 @@ chi phí có thể tăng theo:
 
 Một Ingress Controller có thể route nhiều Service:
 
-```text
-Một entry point
-      |
-      +--> user-service
-      +--> order-service
-      +--> payment-service
+```d2 title="Mô hình dùng chung entry point"
+direction: right
+entry: Một entry point
+user: user-service
+order: order-service
+payment: payment-service
+entry -> user
+entry -> order
+entry -> payment
 ```
 
 Cách này **có thể** tiết kiệm hơn, nhưng không phải quy tắc tuyệt đối. Controller có thể tạo nhiều Load Balancer tùy cấu hình; một controller dùng chung cũng có chi phí tài nguyên, giới hạn throughput và blast radius lớn hơn.
@@ -379,13 +396,17 @@ Trên EKS, AWS Load Balancer Controller vẫn gọi AWS API và cần quyền IA
 
 Điểm linh hoạt của Ingress là bạn có thể thay đổi controller theo nhu cầu:
 
-```text
-Ingress API
-    |
-    +--> NGINX Ingress Controller
-    +--> Traefik
-    +--> AWS Load Balancer Controller
-    +--> F5/HAProxy/implementation khác
+```d2 title="Ingress"
+direction: right
+api: Ingress API
+nginx: NGINX Ingress Controller
+traefik: Traefik
+aws: AWS Load Balancer Controller
+other: F5/HAProxy/implementation khác
+api -- nginx
+api -- traefik
+api -- aws
+api -- other
 ```
 
 Khi đổi controller, cần kiểm tra lại annotation, TLS, source IP, health check, rewrite và các behavior implementation-specific.
@@ -440,17 +461,15 @@ Chọn `Service type: LoadBalancer` khi:
 
 Ví dụ phù hợp:
 
-```text
-Internet/VPC
-     |
-     v
-Network Load Balancer
-     |
-     v
-Service type LoadBalancer
-     |
-     v
-TCP application
+```d2 title="Khi nào nên dùng Service LoadBalancer?"
+direction: down
+n1: "Internet/VPC"
+n2: "Network Load Balancer"
+n3: "Service type LoadBalancer"
+n4: "TCP application"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Đừng chọn cách này chỉ vì manifest ngắn nếu hệ thống có nhiều HTTP microservice và cần routing chung. Hãy tính số lượng Load Balancer, listener, quota, security boundary và chi phí data processing trước.
@@ -468,10 +487,17 @@ Chọn Ingress khi:
 
 Ví dụ:
 
-```text
-api.example.com/users  --> user-service
-api.example.com/orders --> order-service
-web.example.com        --> frontend-service
+```d2 title="Khi nào nên dùng Ingress?"
+direction: right
+users: api.example.com/users
+orders: api.example.com/orders
+web: web.example.com
+user: user-service
+order: order-service
+frontend: frontend-service
+users -> user
+orders -> order
+web -> frontend
 ```
 
 Ingress không phải lựa chọn mặc định cho mọi protocol. Với thiết kế mới cần route và delegation phức tạp hơn, nên xem xét [Gateway API](/networking/gateway-api/). Ingress API vẫn stable nhưng đã frozen; controller hiện tại và nhu cầu migration vẫn là yếu tố quyết định.
@@ -482,8 +508,9 @@ Ingress không phải lựa chọn mặc định cho mọi protocol. Với thi�
 
 Không chính xác. Ingress Controller có thể cần một external Load Balancer để nhận traffic từ Internet:
 
-```text
-Internet --> External Load Balancer --> Ingress Controller --> Service
+```d2 title="“Dùng Ingress thì không cần Load Balancer”"
+direction: right
+n1: "Internet --> External Load Balancer -->\nIngress Controller --> Service"
 ```
 
 Một số môi trường local hoặc bare-metal dùng NodePort, host network, VIP hoặc cơ chế khác. Ingress chỉ mô tả routing; cách có được public entry point phụ thuộc controller và môi trường.
@@ -576,13 +603,24 @@ Ingress
 
 Khác biệt cốt lõi có thể tóm tắt như sau:
 
-```text
-Service LoadBalancer:
-Client --> Load Balancer --> một Service --> Pod
-
-Ingress:
-Client --> entry point --> Ingress Controller
-       --> host/path rule --> Service --> Pod
+```d2 title="Tóm tắt"
+direction: right
+lb: Service LoadBalancer {
+  client: Client
+  lb: Load Balancer
+  svc: một Service
+  pod: Pod
+  client -> lb -> svc -> pod
+}
+ingress: Ingress {
+  client: Client
+  entry: entry point
+  controller: Ingress Controller
+  rule: host/path rule
+  svc: Service
+  pod: Pod
+  client -> entry -> controller -> rule -> svc -> pod
+}
 ```
 
 Để học cách expose từng Service, xem [ClusterIP, NodePort và LoadBalancer](/networking/service-types/). Để học cách viết manifest, chọn `IngressClass`, cấu hình TLS và troubleshoot request, xem [Ingress](/networking/ingress/). Với thiết kế routing mới có delegation hoặc nhiều protocol hơn, tiếp tục với [Gateway API](/networking/gateway-api/).

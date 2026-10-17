@@ -32,13 +32,19 @@ Scheduling policy tốt đặt workload đúng failure domain và resource pool 
 
 Một thiết kế placement production cần nối sáu lớp:
 
-```text
-Workload requirements
-  → resource requests
-  → Node taxonomy và isolation
-  → topology availability
-  → priority/disruption policy
-  → capacity, autoscaling và observability
+```d2 title="Tổng quan"
+direction: right
+n1: "Workload requirements"
+n2: "resource requests"
+n3: "Node taxonomy và isolation"
+n4: "topology availability"
+n5: "priority/disruption policy"
+n6: "capacity, autoscaling và observability"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
 ```
 
 Scheduler chỉ chọn Node từ snapshot hiện tại. Nó không đo business criticality, tự thêm capacity, sửa request sai hoặc rebalance Pod cũ. Những intent đó phải được biểu diễn và vận hành ở các lớp xung quanh.

@@ -35,10 +35,15 @@ Hãy xem một website bán hàng có API và database.
 
 API có ba Pod:
 
-```text
-api-abc ─┐
-api-def ─┼─ cùng chạy code và xử lý request như nhau
-api-ghi ─┘
+```d2 title="API web dùng Deployment"
+direction: right
+a: api-abc
+b: api-def
+c: api-ghi
+work: cùng chạy code và xử lý request như nhau
+a -- work
+b -- work
+c -- work
 ```
 
 Nếu `api-abc` chết, Kubernetes tạo một Pod API mới với tên khác. API mới vẫn làm việc bình thường vì dữ liệu đơn hàng không nằm trên disk local của Pod; nó nằm trong database. Các API Pod **có thể thay thế lẫn nhau**, nên `Deployment` phù hợp.
@@ -47,10 +52,23 @@ Nếu `api-abc` chết, Kubernetes tạo một Pod API mới với tên khác. A
 
 Database có ba member:
 
-```text
-mysql-0 → primary  → data-mysql-0
-mysql-1 → replica  → data-mysql-1
-mysql-2 → replica  → data-mysql-2
+```d2 title="Database dùng StatefulSet"
+direction: right
+n1: "mysql-0"
+n2: "primary"
+n3: "data-mysql-0"
+n4: "mysql-1"
+n5: "replica"
+n6: "data-mysql-1"
+n7: "mysql-2"
+n8: "replica"
+n9: "data-mysql-2"
+n1 -> n2
+n2 -> n3
+n4 -> n5
+n5 -> n6
+n7 -> n8
+n8 -> n9
 ```
 
 Ở đây, `mysql-0`, `mysql-1` và `mysql-2` không chỉ là ba process giống hệt nhau. Mỗi member có:
@@ -71,10 +89,15 @@ Khi khách hàng đặt đơn, API gửi lệnh ghi tới `mysql-0`:
 
 Ba member có thể lưu các bản sao tương ứng của dữ liệu, nhưng mỗi member ghi vào **volume riêng**. Không cho ba process cùng mở một thư mục database:
 
-```text
-mysql-0 ─┐
-mysql-1 ─┼─ cùng ghi /var/lib/mysql  ← nguy hiểm
-mysql-2 ─┘
+```d2 title="Database dùng StatefulSet"
+direction: right
+a: mysql-0
+b: mysql-1
+c: mysql-2
+data: "Cùng ghi /var/lib/mysql\nNguy hiểm" {style.stroke: "#b91c1c"}
+a -> data
+b -> data
+c -> data
 ```
 
 Cách đó có thể làm các process cùng sửa file data/index/WAL, lock hoặc ghi đè lẫn nhau. Filesystem không tự hiểu member nào là primary, transaction nào đã commit hay dữ liệu nào cần replicate. Replication phải do MySQL hoặc database Operator thực hiện.
@@ -83,20 +106,28 @@ Cách đó có thể làm các process cùng sửa file data/index/WAL, lock ho�
 
 Giả sử `mysql-1` bị lỗi. StatefulSet tạo lại một Pod cũng có tên `mysql-1` và gắn lại PVC `data-mysql-1`:
 
-```text
-mysql-1 cũ bị xóa
-→ tạo mysql-1 mới
-→ gắn data-mysql-1
-→ tiếp tục kiểm tra và bắt kịp replication
+```d2 title="Vì sao `mysql-1` phải nhận lại đúng volume của mình?"
+direction: right
+n1: "mysql-1 cũ bị xóa"
+n2: "tạo mysql-1 mới"
+n3: "gắn data-mysql-1"
+n4: "tiếp tục kiểm tra và bắt kịp replication"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Pod mới có thể có UID, IP, Node và container khác. Nhưng nó không nên nhận nhầm `data-mysql-0`, vì đó là dữ liệu và identity của primary. Quan hệ cần giữ là:
 
-```text
-mysql-1
-├── tên ổn định: mysql-1
-├── DNS ổn định: mysql-1.mysql-headless.production.svc.cluster.local
-└── PVC ổn định: data-mysql-1
+```d2 title="Vì sao `mysql-1` phải nhận lại đúng volume của mình?"
+direction: right
+n1: "mysql-1"
+n2: "tên ổn định: mysql-1"
+n3: "DNS ổn định:\nmysql-1.mysql-headless.production.svc.cluster.local"
+n4: "PVC ổn định: data-mysql-1"
+n1 -> n2
+n1 -> n3
+n1 -> n4
 ```
 
 **StatefulSet dùng để quản lý những Pod mà các replica không hoàn toàn thay thế lẫn nhau.** Nó giữ ordinal, hostname logic và PVC tương ứng. Database hoặc Operator mới chịu trách nhiệm replication, primary election, failover và backup.
@@ -108,14 +139,21 @@ mysql-1
 
 Dùng ba câu hỏi sau:
 
-```mermaid
-flowchart TD
-    A[Ứng dụng cần chạy liên tục với nhiều replica?] -->|Không| X[Xem Job, CronJob hoặc Pod phù hợp]
-    A -->|Có| B{Các replica có thể thay thế lẫn nhau?}
-    B -->|Có| D[Thường dùng Deployment]
-    B -->|Không| C{Cần tên/DNS ổn định, PVC riêng hoặc thứ tự khởi động?}
-    C -->|Có| S[Cân nhắc StatefulSet hoặc Operator]
-    C -->|Không| R[Xem lại vì sao replica không thay thế được]
+```d2 title="Quyết định nhanh: có cần StatefulSet không?"
+direction: down
+A: "Ứng dụng cần chạy liên tục với nhiều\nreplica?"
+X: "Xem Job, CronJob hoặc Pod phù hợp"
+B: "Các replica có thể thay thế lẫn\nnhau?" {shape: diamond}
+D: "Thường dùng Deployment"
+C: "Cần tên/DNS ổn định, PVC riêng hoặc\nthứ tự khởi động?" {shape: diamond}
+S: "Cân nhắc StatefulSet hoặc Operator"
+R: "Xem lại vì sao replica không thay\nthế được"
+A -> X: "Không"
+A -> B: "Có"
+B -> D: "Có"
+B -> C: "Không"
+C -> S: "Có"
+C -> R: "Không"
 ```
 
 Dấu hiệu mạnh cho thấy cần StatefulSet:
@@ -142,22 +180,30 @@ Deployment và StatefulSet đều duy trì số Pod mong muốn, recreate Pod b�
 
 ### Deployment: replica là bản sao có thể thay thế
 
-```text
-Deployment api, replicas=3
-├── api-7c8d9f-4k2m1
-├── api-7c8d9f-7n5p3
-└── api-7c8d9f-b8q6r
+```d2 title="Deployment: replica là bản sao có thể thay thế"
+direction: right
+n1: "Deployment api, replicas=3"
+n2: "api-7c8d9f-4k2m1"
+n3: "api-7c8d9f-7n5p3"
+n4: "api-7c8d9f-b8q6r"
+n1 -> n2
+n1 -> n3
+n1 -> n4
 ```
 
 Tên Pod chứa phần ngẫu nhiên. Khi một Pod mất, Pod mới có tên khác. Service thường che giấu toàn bộ Pod phía sau một địa chỉ chung; client không cần chọn replica cụ thể.
 
 ### StatefulSet: replica là một slot có identity riêng
 
-```text
-StatefulSet db, replicas=3
-├── db-0 ↔ data-db-0
-├── db-1 ↔ data-db-1
-└── db-2 ↔ data-db-2
+```d2 title="StatefulSet: replica là một slot có identity riêng"
+direction: right
+n1: "StatefulSet db, replicas=3"
+n2: "db-0 ↔ data-db-0"
+n3: "db-1 ↔ data-db-1"
+n4: "db-2 ↔ data-db-2"
+n1 -> n2
+n1 -> n3
+n1 -> n4
 ```
 
 Các slot được đánh số theo ordinal. Khi `db-1` mất, StatefulSet tạo lại **`db-1`**, không tạo `db-3` để thay thế. Pod mới tiếp tục reference PVC của ordinal `1`.
@@ -229,10 +275,19 @@ Pod `db-1` luôn mount `data-db-1`. Xóa Pod không xóa PVC mặc định; Pod 
 
 Với policy mặc định `OrderedReady`:
 
-```text
-Tạo: db-0 Ready → db-1 Ready → db-2 Ready
-Xóa/scale down: db-2 dừng → db-1 dừng → db-0 dừng
-Update: thường từ ordinal cao xuống thấp
+```d2 title="4. Thứ tự có kiểm soát"
+direction: right
+n1: "Tạo: db-0 Ready"
+n2: "db-1 Ready"
+n3: "db-2 Ready"
+n4: "Xóa/scale down: db-2 dừng"
+n5: "db-1 dừng"
+n6: "db-0 dừng"
+n7: "Update: thường từ ordinal cao xuống thấp"
+n1 -> n2
+n2 -> n3
+n4 -> n5
+n5 -> n6
 ```
 
 Thứ tự này hữu ích khi member sau phụ thuộc member trước để bootstrap hoặc join cluster. Nó cũng có trade-off: chỉ một Pod không Ready có thể chặn toàn bộ scale up hay rollout phía sau.
@@ -241,31 +296,50 @@ Thứ tự này hữu ích khi member sau phụ thuộc member trước để bo
 
 Tiếp tục với website bán hàng ở phần trên. Ta tách đường ghi và đường đọc:
 
-```mermaid
-flowchart TB
-    U[Khách hàng] --> API[API bán hàng]
-    API -->|INSERT order| WS[Service mysql-write]
-    WS --> D0[mysql-0 primary]
-    D0 -->|replication log| D1[mysql-1 replica]
-    D0 -->|replication log| D2[mysql-2 replica]
-    API -->|SELECT product/order| RS[Service mysql-read]
-    RS --> D0
-    RS --> D1
-    RS --> D2
-    D0 --- V0[PVC data-mysql-0]
-    D1 --- V1[PVC data-mysql-1]
-    D2 --- V2[PVC data-mysql-2]
+```d2 title="Ví dụ thực tế: một database cluster ba thành viên"
+direction: down
+U: "Khách hàng"
+API: "API bán hàng"
+WS: "Service mysql-write"
+D0: "mysql-0 primary"
+D1: "mysql-1 replica"
+D2: "mysql-2 replica"
+RS: "Service mysql-read"
+V0: "PVC data-mysql-0"
+V1: "PVC data-mysql-1"
+V2: "PVC data-mysql-2"
+U -> API
+API -> WS: "INSERT order"
+WS -> D0
+D0 -> D1: "replication log"
+D0 -> D2: "replication log"
+API -> RS: "SELECT product/order"
+RS -> D0
+RS -> D1
+RS -> D2
+D0 -- V0
+D1 -- V1
+D2 -- V2
 ```
 
 Một request đặt hàng có thể đi như sau:
 
-```text
-POST /orders
-→ API gửi INSERT tới mysql-0
-→ mysql-0 ghi vào data-mysql-0
-→ mysql-0 gửi replication log
-→ mysql-1 ghi bản sao vào data-mysql-1
-→ mysql-2 ghi bản sao vào data-mysql-2
+```d2 title="Ví dụ thực tế: một database cluster ba thành viên"
+shape: sequence_diagram
+api: API
+primary: mysql-0
+v0: data-mysql-0
+replica1: mysql-1
+v1: data-mysql-1
+replica2: mysql-2
+v2: data-mysql-2
+api."POST /orders"
+api -> primary: INSERT
+primary -> v0: ghi dữ liệu
+primary -> replica1: replication log
+replica1 -> v1: ghi bản sao
+primary -> replica2: replication log
+replica2 -> v2: ghi bản sao
 ```
 
 Một request đọc danh sách sản phẩm có thể đi qua `mysql-read` tới một member ready. Nhưng `mysql-read` không tự biết member nào là primary. Nếu chỉ primary được phép ghi, `mysql-write` phải trỏ tới primary qua label, DNS hoặc cơ chế failover của database Operator.
@@ -338,9 +412,14 @@ Headless Service giúp trả lời câu hỏi:
 
 > “Địa chỉ của **member `db-1` cụ thể** là gì?”
 
-```text
-Service bình thường: db.production.svc → một endpoint phù hợp
-Headless + Pod DNS: db-1.db-headless.production.svc → đúng member db-1
+```d2 title="Vì sao không chỉ dùng Service bình thường?"
+direction: right
+n1: "Service bình thường: db.production.svc"
+n2: "một endpoint phù hợp"
+n3: "Headless + Pod DNS:\ndb-1.db-headless.production.svc"
+n4: "đúng member db-1"
+n1 -> n2
+n3 -> n4
 ```
 
 Distributed application thường cần cả hai:
@@ -389,10 +468,23 @@ data-db-2
 
 Mỗi Pod mount claim cùng ordinal:
 
-```text
-db-0 → data-db-0 → PV/volume A
-db-1 → data-db-1 → PV/volume B
-db-2 → data-db-2 → PV/volume C
+```d2 title="Mỗi replica nhận storage riêng như thế nào?"
+direction: right
+n1: "db-0"
+n2: "data-db-0"
+n3: "PV/volume A"
+n4: "db-1"
+n5: "data-db-1"
+n6: "PV/volume B"
+n7: "db-2"
+n8: "data-db-2"
+n9: "PV/volume C"
+n1 -> n2
+n2 -> n3
+n4 -> n5
+n5 -> n6
+n7 -> n8
+n8 -> n9
 ```
 
 ### Điều gì ổn định và điều gì có thể đổi?
@@ -562,11 +654,15 @@ Container process mới vẫn mount volume của Pod đó. Pod name, UID và PVC
 
 ### Khi Pod bị xóa hoặc reschedule
 
-```text
-web-1 cũ bị xóa
-→ StatefulSet nhận thấy ordinal 1 bị thiếu
-→ tạo Pod web-1 mới với UID/IP có thể khác
-→ web-1 mới mount lại data-web-1
+```d2 title="Khi Pod bị xóa hoặc reschedule"
+direction: right
+n1: "web-1 cũ bị xóa"
+n2: "StatefulSet nhận thấy ordinal 1 bị thiếu"
+n3: "tạo Pod web-1 mới với UID/IP có thể khác"
+n4: "web-1 mới mount lại data-web-1"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Đây là giá trị chính của sticky identity: replacement mới biết chính xác identity và storage nào thuộc về nó.
@@ -624,10 +720,17 @@ Không đổi sang `Parallel` chỉ để che readiness sai. Nếu member cần 
 
 Strategy mặc định là `RollingUpdate`. StatefulSet thường cập nhật từ ordinal lớn xuống nhỏ:
 
-```text
-web-2 → Ready
-web-1 → Ready
-web-0 → Ready
+```d2 title="Rolling update"
+direction: right
+n1: "web-2"
+n2: "Ready"
+n3: "web-1"
+n4: "Ready"
+n5: "web-0"
+n6: "Ready"
+n1 -> n2
+n3 -> n4
+n5 -> n6
 ```
 
 Một Pod mới không Ready làm rollout dừng trước khi update Pod tiếp theo. Kiểm tra:
@@ -768,9 +871,14 @@ kubectl get statefulset,pod,service,pvc -n stateful-lab -o wide
 
 Bạn phải thấy quan hệ:
 
-```text
-web-0 → data-web-0
-web-1 → data-web-1
+```d2 title="1. Tạo namespace và workload"
+direction: right
+n1: "web-0"
+n2: "data-web-0"
+n3: "web-1"
+n4: "data-web-1"
+n1 -> n2
+n3 -> n4
 ```
 
 Nếu chỉ có `web-0`, kiểm tra readiness và PVC của `web-0`; `OrderedReady` sẽ chưa tạo `web-1` khi predecessor chưa Ready.
@@ -1056,11 +1164,15 @@ Pod `Ready` không chứng minh dữ liệu đã được replicate an toàn n�
 
 StatefulSet phù hợp khi từng replica phải giữ một **slot có identity riêng**:
 
-```text
-StatefulSet db
-├── db-0 ↔ DNS db-0.db-headless ↔ PVC data-db-0
-├── db-1 ↔ DNS db-1.db-headless ↔ PVC data-db-1
-└── db-2 ↔ DNS db-2.db-headless ↔ PVC data-db-2
+```d2 title="Tóm tắt"
+direction: right
+n1: "StatefulSet db"
+n2: "db-0 ↔ DNS db-0.db-headless ↔ PVC\ndata-db-0"
+n3: "db-1 ↔ DNS db-1.db-headless ↔ PVC\ndata-db-1"
+n4: "db-2 ↔ DNS db-2.db-headless ↔ PVC\ndata-db-2"
+n1 -> n2
+n1 -> n3
+n1 -> n4
 ```
 
 Cách chọn nhanh:

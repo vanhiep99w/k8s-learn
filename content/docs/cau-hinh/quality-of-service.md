@@ -36,13 +36,19 @@ BestEffort  → không có CPU/memory request/limit
 
 QoS chủ yếu giúp kubelet/kernel quyết định bảo vệ hoặc evict workload thế nào khi Node thiếu resource. QoS không phải SLA, không tạo replica, không bảo vệ khỏi Node failure và không thay thế PriorityClass/PDB.
 
-```mermaid
-flowchart TD
-    P[Pod spec] --> Q{Mọi container có CPU và memory request=limit?}
-    Q -- Có --> G[Guaranteed]
-    Q -- Không --> R{Có bất kỳ CPU/memory request hoặc limit?}
-    R -- Có --> B[Burstable]
-    R -- Không --> E[BestEffort]
+```d2 title="Tổng quan"
+direction: down
+P: "Pod spec"
+Q: "Mọi container có CPU và memory\nrequest=limit?" {shape: diamond}
+G: "Guaranteed"
+R: "Có bất kỳ CPU/memory request hoặc\nlimit?" {shape: diamond}
+B: "Burstable"
+E: "BestEffort"
+P -> Q
+Q -> G: "Có"
+Q -> R: "Không"
+R -> B: "Có"
+R -> E: "Không"
 ```
 
 > [!IMPORTANT]

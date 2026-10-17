@@ -28,18 +28,29 @@ Scheduling Framework là kiến trúc plugin bên trong `kube-scheduler`. Framew
 
 Trang này đi sâu vào cơ chế framework. Nếu cần ôn lại vai trò tổng thể của scheduler, scheduling queue và khác biệt giữa Pod chưa được schedule với Pod đã gán Node nhưng chưa chạy, xem [kube-scheduler](/kien-truc/kube-scheduler/).
 
-```mermaid
-flowchart LR
-    P[Pod chưa có nodeName] --> Q[Scheduling queue]
-    Q --> PRE[PreFilter]
-    PRE --> F[Filter từng Node]
-    F --> PS[PreScore]
-    PS --> S[Score và NormalizeScore]
-    S --> R[Reserve]
-    R --> PM[Permit]
-    PM --> PB[PreBind]
-    PB --> B[Bind]
-    B --> PO[PostBind]
+```d2 title="Tổng quan"
+direction: right
+P: "Pod chưa có nodeName"
+Q: "Scheduling queue"
+PRE: "PreFilter"
+F: "Filter từng Node"
+PS: "PreScore"
+S: "Score và NormalizeScore"
+R: "Reserve"
+PM: "Permit"
+PB: "PreBind"
+B: "Bind"
+PO: "PostBind"
+P -> Q
+Q -> PRE
+PRE -> F
+F -> PS
+PS -> S
+S -> R
+R -> PM
+PM -> PB
+PB -> B
+B -> PO
 ```
 
 Framework không phải một API để gắn script động vào scheduler đang chạy. Plugin được compile vào scheduler binary; configuration quyết định plugin nào được bật, tắt và cấu hình cho từng profile.
@@ -74,20 +85,19 @@ Binding cycle áp dụng quyết định đã chọn. Nhiều binding cycle có 
 
 Scheduler dùng cơ chế **assume**: cập nhật cache nội bộ như thể Pod đã được bind trước khi API write hoàn tất. Cách này tăng throughput nhưng yêu cầu rollback qua `Unreserve` nếu các bước sau thất bại.
 
-```mermaid
-sequenceDiagram
-    participant Q as Queue
-    participant S as Scheduler
-    participant C as Scheduler cache
-    participant A as API Server
-
-    Q->>S: Pod tiếp theo
-    S->>S: Filter và Score
-    S->>C: Assume Pod trên Node
-    S->>S: Reserve / Permit / PreBind
-    S->>A: Bind Pod vào Node
-    A-->>S: Thành công
-    S->>C: Hoàn tất cache state
+```d2 title="2.2 Binding cycle"
+shape: sequence_diagram
+Q: "Queue"
+S: "Scheduler"
+C: "Scheduler cache"
+A: "API Server"
+Q -> S: "Pod tiếp theo"
+S -> S: "Filter và Score"
+S -> C: "Assume Pod trên Node"
+S -> S: "Reserve / Permit / PreBind"
+S -> A: "Bind Pod vào Node"
+A -> S: "Thành công" {style.stroke-dash: 4}
+S -> C: "Hoàn tất cache state"
 ```
 
 ## 3. Extension points
@@ -126,12 +136,21 @@ Tên plugin và tập mặc định có thể thay đổi giữa các Kubernetes
 
 Hard constraints được kết hợp theo logic giao nhau. Một Node có đủ CPU vẫn bị loại nếu sai zone; Node đúng zone vẫn bị loại nếu Pod không tolerate taint. Score chỉ chạy trên tập Node đã qua toàn bộ filter.
 
-```text
-100 Nodes
-  ├─ 20 Node không đủ resource
-  ├─ 30 Node sai node affinity
-  ├─ 10 Node có taint không được tolerate
-  └─ 40 feasible Nodes → Score → chọn 1 Node
+```d2 title="4. Plugin mặc định phối hợp ra sao"
+direction: right
+n1: "100 Nodes"
+n2: "20 Node không đủ resource"
+n3: "30 Node sai node affinity"
+n4: "10 Node có taint không được tolerate"
+n5: "40 feasible Nodes"
+n6: "Score"
+n7: "chọn 1 Node"
+n1 -> n2
+n1 -> n3
+n1 -> n4
+n5 -> n6
+n6 -> n7
+n1 -> n5
 ```
 
 Vì thế, tăng weight của một Score plugin không thể cứu Node đã bị Filter loại.

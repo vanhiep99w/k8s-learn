@@ -28,17 +28,17 @@ description: "Hướng dẫn sử dụng kubectl để quản lý context, đọ
 
 `kubectl` là CLI chính thức để giao tiếp với Kubernetes API Server. Nó đọc kubeconfig để biết cluster endpoint, credentials và context, sau đó gửi HTTP request đến API.
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant K as kubectl
-    participant Config as kubeconfig
-    participant API as API Server
-    User->>K: kubectl get pods
-    K->>Config: Đọc context và credentials
-    K->>API: GET /api/v1/namespaces/.../pods
-    API-->>K: API objects
-    K-->>User: Bảng kết quả
+```d2 title="Tổng quan"
+shape: sequence_diagram
+User: "User"
+K: "kubectl"
+Config: "kubeconfig"
+API: "API Server"
+User -> K: "kubectl get pods"
+K -> Config: "Đọc context và credentials"
+K -> API: "GET /api/v1/namespaces/.../pods"
+API -> K: "API objects" {style.stroke-dash: 4}
+K -> User: "Bảng kết quả" {style.stroke-dash: 4}
 ```
 
 > [!IMPORTANT]

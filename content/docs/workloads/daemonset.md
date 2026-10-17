@@ -34,21 +34,44 @@ description: "Hiểu Kubernetes DaemonSet từ mental model một Pod trên mỗ
 
 Giả sử cluster có ba Node:
 
-```text
-Cluster
-├── node-a → node-agent-abc
-├── node-b → node-agent-def
-└── node-c → node-agent-ghi
+```d2 title="DaemonSet là gì?"
+direction: right
+n1: "Cluster"
+n2: "node-a"
+n3: "node-agent-abc"
+n4: "node-b"
+n5: "node-agent-def"
+n6: "node-c"
+n7: "node-agent-ghi"
+n2 -> n3
+n1 -> n2
+n4 -> n5
+n1 -> n4
+n6 -> n7
+n1 -> n6
 ```
 
 Mỗi Node có một Pod của DaemonSet. Nếu thêm `node-d`, DaemonSet tự tạo thêm một Pod cho Node mới:
 
-```text
-Cluster sau khi thêm Node
-├── node-a → node-agent-abc
-├── node-b → node-agent-def
-├── node-c → node-agent-ghi
-└── node-d → node-agent-jkl   ← tự được tạo
+```d2 title="DaemonSet là gì?"
+direction: right
+n1: "Cluster sau khi thêm Node"
+n2: "node-a"
+n3: "node-agent-abc"
+n4: "node-b"
+n5: "node-agent-def"
+n6: "node-c"
+n7: "node-agent-ghi"
+n8: "node-d"
+n9: "node-agent-jkl   ← tự được tạo"
+n2 -> n3
+n1 -> n2
+n4 -> n5
+n1 -> n4
+n6 -> n7
+n1 -> n6
+n8 -> n9
+n1 -> n8
 ```
 
 DaemonSet phù hợp với chương trình cần hiện diện ở cấp Node, ví dụ:
@@ -111,30 +134,50 @@ Ví dụ lựa chọn:
 
 Có thể chọn nhanh:
 
-```text
-Process chạy liên tục?
-├── Không → Job hoặc CronJob
-└── Có
-    ├── Cần tổng cộng N replica → Deployment
-    └── Cần hiện diện trên từng Node phù hợp → DaemonSet
+```d2 title="DaemonSet khác Deployment như thế nào?"
+direction: right
+n1: "Process chạy liên tục?"
+n2: "Không"
+n3: "Job hoặc CronJob"
+n4: "Có"
+n5: "Cần tổng cộng N replica"
+n6: "Deployment"
+n7: "Cần hiện diện trên từng Node phù hợp"
+n8: "DaemonSet"
+n2 -> n3
+n1 -> n2
+n1 -> n4
+n5 -> n6
+n4 -> n5
+n7 -> n8
+n4 -> n7
 ```
 
 ## DaemonSet hoạt động ra sao?
 
 DaemonSet controller liên tục so sánh desired state với trạng thái thật trong cluster.
 
-```mermaid
-flowchart TD
-    A[DaemonSet spec] --> B[DaemonSet controller đọc danh sách Node]
-    B --> C{Node có phù hợp?}
-    C -->|Không| D[Không cần Pod trên Node]
-    C -->|Có| E{Node đã có Pod của DaemonSet?}
-    E -->|Có| F[Giữ và theo dõi Pod]
-    E -->|Chưa| G[Tạo Pod hướng tới Node]
-    G --> H[Scheduler kiểm tra và bind Pod]
-    H --> I[Kubelet chạy container trên Node]
-    F --> B
-    I --> B
+```d2 title="DaemonSet hoạt động ra sao?"
+direction: down
+A: "DaemonSet spec"
+B: "DaemonSet controller đọc danh sách\nNode"
+C: "Node có phù hợp?" {shape: diamond}
+D: "Không cần Pod trên Node"
+E: "Node đã có Pod của DaemonSet?" {shape: diamond}
+F: "Giữ và theo dõi Pod"
+G: "Tạo Pod hướng tới Node"
+H: "Scheduler kiểm tra và bind Pod"
+I: "Kubelet chạy container trên Node"
+A -> B
+B -> C
+C -> D: "Không"
+C -> E: "Có"
+E -> F: "Có"
+E -> G: "Chưa"
+G -> H
+H -> I
+F -> B
+I -> B
 ```
 
 Luồng đơn giản khi cluster có Node mới:
@@ -158,19 +201,21 @@ Vì vậy, DaemonSet có thể muốn một Pod trên `node-d`, nhưng Pod vẫn
 
 ### Controller nào xử lý trường hợp nào?
 
-```text
-Container trong Pod bị lỗi
-└── kubelet restart container trong cùng Pod
-    vì restartPolicy của DaemonSet là Always
-
-Cả Pod bị xóa hoặc hỏng
-└── DaemonSet controller tạo Pod thay thế cho Node đó
-
-Node mới xuất hiện
-└── DaemonSet controller tạo Pod cho Node nếu Node phù hợp
-
-Node bị xóa khỏi cluster
-└── Pod phụ thuộc trên Node được garbage collect
+```d2 title="Controller nào xử lý trường hợp nào?"
+direction: right
+n1: "Container trong Pod bị lỗi"
+n2: "kubelet restart container trong cùng Pod"
+n3: "vì restartPolicy của DaemonSet là Always"
+n4: "Cả Pod bị xóa hoặc hỏng"
+n5: "DaemonSet controller tạo Pod thay thế\ncho Node đó"
+n6: "Node mới xuất hiện"
+n7: "DaemonSet controller tạo Pod cho Node\nnếu Node phù hợp"
+n8: "Node bị xóa khỏi cluster"
+n9: "Pod phụ thuộc trên Node được garbage\ncollect"
+n1 -> n2
+n4 -> n5
+n6 -> n7
+n8 -> n9
 ```
 
 DaemonSet không tự thêm leader election, replication dữ liệu hoặc failover logic cho chương trình bên trong. Nó chỉ đảm bảo placement và lifecycle của Pod.
@@ -268,16 +313,25 @@ daemonset.apps/node-agent created
 
 Manifest có ba lớp chính:
 
-```text
-DaemonSet metadata
-└── DaemonSet spec
-    ├── selector              # Pod nào thuộc DaemonSet?
-    └── template              # Pod mới được tạo như thế nào?
-        ├── labels
-        └── Pod spec
-            ├── containers
-            ├── tolerations
-            └── resources
+```d2 title="Đọc manifest DaemonSet"
+direction: right
+n1: "DaemonSet metadata"
+n2: "DaemonSet spec"
+n3: "selector              # Pod nào thuộc\nDaemonSet?"
+n4: "template              # Pod mới được tạo\nnhư thế nào?"
+n5: "labels"
+n6: "Pod spec"
+n7: "containers"
+n8: "tolerations"
+n9: "resources"
+n1 -> n2
+n2 -> n3
+n2 -> n4
+n4 -> n5
+n4 -> n6
+n6 -> n7
+n6 -> n8
+n6 -> n9
 ```
 
 ### `apiVersion`, `kind` và `metadata`
@@ -503,12 +557,14 @@ DaemonSet cũng không tạo một Pod “bù” trên Node khác, vì mục ti�
 
 Mặc định, DaemonSet nhắm tới mọi Node. Bạn có thể thu hẹp bằng `nodeSelector` hoặc `nodeAffinity`.
 
-```text
-Không có selector/affinity
-└── mọi Node được xem xét
-
-Có nodeSelector/affinity
-└── chỉ Node match điều kiện được xem xét
+```d2 title="Chọn những Node được chạy Pod"
+direction: right
+n1: "Không có selector/affinity"
+n2: "mọi Node được xem xét"
+n3: "Có nodeSelector/affinity"
+n4: "chỉ Node match điều kiện được xem xét"
+n1 -> n2
+n3 -> n4
 ```
 
 ### Dùng `nodeSelector` cho điều kiện đơn giản
@@ -641,13 +697,25 @@ spec:
 
 Luồng quyết định:
 
-```text
-Node có đúng label không?
-├── Không → DaemonSet không cần Pod ở đó
-└── Có
-    └── Pod có tolerate taint không?
-        ├── Không → Pod không schedule được
-        └── Có → tiếp tục kiểm tra CPU, memory, volume, port...
+```d2 title="Ví dụ Node dành riêng cho observability"
+direction: right
+n1: "Node có đúng label không?"
+n2: "Không"
+n3: "DaemonSet không cần Pod ở đó"
+n4: "Có"
+n5: "Pod có tolerate taint không?"
+n6: "Không"
+n7: "Pod không schedule được"
+n8: "Có"
+n9: "tiếp tục kiểm tra CPU, memory, volume,\nport..."
+n2 -> n3
+n1 -> n2
+n1 -> n4
+n4 -> n5
+n6 -> n7
+n5 -> n6
+n8 -> n9
+n5 -> n8
 ```
 
 ### Ba taint effect thường gặp
@@ -700,11 +768,19 @@ spec:
 
 Ví dụ ba Node với `maxUnavailable: 1`:
 
-```text
-Ban đầu:   node-a v1 | node-b v1 | node-c v1
-Bước 1:    node-a v2 | node-b v1 | node-c v1
-Bước 2:    node-a v2 | node-b v2 | node-c v1
-Kết thúc:  node-a v2 | node-b v2 | node-c v2
+Chuyển từng bước để quan sát phiên bản Pod của DaemonSet trên mỗi Node:
+
+```d2 mode=steps title="Rolling update DaemonSet trên ba Node"
+direction: right
+grid-columns: 3
+a: "node-a\nv1"
+b: "node-b\nv1"
+c: "node-c\nv1"
+steps: {
+  "Bước 1": {a: "node-a\nv2"}
+  "Bước 2": {b: "node-b\nv2"}
+  "Kết thúc": {c: "node-c\nv2"}
+}
 ```
 
 Thứ tự thực tế không nhất thiết là `node-a`, rồi `node-b`, rồi `node-c`. Ứng dụng không nên phụ thuộc vào thứ tự rollout.
@@ -1101,15 +1177,35 @@ Khi DaemonSet không đạt trạng thái mong muốn, trước tiên trả lờ
 
 Decision tree:
 
-```text
-DESIRED thấp hơn số Node mong đợi?
-├── Có → kiểm tra selector, affinity và Node labels
-└── Không
-    ├── CURRENT thấp hơn DESIRED → kiểm tra Events và tạo Pod
-    ├── Pod Pending → kiểm tra taint, resource, volume, port
-    ├── Pod Running nhưng chưa Ready → kiểm tra probe và dependency
-    ├── Pod CrashLoopBackOff → kiểm tra logs, exit code, OOM
-    └── UPDATED thấp → kiểm tra rollout và Pod template mới
+```d2 title="Troubleshooting"
+direction: right
+n1: "DESIRED thấp hơn số Node mong đợi?"
+n2: "Có"
+n3: "kiểm tra selector, affinity và Node\nlabels"
+n4: "Không"
+n5: "CURRENT thấp hơn DESIRED"
+n6: "kiểm tra Events và tạo Pod"
+n7: "Pod Pending"
+n8: "kiểm tra taint, resource, volume, port"
+n9: "Pod Running nhưng chưa Ready"
+n10: "kiểm tra probe và dependency"
+n11: "Pod CrashLoopBackOff"
+n12: "kiểm tra logs, exit code, OOM"
+n13: "UPDATED thấp"
+n14: "kiểm tra rollout và Pod template mới"
+n2 -> n3
+n1 -> n2
+n1 -> n4
+n5 -> n6
+n4 -> n5
+n7 -> n8
+n4 -> n7
+n9 -> n10
+n4 -> n9
+n11 -> n12
+n4 -> n11
+n13 -> n14
+n4 -> n13
 ```
 
 ### `DESIRED` thấp hơn số Node mong đợi
@@ -1304,10 +1400,13 @@ Agent production phải gửi logs/metrics ra hệ thống tập trung. Đừng 
 
 Mental model ngắn nhất:
 
-```text
-DaemonSet
-└── với mỗi Node phù hợp
-    └── duy trì một Pod của DaemonSet
+```d2 title="Tóm tắt"
+direction: right
+n1: "DaemonSet"
+n2: "với mỗi Node phù hợp"
+n3: "duy trì một Pod của DaemonSet"
+n1 -> n2
+n2 -> n3
 ```
 
 Ba lớp quyết định placement:

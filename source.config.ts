@@ -1,6 +1,11 @@
 import { defineDocs, defineConfig } from 'fumadocs-mdx/config';
 import remarkGithubAdmonitions from 'remark-github-admonitions-to-directives';
 import { visit } from 'unist-util-visit';
+import { remarkD2 } from '@vanhiep99w/docs-kit/d2';
+import { remarkTerminalSession } from '@vanhiep99w/docs-kit/terminal-session';
+import { remarkCodeWalkthrough } from '@vanhiep99w/docs-kit/code-walkthrough';
+import { remarkCodeDiff } from '@vanhiep99w/docs-kit/code-diff';
+import { remarkProtocolExchange } from '@vanhiep99w/docs-kit/protocol-exchange';
 
 function remarkCalloutDirectives() {
   const typeMap: Record<string, 'info' | 'warn' | 'error'> = {
@@ -46,32 +51,26 @@ function remarkCalloutDirectives() {
   };
 }
 
-function remarkMermaid() {
-  return (tree: import('mdast').Root) => {
-    visit(tree, 'code', (node, index, parent) => {
-      if (node.lang !== 'mermaid' || index === undefined || !parent) return;
-      (parent.children as unknown[])[index] = {
-        type: 'mdxJsxFlowElement',
-        name: 'MermaidDiagram',
-        attributes: [
-          {
-            type: 'mdxJsxAttribute',
-            name: 'chart',
-            value: node.value,
-          },
-        ],
-        children: [],
-      };
-    });
-  };
-}
-
 export const docs = defineDocs({
   dir: 'content/docs',
 });
 
 export default defineConfig({
   mdxOptions: {
-    remarkPlugins: [remarkGithubAdmonitions, remarkCalloutDirectives, remarkMermaid],
+    remarkPlugins: [
+      remarkGithubAdmonitions,
+      remarkCalloutDirectives,
+      [remarkD2, {
+        cacheDir: '.next/cache/docs-kit/d2',
+        sketch: false,
+        scale: 1,
+        interactive: true,
+        defaultCaption: 'Sơ đồ',
+      }],
+      remarkTerminalSession,
+      remarkCodeWalkthrough,
+      remarkCodeDiff,
+      remarkProtocolExchange,
+    ],
   },
 });

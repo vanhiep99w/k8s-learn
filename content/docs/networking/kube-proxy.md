@@ -40,10 +40,11 @@ api-c → 10.244.3.13:8080
 
 Pod có thể bị xóa, được tạo lại hoặc đổi IP trong rollout. Client không nên giữ danh sách Pod IP này. Thay vào đó, client gọi một địa chỉ ổn định của Service:
 
-```text
-api.production.svc.cluster.local:80
-                 ↓ DNS
-          10.96.20.30:80
+```d2 title="kube-proxy giải quyết vấn đề gì?"
+direction: right
+dns: api.production.svc.cluster.local:80
+vip: 10.96.20.30:80
+dns -> vip: DNS
 ```
 
 `10.96.20.30` là `ClusterIP` của Service. Nhưng địa chỉ này thường không được gắn vào card mạng của một máy cụ thể. Vậy khi packet tới `10.96.20.30:80`, thành phần nào chuyển nó tới một Pod thật?
@@ -62,10 +63,11 @@ một endpoint ready:targetPort
 
 Ví dụ:
 
-```text
-10.96.20.30:80
-      ↓ chọn một backend
-10.244.2.12:8080
+```d2 title="kube-proxy giải quyết vấn đề gì?"
+direction: right
+vip: 10.96.20.30:80
+backend: 10.244.2.12:8080
+vip -> backend: chọn một backend
 ```
 
 Trên Linux, kube-proxy thường không tự nhận rồi copy từng packet. Nó cấu hình rule trong kernel; kernel mới là thành phần xử lý traffic thực tế.
@@ -104,15 +106,22 @@ api-c  10.244.3.13:8080
 
 EndpointSlice controller ghi danh sách backend vào EndpointSlice. kube-proxy trên mỗi Node watch Service và EndpointSlice, rồi chuẩn bị rule tương ứng:
 
-```mermaid
-flowchart LR
-    S[Service<br/>10.96.20.30:80] --> E[EndpointSlice]
-    E --> A[10.244.1.11:8080 ready]
-    E --> B[10.244.2.12:8080 ready]
-    E --> C[10.244.3.13:8080 ready]
-    S --> K[kube-proxy trên mỗi Node]
-    E --> K
-    K --> R[Rule trong kernel của Node]
+```d2 title="Ví dụ xuyên suốt: Service có ba Pod"
+direction: right
+S: "Service\n10.96.20.30:80"
+E: "EndpointSlice"
+A: "10.244.1.11:8080 ready"
+B: "10.244.2.12:8080 ready"
+C: "10.244.3.13:8080 ready"
+K: "kube-proxy trên mỗi Node"
+R: "Rule trong kernel của Node"
+S -> E
+E -> A
+E -> B
+E -> C
+S -> K
+E -> K
+K -> R
 ```
 
 Khi một client mở connection tới `10.96.20.30:80`, rule trên **Node nơi packet đi qua** chọn một endpoint, ví dụ `10.244.2.12:8080`, rồi đổi destination của packet sang endpoint đó.
@@ -136,12 +145,19 @@ Client → tiến trình kube-proxy → Pod
 
 Cách hình dung này không chính xác trên Linux hiện đại. Với các mode phổ biến:
 
-```text
-                 control flow
-kube-proxy ─────────────────────→ cấu hình rule trong kernel
-
-                 traffic flow
-Client packet ──────────────────→ kernel rule ──→ Pod
+```d2 title="kube-proxy có thực sự proxy từng packet không?"
+direction: right
+control: control flow {
+  proxy: kube-proxy
+  rules: cấu hình rule trong kernel
+  proxy -> rules
+}
+traffic: traffic flow {
+  packet: Client packet
+  rules: kernel rule
+  pod: Pod
+  packet -> rules -> pod
+}
 ```
 
 kube-proxy chạy control loop:
@@ -169,34 +185,34 @@ Tách hai flow giúp tránh nhầm API server nằm trên đường đi của re
 
 ### Control flow: chuẩn bị rule
 
-```mermaid
-sequenceDiagram
-    participant U as User/controller
-    participant A as API Server
-    participant E as EndpointSlice controller
-    participant K as kube-proxy trên Node A
-    participant N as Kernel Node A
-    U->>A: Tạo Service, Deployment
-    E->>A: Watch Service và Pod
-    E->>A: Ghi EndpointSlice
-    K->>A: Watch Service + EndpointSlice
-    K->>N: Program rule Service → endpoints
+```d2 title="Control flow: chuẩn bị rule"
+shape: sequence_diagram
+U: "User/controller"
+A: "API Server"
+E: "EndpointSlice controller"
+K: "kube-proxy trên Node A"
+N: "Kernel Node A"
+U -> A: "Tạo Service, Deployment"
+E -> A: "Watch Service và Pod"
+E -> A: "Ghi EndpointSlice"
+K -> A: "Watch Service + EndpointSlice"
+K -> N: "Program rule Service → endpoints"
 ```
 
 Control flow xảy ra khi resource hoặc endpoint thay đổi. API server không xử lý request ứng dụng.
 
 ### Traffic flow: vận chuyển connection
 
-```mermaid
-sequenceDiagram
-    participant C as Client Pod
-    participant N as Kernel trên Node client
-    participant P as Backend Pod
-    C->>N: TCP SYN tới 10.96.20.30:80
-    N->>N: Chọn endpoint và DNAT
-    N->>P: TCP SYN tới 10.244.2.12:8080
-    P-->>N: TCP response
-    N-->>C: Reverse NAT, client vẫn thấy Service IP
+```d2 title="Traffic flow: vận chuyển connection"
+shape: sequence_diagram
+C: "Client Pod"
+N: "Kernel trên Node client"
+P: "Backend Pod"
+C -> N: "TCP SYN tới 10.96.20.30:80"
+N -> N: "Chọn endpoint và DNAT"
+N -> P: "TCP SYN tới 10.244.2.12:8080"
+P -> N: "TCP response" {style.stroke-dash: 4}
+N -> C: "Reverse NAT, client vẫn thấy Service\nIP" {style.stroke-dash: 4}
 ```
 
 Traffic flow không cần gọi API server cho từng connection. Vì vậy API server đang bận không nhất thiết làm connection Service hiện có dừng ngay, nhưng data plane sẽ không theo kịp endpoint mới nếu watch/sync bị gián đoạn lâu.
@@ -205,12 +221,17 @@ Traffic flow không cần gọi API server cho từng connection. Vì vậy API 
 
 Khi Pod vừa Ready:
 
-```text
-Pod readiness đổi
-→ EndpointSlice được cập nhật
-→ kube-proxy trên từng Node nhận watch event
-→ rule kernel được sync
-→ connection mới có thể chọn Pod đó
+```d2 title="Có độ trễ hội tụ"
+direction: right
+n1: "Pod readiness đổi"
+n2: "EndpointSlice được cập nhật"
+n3: "kube-proxy trên từng Node nhận watch\nevent"
+n4: "rule kernel được sync"
+n5: "connection mới có thể chọn Pod đó"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Chuỗi này cần thời gian, thường ngắn nhưng không bằng không. Nếu EndpointSlice đã đúng mà chỉ một Node chưa route được, có thể kube-proxy hoặc service data plane trên Node đó chưa hội tụ.
@@ -267,13 +288,19 @@ curl http://api.production/
 
 Không phải mọi Pod match selector đều lập tức được chọn. Có thể hình dung việc chọn backend theo các bước sau:
 
-```mermaid
-flowchart TD
-    A[Tất cả endpoint trong EndpointSlice] --> B[Lọc endpoint có thể phục vụ]
-    B --> C[Áp dụng internal/external traffic policy]
-    C --> D[Áp dụng trafficDistribution nếu có]
-    D --> E[Áp dụng session affinity nếu có]
-    E --> F[Mode data plane chọn một endpoint]
+```d2 title="Service chọn Pod nào?"
+direction: down
+A: "Tất cả endpoint trong EndpointSlice"
+B: "Lọc endpoint có thể phục vụ"
+C: "Áp dụng internal/external traffic\npolicy"
+D: "Áp dụng trafficDistribution nếu có"
+E: "Áp dụng session affinity nếu có"
+F: "Mode data plane chọn một endpoint"
+A -> B
+B -> C
+C -> D
+D -> E
+E -> F
 ```
 
 ### Bước 1: lấy endpoint từ EndpointSlice
@@ -305,8 +332,19 @@ Nếu Service dùng `sessionAffinity: ClientIP`, các connection mới từ cùn
 
 Với `iptables` và `nftables` mode mặc định, backend được chọn theo cơ chế ngẫu nhiên/xác suất trong rule. Kube-proxy không đảm bảo chuỗi cố định:
 
-```text
-A → B → C → A → B → C
+```d2 title="Bước 5: chọn một endpoint"
+direction: right
+n1: "A"
+n2: "B"
+n3: "C"
+n4: "A"
+n5: "B"
+n6: "C"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
 ```
 
 và cũng không cam kết mỗi Pod nhận đúng một phần ba số HTTP request.
@@ -320,11 +358,19 @@ và cũng không cam kết mỗi Pod nhận đúng một phần ba số HTTP req
 
 ### Nhiều connection ngắn
 
-```text
-TCP connection 1 → api-a
-TCP connection 2 → api-c
-TCP connection 3 → api-b
-TCP connection 4 → api-a
+```d2 title="Nhiều connection ngắn"
+direction: right
+c1: TCP connection 1
+c2: TCP connection 2
+c3: TCP connection 3
+c4: TCP connection 4
+a: api-a
+b: api-b
+c: api-c
+c1 -> a
+c2 -> c
+c3 -> b
+c4 -> a
 ```
 
 Với số lượng connection lớn và backend tương đương, phân phối có thể gần đều. Với sample nhỏ, ngẫu nhiên tạo chênh lệch là bình thường.
@@ -333,12 +379,15 @@ Với số lượng connection lớn và backend tương đương, phân phối 
 
 Một TCP connection có thể chứa nhiều HTTP request:
 
-```text
-TCP connection 1 → api-a
-├── HTTP request 1
-├── HTTP request 2
-├── HTTP request 3
-└── HTTP request 4
+```d2 title="HTTP keep-alive"
+direction: right
+n1: "TCP connection 1"
+n2: "api-a"
+n3: "├── HTTP request 1"
+n4: "├── HTTP request 2"
+n5: "├── HTTP request 3"
+n6: "└── HTTP request 4"
+n1 -> n2
 ```
 
 Service chỉ chọn `api-a` khi connection được thiết lập. Các request sau dùng lại connection đó vẫn tới `api-a`.
@@ -453,10 +502,17 @@ Các giá trị khả dụng phụ thuộc version/service proxy. Kubernetes hi�
 
 Ví dụ `PreferSameZone`:
 
-```text
-Client zone A
-├── có endpoint zone A → ưu tiên chúng
-└── không có endpoint zone A → fallback endpoint zone khác
+```d2 title="`trafficDistribution`"
+direction: right
+n1: "Client zone A"
+n2: "có endpoint zone A"
+n3: "ưu tiên chúng"
+n4: "không có endpoint zone A"
+n5: "fallback endpoint zone khác"
+n2 -> n3
+n1 -> n2
+n4 -> n5
+n1 -> n4
 ```
 
 Locality giảm latency và cross-zone cost nhưng có thể làm endpoint trong một zone quá tải. Cần kết hợp topology spread và capacity theo từng zone.
@@ -477,22 +533,30 @@ kube-proxy có thể tham gia nhiều entry point, nhưng đích cuối vẫn l�
 
 ### ClusterIP
 
-```text
-Client trong cluster
-→ ClusterIP:port
-→ service rule trên Node client
-→ PodIP:targetPort
+```d2 title="ClusterIP"
+direction: right
+n1: "Client trong cluster"
+n2: "ClusterIP:port"
+n3: "service rule trên Node client"
+n4: "PodIP:targetPort"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Đây là flow đơn giản nhất để hiểu Service routing.
 
 ### NodePort
 
-```text
-Client
-→ NodeIP:NodePort
-→ service rule trên Node nhận packet
-→ một Pod endpoint
+```d2 title="NodePort"
+direction: right
+n1: "Client"
+n2: "NodeIP:NodePort"
+n3: "service rule trên Node nhận packet"
+n4: "một Pod endpoint"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Với traffic policy `Cluster`, Pod có thể nằm trên Node khác. Với `Local`, chỉ Pod trên Node nhận packet được chọn.
@@ -501,23 +565,32 @@ Với traffic policy `Cluster`, Pod có thể nằm trên Node khác. Với `Loc
 
 Một flow phổ biến:
 
-```text
-External client
-→ cloud/external load balancer
-→ NodeIP:NodePort
-→ kube-proxy rule
-→ Pod endpoint
+```d2 title="LoadBalancer"
+direction: right
+n1: "External client"
+n2: "cloud/external load balancer"
+n3: "NodeIP:NodePort"
+n4: "kube-proxy rule"
+n5: "Pod endpoint"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Nhưng đây không phải đường đi bắt buộc. Một số provider/CNI cho load balancer target trực tiếp Pod IP hoặc dùng data plane khác. Vì vậy hãy xác định implementation thật thay vì mặc định mọi LoadBalancer đều qua NodePort.
 
 ### Ingress hoặc Gateway
 
-```text
-Client
-→ Ingress/Gateway data plane
-→ Service hoặc EndpointSlice backend
-→ Pod
+```d2 title="Ingress hoặc Gateway"
+direction: right
+n1: "Client"
+n2: "Ingress/Gateway data plane"
+n3: "Service hoặc EndpointSlice backend"
+n4: "Pod"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Ingress/Gateway chọn route bằng host/path/header ở L7. kube-proxy chỉ tham gia nếu controller gọi qua Service VIP; một số controller đọc EndpointSlice và gọi Pod trực tiếp.
@@ -639,11 +712,15 @@ Managed Kubernetes có thể ẩn cấu hình hoặc không cho sửa. Thay prox
 
 Một số CNI/service data plane dùng eBPF hoặc cơ chế riêng để thay kube-proxy:
 
-```text
-Service + EndpointSlice
-→ CNI service proxy/eBPF agent
-→ eBPF maps/kernel hooks
-→ Pod endpoint
+```d2 title="Khi cluster không dùng kube-proxy"
+direction: right
+n1: "Service + EndpointSlice"
+n2: "CNI service proxy/eBPF agent"
+n3: "eBPF maps/kernel hooks"
+n4: "Pod endpoint"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Khi đó:
@@ -681,12 +758,17 @@ Troubleshooting bằng iptables trên cluster eBPF có thể dẫn tới kết l
 
 Readiness probe thành công làm EndpointSlice cập nhật endpoint thành ready. kube-proxy sau đó sync rule để connection mới có thể chọn Pod.
 
-```text
-Pod process start
-→ readiness pass
-→ EndpointSlice ready=true
-→ kube-proxy sync
-→ connection mới bắt đầu tới Pod
+```d2 title="Pod Ready mới trở thành backend bình thường"
+direction: right
+n1: "Pod process start"
+n2: "readiness pass"
+n3: "EndpointSlice ready=true"
+n4: "kube-proxy sync"
+n5: "connection mới bắt đầu tới Pod"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Nếu readiness quá nông, Pod chưa load xong config vẫn vào traffic. Nếu readiness flapping, endpoint liên tục vào/ra data plane và tạo lỗi ngắt quãng.
@@ -695,13 +777,19 @@ Nếu readiness quá nông, Pod chưa load xong config vẫn vào traffic. Nếu
 
 Một rollout tốt cần phối hợp:
 
-```text
-Pod bắt đầu terminate
-→ endpoint được đánh dấu terminating/not ready
-→ service proxy ngừng chọn cho connection mới
-→ connection cũ có thời gian drain
-→ process exit
-→ Pod bị xóa
+```d2 title="Khi Pod terminate"
+direction: right
+n1: "Pod bắt đầu terminate"
+n2: "endpoint được đánh dấu terminating/not\nready"
+n3: "service proxy ngừng chọn cho connection\nmới"
+n4: "connection cũ có thời gian drain"
+n5: "process exit"
+n6: "Pod bị xóa"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
 ```
 
 Các thành phần cần được thiết kế cùng nhau:
@@ -827,15 +915,23 @@ kubectl delete namespace proxy-lab
 
 Dùng thứ tự sau thay vì restart kube-proxy ngay:
 
-```text
-Application process
-→ Pod IP và targetPort
-→ readiness
-→ EndpointSlice
-→ Service port/ClusterIP
-→ service proxy trên Node client
-→ CNI route/NetworkPolicy
-→ conntrack/kernel
+```d2 title="Troubleshooting theo từng lớp"
+direction: right
+n1: "Application process"
+n2: "Pod IP và targetPort"
+n3: "readiness"
+n4: "EndpointSlice"
+n5: "Service port/ClusterIP"
+n6: "service proxy trên Node client"
+n7: "CNI route/NetworkPolicy"
+n8: "conntrack/kernel"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
+n7 -> n8
 ```
 
 ### Service không có endpoint
@@ -1009,28 +1105,33 @@ Không chỉnh trực tiếp rule do kube-proxy sở hữu. Control loop sẽ gh
 
 Ghi nhớ mối quan hệ sau:
 
-```text
-Service
-├── ClusterIP: địa chỉ ổn định client gọi
-└── port: cổng client gọi
-
-EndpointSlice
-└── danh sách PodIP:targetPort đủ điều kiện
-
-kube-proxy hoặc replacement
-└── watch hai nguồn trên và program data plane Node
-
-Kernel
-└── chọn endpoint cho connection mới, DNAT và giữ mapping
+```d2 title="Tóm tắt"
+direction: right
+svc: Service {
+  ip: ClusterIP — địa chỉ ổn định client gọi
+  port: port — cổng client gọi
+}
+ep: "EndpointSlice\nPodIP:targetPort đủ điều kiện"
+proxy: "kube-proxy hoặc replacement\nwatch và program data plane Node"
+kernel: "Kernel\nchọn endpoint cho connection mới,\nDNAT và giữ mapping"
+svc -> proxy
+ ep -> proxy
+proxy -> kernel
 ```
 
 Khi client gọi Service:
 
-```text
-Client → Service VIP
-→ lọc endpoint theo readiness/policy/locality/affinity
-→ chọn một Pod cho connection
-→ conntrack giữ connection với Pod đó
+```d2 title="Tóm tắt"
+direction: right
+n1: "Client"
+n2: "Service VIP"
+n3: "lọc endpoint theo\nreadiness/policy/locality/affinity"
+n4: "chọn một Pod cho connection"
+n5: "conntrack giữ connection với Pod đó"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Ba kết luận quan trọng nhất:

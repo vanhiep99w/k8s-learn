@@ -28,14 +28,21 @@ description: "Kiến trúc CSI trong Kubernetes: controller/node plugin, sidecar
 
 Container Storage Interface (CSI) là chuẩn gRPC để container orchestrator dùng storage system mà không nhúng code vendor vào Kubernetes core. Storage vendor phát hành driver độc lập; Kubernetes và CSI sidecars chuyển API objects thành operation chuẩn như `CreateVolume`, `ControllerPublishVolume`, `NodeStageVolume` và `NodePublishVolume`.
 
-```mermaid
-flowchart LR
-    API[Kubernetes API] <--> C[CSI controller Pods]
-    C <--> B[Storage backend API]
-    K[kubelet] <--> N[CSI node plugin]
-    N <--> D[Device / filesystem trên Node]
-    B <--> D
-    D --> P[Pod mount/device]
+```d2 title="Tổng quan"
+direction: right
+API: "Kubernetes API"
+C: "CSI controller Pods"
+B: "Storage backend API"
+K: "kubelet"
+N: "CSI node plugin"
+D: "Device / filesystem trên Node"
+P: "Pod mount/device"
+API <-> C
+C <-> B
+K <-> N
+N <-> D
+B <-> D
+D -> P
 ```
 
 CSI là interface, không phải một storage product. Mỗi driver có support matrix, deployment, failure domain và operational behavior riêng.
@@ -145,22 +152,22 @@ spec:
 
 ## 5. Luồng provision, attach và mount
 
-```mermaid
-sequenceDiagram
-    participant PVC as PVC
-    participant EP as external-provisioner
-    participant CP as CSI controller
-    participant EA as external-attacher
-    participant NP as CSI node plugin
-    participant K as kubelet
-    PVC->>EP: Claim cần StorageClass
-    EP->>CP: CreateVolume
-    CP-->>EP: volume_id + topology
-    EP->>PVC: Create PV và bind
-    EA->>CP: ControllerPublishVolume(Node)
-    K->>NP: NodeStageVolume
-    K->>NP: NodePublishVolume(Pod path)
-    NP-->>K: Mount/device ready
+```d2 title="5. Luồng provision, attach và mount"
+shape: sequence_diagram
+PVC: "PVC"
+EP: "external-provisioner"
+CP: "CSI controller"
+EA: "external-attacher"
+NP: "CSI node plugin"
+K: "kubelet"
+PVC -> EP: "Claim cần StorageClass"
+EP -> CP: "CreateVolume"
+CP -> EP: "volume_id + topology" {style.stroke-dash: 4}
+EP -> PVC: "Create PV và bind"
+EA -> CP: "ControllerPublishVolume(Node)"
+K -> NP: "NodeStageVolume"
+K -> NP: "NodePublishVolume(Pod path)"
+NP -> K: "Mount/device ready" {style.stroke-dash: 4}
 ```
 
 Operation cụ thể phụ thuộc capability:

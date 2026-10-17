@@ -30,21 +30,14 @@ description: "Mô hình declarative của Kubernetes, spec/status, control loop,
 
 Declarative model là nền tảng của Kubernetes: người dùng khai báo trạng thái mong muốn, còn controller liên tục quan sát và đưa trạng thái thực tế tiến về trạng thái đó. Khác biệt giữa hai trạng thái không phải ngoại lệ; nó là đầu vào bình thường của control loop.
 
-```text
-          ┌──────────────────────────────┐
-          │ Desired state: spec          │
-          │ "Tôi muốn 3 replicas"        │
-          └──────────────┬───────────────┘
-                         │ compare
-                         ▼
-                Reconciliation loop
-                         │ act
-                         ▼
-          ┌──────────────────────────────┐
-          │ Actual/observed state        │
-          │ "Hiện có 2 Pods Ready"       │
-          └──────────────┬───────────────┘
-                         └──── observe again
+```d2 title="Tổng quan"
+direction: right
+desired: "Desired state: spec\nTôi muốn 3 replicas"
+loop: Reconciliation loop
+actual: "Actual/observed state\nHiện có 2 Pods Ready"
+desired -> loop: compare
+loop -> actual: act
+actual -> loop: observe again
 ```
 
 > [!IMPORTANT]
@@ -90,12 +83,17 @@ current=4 → remove 1
 
 Trong GitOps, manifest trong Git thường là source of intent cấp cao; GitOps controller đưa cluster API state về Git state, rồi built-in controllers đưa runtime về API state.
 
-```text
-Git desired state
-  → GitOps reconciliation
-  → Kubernetes API desired state
-  → built-in reconciliation
-  → Pods/Nodes/external resources
+```d2 title="1.3 Kubernetes vẫn có command imperative"
+direction: right
+n1: "Git desired state"
+n2: "GitOps reconciliation"
+n3: "Kubernetes API desired state"
+n4: "built-in reconciliation"
+n5: "Pods/Nodes/external resources"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 ---
@@ -126,11 +124,15 @@ Controller không luôn thấy actual state tức thời. Nó thấy observation
 
 Phân biệt này quan trọng:
 
-```text
-actual state thay đổi
-  → observer phát hiện
-  → status được cập nhật
-  → client mới thấy observed state
+```d2 title="2.3 Observed state"
+direction: right
+n1: "actual state thay đổi"
+n2: "observer phát hiện"
+n3: "status được cập nhật"
+n4: "client mới thấy observed state"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Status là báo cáo, không phải bản thân reality tuyệt đối.
@@ -191,8 +193,15 @@ Watch event nói “có thể state đã đổi”. Reconciler phải đọc sta
 
 Nếu logic yêu cầu nhận chính xác chuỗi:
 
-```text
-ADDED → MODIFIED A → MODIFIED B → DELETED
+```d2 title="4.2 Vì sao không edge-triggered thuần túy"
+direction: right
+n1: "ADDED"
+n2: "MODIFIED A"
+n3: "MODIFIED B"
+n4: "DELETED"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 mất một event có thể làm state sai vĩnh viễn. Level-based controller chỉ hỏi:
@@ -236,8 +245,17 @@ Nhiều actor update object có thể nhận `409 Conflict`. Reconciler phải f
 
 Dependency outage không nên tạo hot loop:
 
-```text
-retry 1s → 2s → 4s → ... → max delay
+```d2 title="5.3 Backoff"
+direction: right
+n1: "retry 1s"
+n2: "2s"
+n3: "4s"
+n4: "..."
+n5: "max delay"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Event mới có thể reset hoặc kích hoạt retry tùy queue implementation.
@@ -254,14 +272,21 @@ Reconcile/action có thể xảy ra nhiều lần. Hãy thiết kế side effect
 
 Apply Deployment không tạo Pod trực tiếp:
 
-```text
-Deployment spec
-  → Deployment controller creates ReplicaSet
-  → ReplicaSet controller creates Pods
-  → Scheduler binds Pods
-  → kubelet starts Containers
-  → probes set Ready
-  → EndpointSlice includes ready endpoints
+```d2 title="6.1 Convergence có nhiều bước"
+direction: right
+n1: "Deployment spec"
+n2: "Deployment controller creates ReplicaSet"
+n3: "ReplicaSet controller creates Pods"
+n4: "Scheduler binds Pods"
+n5: "kubelet starts Containers"
+n6: "probes set Ready"
+n7: "EndpointSlice includes ready endpoints"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
 ```
 
 Mỗi arrow có queue, cache, API call và retry riêng.
@@ -300,8 +325,13 @@ Nếu controller liên tục sửa rồi actor khác đổi ngược lại, hệ
 
 Owner references mô tả lifecycle dependency:
 
-```text
-Deployment → ReplicaSet → Pod
+```d2 title="7.1 Ownership graph"
+direction: right
+n1: "Deployment"
+n2: "ReplicaSet"
+n3: "Pod"
+n1 -> n2
+n2 -> n3
 ```
 
 Garbage collector dùng UID để xử lý dependent khi owner bị xóa.
@@ -401,11 +431,13 @@ Khi delete object có finalizer, API đặt `deletionTimestamp`. Controller quan
 
 Kubernetes và external systems không có một ACID transaction chung. Nếu flow tạo ba resource rồi bước cuối fail, controller thường reconcile/compensate thay vì rollback tức thì toàn bộ.
 
-```text
-Create cloud resource succeeded
-Status update failed
-  → next reconcile discovers resource by UID tag
-  → updates status instead of creating duplicate
+```d2 title="10.2 Compensation thay rollback transaction"
+direction: right
+created: Create cloud resource succeeded
+failed: Status update failed
+discover: next reconcile discovers resource by UID tag
+update: updates status instead of creating duplicate
+created -> failed -> discover -> update
 ```
 
 ### 10.3 Quy ước vận hành finalizer

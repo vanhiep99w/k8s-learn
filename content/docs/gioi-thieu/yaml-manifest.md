@@ -276,12 +276,16 @@ status:
 
 Manifest người dùng thường không khai báo `status`. Nhiều resource có `/status` subresource riêng để controller cập nhật mà không ghi đè `spec`.
 
-```mermaid
-flowchart LR
-    S[spec: desired state] --> C[Controller]
-    C --> W[Workload thực tế]
-    W --> T[status: actual state]
-    T --> C
+```d2 title="4.2 status"
+direction: right
+S: "spec: desired state"
+C: "Controller"
+W: "Workload thực tế"
+T: "status: actual state"
+S -> C
+C -> W
+W -> T
+T -> C
 ```
 
 `metadata.generation` tăng khi desired state thay đổi. Nhiều controller ghi `status.observedGeneration` để cho biết generation nào đã được xử lý.
@@ -290,28 +294,57 @@ flowchart LR
 
 ## 5. Ví dụ Pod
 
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: web-pod
-  namespace: demo
-  labels:
-    app: web
-spec:
-  containers:
-    - name: nginx
-      image: nginx:1.27-alpine
-      ports:
-        - name: http
-          containerPort: 80
-          protocol: TCP
-      resources:
-        requests:
-          cpu: 50m
-          memory: 64Mi
-        limits:
-          memory: 128Mi
+Chọn từng bước để đọc manifest từ ngoài vào trong. Nút copy lấy toàn bộ `pod.yaml`, không kèm số dòng hay phần giải thích.
+
+```code-walkthrough
+title: Đọc manifest Pod
+language: yaml
+snapshots:
+  - id: pod
+    title: pod.yaml
+    code: |-
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        name: web-pod
+        namespace: demo
+        labels:
+          app: web
+      spec:
+        containers:
+          - name: nginx
+            image: nginx:1.27-alpine
+            ports:
+              - name: http
+                containerPort: 80
+                protocol: TCP
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                memory: 128Mi
+steps:
+  - id: api
+    snapshot: pod
+    title: API và loại resource
+    description: Tạo object Pod từ core API v1.
+    ranges: [[1, 2]]
+  - id: identity
+    snapshot: pod
+    title: Danh tính và labels
+    description: Pod web-pod thuộc Namespace demo và có label app=web.
+    ranges: [[3, 7]]
+  - id: container
+    snapshot: pod
+    title: Container và port
+    description: Container nginx dùng image NGINX và khai báo port 80; khai báo containerPort không tự expose ứng dụng ra ngoài cluster.
+    ranges: [[8, 15]]
+  - id: resources
+    snapshot: pod
+    title: Requests và limits
+    description: Scheduler dùng requests để chọn Node; memory limit đặt ranh giới sử dụng memory cho Container.
+    ranges: [[16, 21]]
 ```
 
 Đọc từ ngoài vào trong:
@@ -370,12 +403,17 @@ spec:
 
 Ba lớp cần phân biệt:
 
-```text
-Deployment metadata
-└── Deployment spec
-    └── Pod template metadata
-        └── Pod template spec
-            └── containers
+```d2 title="6. Ví dụ Deployment"
+direction: right
+n1: "Deployment metadata"
+n2: "Deployment spec"
+n3: "Pod template metadata"
+n4: "Pod template spec"
+n5: "containers"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Sai lầm phổ biến là đặt `containers` trực tiếp dưới Deployment `spec`. Deployment không chạy Container; nó quản lý ReplicaSet, còn ReplicaSet tạo Pod từ `spec.template`.

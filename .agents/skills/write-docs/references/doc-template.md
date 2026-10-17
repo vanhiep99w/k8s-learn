@@ -35,10 +35,12 @@ Nêu chủ đề là gì, giải quyết vấn đề nào, phạm vi trang và k
 
 Mô tả starting state, pain point và cách nhìn đơn giản giúp hiểu các phần sau.
 
-```mermaid
-flowchart LR
-    A[Starting state] --> B[Mechanism]
-    B --> C[Desired result]
+```d2 title="Mental model"
+direction: right
+start: Starting state
+mechanism: Mechanism
+result: Desired result
+start -> mechanism -> result
 ```
 
 Giải thích điểm người đọc cần quan sát trong diagram.

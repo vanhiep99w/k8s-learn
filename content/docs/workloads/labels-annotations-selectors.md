@@ -28,13 +28,13 @@ Labels và annotations đều là metadata dạng key/value, nhưng mục đích
 - **Annotations** lưu thông tin bổ sung không dùng để chọn object.
 - **Selectors** là biểu thức tìm objects dựa trên labels.
 
-```text
-Pod labels: app=checkout, env=prod, track=stable
-                  │
-       ┌──────────┴──────────┐
-       ▼                     ▼
-Service selector        kubectl query
-app=checkout            env=prod,app=checkout
+```d2 title="Tổng quan"
+direction: right
+pod: "Pod labels\napp=checkout, env=prod, track=stable"
+service: "Service selector\napp=checkout"
+query: "kubectl query\nenv=prod,app=checkout"
+pod -- service
+pod -- query
 ```
 
 > [!IMPORTANT]

@@ -19,7 +19,7 @@ Before modifying files, start at [Repository quickstart](quickstart.md) and foll
 
 ## Local setup
 
-The repository commits `package-lock.json` but does not declare a Node.js version in `package.json`. Use a Node/npm combination compatible with Next.js 15 and the lockfile in the development environment; do not document a precise version unless the repository begins pinning one.
+The repository commits `package-lock.json` but does not declare a Node.js version in `package.json`. Use Node.js 22+ for the docs-kit build-time renderer and a compatible npm version with the checked-in lockfile. The repository does not pin an exact runtime version.
 
 Install reproducibly and start the development server:
 
@@ -106,7 +106,7 @@ Content requirements from `AGENTS.md` and the writing skill:
 - provide verification, failure modes, and cleanup for hands-on instructions when applicable;
 - do not present a generic placeholder objective as completed guidance.
 
-Supported custom content includes Callout, Cards, Steps, Tabs, Accordion, TypeTable, and fenced Mermaid diagrams. Their actual renderer contract lives in `source.config.ts` and `src/app/[[...slug]]/page.tsx`.
+Supported custom content includes Callout, Cards, Steps, Tabs, Accordion, TypeTable, fenced D2 diagrams, and docs-kit Terminal Session, Code Walkthrough, Code Diff, and Protocol Exchange. Their actual renderer contract lives in `source.config.ts` and `src/app/[[...slug]]/page.tsx`.
 
 ### 4. Update navigation atomically
 
@@ -136,7 +136,7 @@ Then inspect at least:
 - its sidebar location;
 - headings/table of contents;
 - internal links;
-- code, table, callout, and Mermaid rendering used by the page; and
+- code, table, callout, D2, and docs-kit viewers used by the page; and
 - the generated search result by title or heading.
 
 If the page contains a lab, independently check that commands are internally consistent, expected resources have verification steps, and destructive resources have cleanup instructions. The repository has no executable lab fixtures or cluster test harness, so do not claim a Kubernetes exercise was run unless it actually was.
@@ -177,14 +177,16 @@ For a new syntax or component:
 
 Do not move remark configuration back into `next.config.mjs` without understanding the centralization introduced by commit `f94a2e1`.
 
-### Mermaid
+### D2 and docs-kit
 
-Mermaid diagrams compile to a custom MDX element but render SVG in the browser through a dynamic import. Validation therefore has two levels:
+D2 is compiled to light/dark SVG at build time; there is no browser compiler or Mermaid renderer. Read the contracts in [Site architecture](architecture.md) and the authoring examples in `.agents/skills/write-docs/references/fumadocs-components.md`.
 
-- `npm run build` checks the content/MDX integration;
-- browser inspection checks Mermaid parse errors, client execution, and horizontal layout.
-
-Test more than one diagram if changing initialization because the component generates per-instance IDs.
+- `npm run build` validates D2 syntax and viewer YAML descriptors, including file/fence locations in errors.
+- Browser checks cover SVG layout, Explore lazy-loading, zoom/fit/expansion, theme, keyboard behavior, and mobile overflow.
+- For scenario/step modes, verify every board and the no-JavaScript fallback.
+- Use text for logs, output, positional syntax, formulas, and file trees. Do not convert every mapping into a graphic.
+- Use only trusted source; all code snapshots and scenarios are public. Do not claim a terminal transcript or HTTP example was executed.
+- Cache lives in `.next/cache/docs-kit/d2` and is ignored. No D2 CLI is required.
 
 ### Search
 
@@ -208,7 +210,7 @@ Do not describe the current implementation as full-text search.
 |---|---|
 | Long prose | `content/docs/gioi-thieu/container-fundamentals.md` |
 | Lab with YAML and shell | `content/docs/gioi-thieu/first-application.md` |
-| Mermaid-heavy architecture | `content/docs/kien-truc/tong-quan-cluster.md` |
+| D2-heavy architecture | `content/docs/kien-truc/tong-quan-cluster.md` |
 | Short placeholder | `content/docs/workloads/deployment.md` |
 
 The CSS imports Google Fonts at runtime. A font change may affect browser network behavior as well as layout, even though the static build succeeds.
@@ -247,7 +249,7 @@ For runtime changes, also inspect:
 - one completed architecture page;
 - one placeholder page;
 - output under `dist/`; and
-- console errors during Mermaid or search interaction.
+- console errors during D2, docs-kit viewer, or search interaction.
 
 ## Deployment
 
@@ -283,7 +285,8 @@ For URL changes, restoring code alone may not preserve external links. Prefer st
 | Build cannot resolve a page or generated source | Content/compiler | Frontmatter, metadata entry, `source.config.ts`, generated `.source/` |
 | Admonition displays as plain text or fails | Remark pipeline | Input syntax and callout transform in `source.config.ts` |
 | MDX element is undefined | Renderer contract | Component import and registration in catch-all `page.tsx` |
-| Mermaid area remains empty | Client renderer | Browser console, chart syntax, dynamic import, generated ID |
+| D2 fails to build | Build-time renderer | Source location, D2 syntax/reserved keywords, fence metadata, worker/cache |
+| D2 controls or example viewer do not work | Client boundary | Registered component, global CSS, browser console, lazy chunk |
 | Search cannot find body text | Expected design | Current index omits `structuredData.contents` |
 | Root redirects to 404 | Entry lesson changed | Redirect target and `gioi-thieu/meta.json` |
 | Internal link redirects twice or fails in export | URL shape | Missing trailing slash or stale slug |

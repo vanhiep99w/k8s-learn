@@ -30,32 +30,31 @@ Kubernetes là tập hợp nhiều component chuyên trách, không phải một
 1. Khi một resource thay đổi, component nào phải phản ứng?
 2. Khi trạng thái không hội tụ, nên kiểm tra component nào trước?
 
-```mermaid
-flowchart TB
-    subgraph CP[Control Plane]
-        API[kube-apiserver]
-        ETCD[(etcd)]
-        SCH[kube-scheduler]
-        KCM[kube-controller-manager]
-        CCM[cloud-controller-manager]
-        API <--> ETCD
-        SCH <--> API
-        KCM <--> API
-        CCM <--> API
-    end
-
-    subgraph NODE[Worker Node]
-        KL[kubelet]
-        CR[Container Runtime]
-        NP[Network dataplane / agent]
-        POD[Pods]
-        KL --> CR
-        CR --> POD
-        NP --> POD
-    end
-
-    USER[kubectl / clients] --> API
-    KL <--> API
+```d2 title="Tổng quan"
+direction: down
+USER: "kubectl / clients"
+CP: "Control Plane" {
+  API: "kube-apiserver"
+  ETCD: "etcd" {shape: cylinder}
+  SCH: "kube-scheduler"
+  KCM: "kube-controller-manager"
+  CCM: "cloud-controller-manager"
+}
+NODE: "Worker Node" {
+  KL: "kubelet"
+  CR: "Container Runtime"
+  NP: "Network dataplane / agent"
+  POD: "Pods"
+}
+CP.API <-> CP.ETCD
+CP.SCH <-> CP.API
+CP.KCM <-> CP.API
+CP.CCM <-> CP.API
+NODE.KL -> NODE.CR
+NODE.CR -> NODE.POD
+NODE.NP -> NODE.POD
+USER -> CP.API
+NODE.KL <-> CP.API
 ```
 
 > [!IMPORTANT]
@@ -252,8 +251,19 @@ Client phải xử lý:
 
 Thay vì xử lý toàn bộ logic ngay trong watch handler, controller thường đưa key như `namespace/name` vào rate-limited queue. Worker đọc key, lấy trạng thái mới nhất rồi reconcile.
 
-```text
-API watch → informer/cache → event handler → work queue → reconcile worker → API update
+```d2 title="5.2 Work queue"
+direction: right
+n1: "API watch"
+n2: "informer/cache"
+n3: "event handler"
+n4: "work queue"
+n5: "reconcile worker"
+n6: "API update"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
 ```
 
 Cách này cho phép retry và gộp nhiều event của cùng object.

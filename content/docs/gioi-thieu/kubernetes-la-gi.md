@@ -50,14 +50,20 @@ Một Container có thể chạy bằng một lệnh. Nhưng khi hệ thống c�
 
 Nếu tự viết script cho từng việc, hệ thống dễ phụ thuộc vào thứ tự thao tác và trạng thái cũ. Kubernetes thay thế nhiều script imperative bằng API object và các control loop độc lập.
 
-```mermaid
-flowchart TD
-    U[Người dùng hoặc CI/CD] -->|Gửi desired state| API[Kubernetes API Server]
-    API --> STORE[(Cluster state)]
-    CTRL[Controllers] -->|Watch| API
-    CTRL -->|Create hoặc update| API
-    SCHED[Scheduler] -->|Chọn Node| API
-    NODE[Node components] -->|Chạy Container và báo status| API
+```d2 title="1. Vì sao cần Kubernetes"
+direction: down
+U: "Người dùng hoặc CI/CD"
+API: "Kubernetes API Server"
+STORE: "Cluster state" {shape: cylinder}
+CTRL: "Controllers"
+SCHED: "Scheduler"
+NODE: "Node components"
+U -> API: "Gửi desired state"
+API -> STORE
+CTRL -> API: "Watch"
+CTRL -> API: "Create hoặc update"
+SCHED -> API: "Chọn Node"
+NODE -> API: "Chạy Container và báo status"
 ```
 
 ---
@@ -134,18 +140,28 @@ Kubernetes không tự động cung cấp đầy đủ:
 
 Một cluster gồm **Control Plane** và một hoặc nhiều **Worker Node**.
 
-```text
-┌──────────────────── Control Plane ────────────────────┐
-│ API Server │ etcd │ Scheduler │ Controller Managers   │
-└───────────────────────────────┬───────────────────────┘
-                                │ Kubernetes API
-               ┌────────────────┴────────────────┐
-               │                                 │
-               ▼                                 ▼
-┌───────── Worker Node A ────────┐  ┌──────  Worker Node B ──────┐
-│ kubelet │ runtime │ networking │  │ kubelet │ runtime │ network│
-│ Pods                           │  │ Pods                       │
-└────────────────────────────────┘  └────────────────────────────┘
+```d2 title="4. Kiến trúc ở mức tổng quan"
+direction: down
+cp: Control Plane {
+  api: API Server
+  etcd: etcd {shape: cylinder}
+  scheduler: Scheduler
+  controllers: Controller Managers
+}
+a: Worker Node A {
+  kubelet: kubelet
+  runtime: runtime
+  net: networking
+  pods: Pods
+}
+b: Worker Node B {
+  kubelet: kubelet
+  runtime: runtime
+  net: network
+  pods: Pods
+}
+cp.api <-> a.kubelet: Kubernetes API
+cp.api <-> b.kubelet: Kubernetes API
 ```
 
 ### 4.1 Control Plane
@@ -199,8 +215,15 @@ spec:
 
 Reconciliation loop có thể diễn giải như sau:
 
-```text
-observe actual state → compare with desired state → act → repeat
+```d2 title="5. Object model và reconciliation"
+direction: right
+n1: "observe actual state"
+n2: "compare with desired state"
+n3: "act"
+n4: "repeat"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Controller cần có tính idempotent: chạy lại nhiều lần vẫn tiến hệ thống đến cùng trạng thái mong muốn, thay vì phụ thuộc vào một chuỗi bước chỉ chạy đúng một lần.
@@ -227,22 +250,22 @@ Hãy dùng `kubectl api-resources` để xem resource thực tế được clust
 
 ## 7. Luồng triển khai một ứng dụng
 
-```mermaid
-sequenceDiagram
-    participant Dev as Developer
-    participant Kubectl as kubectl
-    participant API as API Server
-    participant Ctrl as Deployment Controller
-    participant Sched as Scheduler
-    participant Kubelet as kubelet
-    Dev->>Kubectl: kubectl apply -f app.yaml
-    Kubectl->>API: Create hoặc patch Deployment
-    API-->>Kubectl: Accepted
-    Ctrl->>API: Tạo ReplicaSet và Pods
-    Sched->>API: Bind Pod vào Node
-    Kubelet->>API: Watch assigned Pod
-    Kubelet->>Kubelet: Pull image và start Container
-    Kubelet->>API: Update Pod status
+```d2 title="7. Luồng triển khai một ứng dụng"
+shape: sequence_diagram
+Dev: "Developer"
+Kubectl: "kubectl"
+API: "API Server"
+Ctrl: "Deployment Controller"
+Sched: "Scheduler"
+Kubelet: "kubelet"
+Dev -> Kubectl: "kubectl apply -f app.yaml"
+Kubectl -> API: "Create hoặc patch Deployment"
+API -> Kubectl: "Accepted" {style.stroke-dash: 4}
+Ctrl -> API: "Tạo ReplicaSet và Pods"
+Sched -> API: "Bind Pod vào Node"
+Kubelet -> API: "Watch assigned Pod"
+Kubelet -> Kubelet: "Pull image và start Container"
+Kubelet -> API: "Update Pod status"
 ```
 
 Điểm quan trọng: `kubectl` không trực tiếp kết nối đến Node để chạy Container. Nó gửi request đến API Server; các component khác phản ứng với object mới.

@@ -45,36 +45,42 @@ Sau bài lab, bạn có thể:
 
 ## 1. Kiến trúc bài lab
 
-```text
-Browser/curl
-    │ localhost:8080
-    ▼
-kubectl port-forward
-    │
-    ▼
-Service web (ClusterIP, port 80)
-    │ selector: app=web
-    ├──────────────┐
-    ▼              ▼
-Pod web-...      Pod web-...
-nginx:1.27       nginx:1.27
-    ▲              ▲
-    └── ReplicaSet ┘
-             ▲
-         Deployment web
+```d2 title="1. Kiến trúc bài lab"
+direction: down
+client: Browser/curl
+forward: kubectl port-forward
+svc: "Service web\nClusterIP, port 80"
+p1: "Pod web-…\nnginx:1.27"
+p2: "Pod web-…\nnginx:1.27"
+rs: ReplicaSet
+d: Deployment web
+client -> forward: localhost:8080
+forward -> svc
+svc -> p1: "selector: app=web"
+svc -> p2: "selector: app=web"
+d -> rs
+rs -> p1
+rs -> p2
 ```
 
 Luồng quản lý:
 
-```mermaid
-flowchart TD
-    M[deployment.yaml] -->|kubectl apply| API[API Server]
-    API --> D[Deployment]
-    D --> RS[ReplicaSet]
-    RS --> P1[Pod 1]
-    RS --> P2[Pod 2]
-    S[Service] -->|selector app=web| P1
-    S -->|selector app=web| P2
+```d2 title="1. Kiến trúc bài lab"
+direction: down
+M: "deployment.yaml"
+API: "API Server"
+D: "Deployment"
+RS: "ReplicaSet"
+P1: "Pod 1"
+P2: "Pod 2"
+S: "Service"
+M -> API: "kubectl apply"
+API -> D
+D -> RS
+RS -> P1
+RS -> P2
+S -> P1: "selector app=web"
+S -> P2: "selector app=web"
 ```
 
 Deployment không trực tiếp chạy Container. Deployment controller tạo ReplicaSet; ReplicaSet controller tạo Pods; Scheduler chọn Node; kubelet trên Node khởi động Container.
@@ -131,10 +137,27 @@ metadata:
 
 Kiểm tra và apply:
 
-```bash
-kubectl apply --dry-run=server -f namespace.yaml
-kubectl apply -f namespace.yaml
-kubectl get namespace first-app
+Các bước dưới đây chạy trên máy local, với context cluster đã xác minh ở phần chuẩn bị. Đây là hướng dẫn tĩnh, không phải terminal kết nối với cluster.
+
+```terminal-session
+title: Tạo và kiểm tra Namespace của bài lab
+context:
+  kind: local
+  label: kubectl context kind-k8s-learn
+  cwd: first-application
+steps:
+  - id: validate
+    title: Kiểm tra manifest trên API Server
+    command: kubectl apply --dry-run=server -f namespace.yaml
+    expected: Manifest hợp lệ và được admission chấp nhận; chưa tạo Namespace thật.
+  - id: apply
+    title: Tạo Namespace
+    command: kubectl apply -f namespace.yaml
+    expected: Namespace first-app được tạo hoặc cập nhật.
+  - id: verify
+    title: Xác minh
+    command: kubectl get namespace first-app
+    expected: Namespace first-app có trạng thái Active.
 ```
 
 Namespace giúp nhóm resource của lab và đơn giản hóa cleanup. Các resource bên dưới sẽ khai báo `metadata.namespace: first-app` để không phụ thuộc context mặc định.
@@ -405,10 +428,18 @@ kubectl apply -f deployment.yaml
 
 ### 9.1 Update image
 
-Sửa manifest:
+Sửa image trong `deployment.yaml` từ `1.27-alpine` sang `1.28-alpine`. Diff dưới đây chỉ trích field cần đổi, không phải manifest hoàn chỉnh; giữ nguyên các field còn lại.
 
-```yaml
-image: nginx:1.28-alpine
+```code-diff
+title: Update image trong deployment.yaml
+language: yaml
+wordDiff: true
+before:
+  code: |-
+    image: nginx:1.27-alpine
+after:
+  code: |-
+    image: nginx:1.28-alpine
 ```
 
 Xem diff và apply:
@@ -564,9 +595,27 @@ kind delete cluster --name k8s-learn
 
 Bạn vừa đi qua vòng đời hoàn chỉnh:
 
-```text
-viết manifest → validate → apply → observe → expose
-→ scale → update → phát hiện lỗi → rollback → cleanup
+```d2 title="13. Tổng kết"
+direction: right
+n1: "viết manifest"
+n2: "validate"
+n3: "apply"
+n4: "observe"
+n5: "expose"
+n6: "scale"
+n7: "update"
+n8: "phát hiện lỗi"
+n9: "rollback"
+n10: "cleanup"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
+n7 -> n8
+n8 -> n9
+n9 -> n10
 ```
 
 Các quan hệ cần nhớ:

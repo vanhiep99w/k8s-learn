@@ -34,33 +34,54 @@ description: "Runbook troubleshooting Kubernetes networking theo từng tầng: 
 
 Networking incident khó vì một request đi qua nhiều control plane và data plane:
 
-```text
-Client process
-→ resolver
-→ CoreDNS Service
-→ CoreDNS Pod/upstream
-→ destination Service VIP
-→ service proxy
-→ EndpointSlice
-→ CNI route/tunnel
-→ NetworkPolicy
-→ backend socket
-→ return path
+```d2 title="Tổng quan"
+direction: right
+n1: "Client process"
+n2: "resolver"
+n3: "CoreDNS Service"
+n4: "CoreDNS Pod/upstream"
+n5: "destination Service VIP"
+n6: "service proxy"
+n7: "EndpointSlice"
+n8: "CNI route/tunnel"
+n9: "NetworkPolicy"
+n10: "backend socket"
+n11: "return path"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
+n7 -> n8
+n8 -> n9
+n9 -> n10
+n10 -> n11
 ```
 
 Nguyên tắc hiệu quả nhất: **tách từng layer và thay một biến mỗi lần**. Đừng restart mọi component hoặc xóa Pod trước khi thu thập evidence.
 
-```mermaid
-flowchart TD
-    A[Request lỗi] --> B{Gọi Pod IP trực tiếp?}
-    B -->|Không| C[Process / Pod route / CNI / Policy]
-    B -->|Có| D{Gọi Service ClusterIP?}
-    D -->|Không| E[Service / EndpointSlice / service proxy]
-    D -->|Có| F{Gọi DNS name?}
-    F -->|Không| G[resolv.conf / CoreDNS / DNS policy]
-    F -->|Có| H{Gọi qua Gateway/LB?}
-    H -->|Không| I[Host/SNI/route/TLS/LB/firewall]
-    H -->|Có| J[Intermittent/performance: endpoint, Node, MTU, conntrack]
+```d2 title="Tổng quan"
+direction: down
+A: "Request lỗi"
+B: "Gọi Pod IP trực tiếp?" {shape: diamond}
+C: "Process / Pod route / CNI / Policy"
+D: "Gọi Service ClusterIP?" {shape: diamond}
+E: "Service / EndpointSlice / service\nproxy"
+F: "Gọi DNS name?" {shape: diamond}
+G: "resolv.conf / CoreDNS / DNS policy"
+H: "Gọi qua Gateway/LB?" {shape: diamond}
+I: "Host/SNI/route/TLS/LB/firewall"
+J: "Intermittent/performance: endpoint,\nNode, MTU, conntrack"
+A -> B
+B -> C: "Không"
+B -> D: "Có"
+D -> E: "Không"
+D -> F: "Có"
+F -> G: "Không"
+F -> H: "Có"
+H -> I: "Không"
+H -> J: "Có"
 ```
 
 ## 1. Chuẩn hóa mô tả sự cố

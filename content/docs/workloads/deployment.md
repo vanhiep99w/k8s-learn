@@ -28,13 +28,19 @@ description: "Triển khai ứng dụng stateless bằng Deployment: quan hệ R
 
 Deployment là controller phổ biến nhất cho ứng dụng stateless chạy liên tục. Bạn khai báo số replicas và Pod template; Deployment quản lý ReplicaSets, còn ReplicaSets duy trì Pods.
 
-```text
-Deployment
-├── old ReplicaSet ── replicas: 0
-└── current ReplicaSet ── replicas: 3
-    ├── Pod
-    ├── Pod
-    └── Pod
+```d2 title="Tổng quan"
+direction: right
+n1: "Deployment"
+n2: "old ReplicaSet ── replicas: 0"
+n3: "current ReplicaSet ── replicas: 3"
+n4: "Pod"
+n5: "Pod"
+n6: "Pod"
+n1 -> n2
+n1 -> n3
+n3 -> n4
+n3 -> n5
+n3 -> n6
 ```
 
 Deployment cung cấp:
@@ -55,21 +61,32 @@ Deployment cung cấp:
 
 Luồng reconciliation:
 
-```mermaid
-flowchart LR
-    M[Deployment spec] --> DC[Deployment controller]
-    DC --> RS1[Old ReplicaSet]
-    DC --> RS2[New ReplicaSet]
-    RS1 --> P1[Old Pods]
-    RS2 --> P2[New Pods]
+```d2 title="1. Deployment quản lý điều gì?"
+direction: right
+M: "Deployment spec"
+DC: "Deployment controller"
+RS1: "Old ReplicaSet"
+RS2: "New ReplicaSet"
+P1: "Old Pods"
+P2: "New Pods"
+M -> DC
+DC -> RS1
+DC -> RS2
+RS1 -> P1
+RS2 -> P2
 ```
 
 Deployment controller quyết định số replicas của từng ReplicaSet trong rollout. ReplicaSet controller mới trực tiếp tạo/xóa Pods.
 
 Ownership chain:
 
-```text
-Deployment UID → ReplicaSet ownerReference → Pod ownerReference
+```d2 title="1. Deployment quản lý điều gì?"
+direction: right
+n1: "Deployment UID"
+n2: "ReplicaSet ownerReference"
+n3: "Pod ownerReference"
+n1 -> n2
+n2 -> n3
 ```
 
 Không quản lý ReplicaSet/Pod con bằng tay; sửa Deployment template hoặc source manifest.

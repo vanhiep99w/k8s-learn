@@ -34,11 +34,15 @@ NetworkPolicy là namespaced API cho phép kiểm soát connection tới/từ Po
 
 Mặc định, Pod là non-isolated: traffic được phép. Khi một policy chọn Pod cho một hướng, Pod bị isolate hướng đó và chỉ traffic match **ít nhất một allow rule** của các policy áp dụng mới được phép.
 
-```mermaid
-flowchart LR
-    F[frontend Pod] -->|egress must allow| N{NetworkPolicy}
-    N -->|ingress must also allow| A[api Pod:8080]
-    A -->|egress| D[database Pod:5432]
+```d2 title="Tổng quan"
+direction: right
+F: "frontend Pod"
+N: "NetworkPolicy" {shape: diamond}
+A: "api Pod:8080"
+D: "database Pod:5432"
+F -> N: "egress must allow"
+N -> A: "ingress must also allow"
+A -> D: "egress"
 ```
 
 > [!IMPORTANT]

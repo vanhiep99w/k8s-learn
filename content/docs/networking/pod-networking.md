@@ -31,19 +31,19 @@ description: "Deep-dive Pod networking: network namespace, veth, route, overlay/
 
 Pod là đơn vị network nhỏ nhất mà Kubernetes cấp identity. Mỗi Pod thông thường có network namespace và Pod IP riêng; tất cả container trong Pod cùng nhìn thấy một network stack.
 
-```text
-Node
-┌──────────────────────────────────────────┐
-│ root network namespace                   │
-│   route / bridge / tunnel / eBPF         │
-│       │ veth                             │
-│  ┌────┴───────────────────────────────┐  │
-│  │ Pod network namespace              │  │
-│  │ eth0 = 10.244.1.25                 │  │
-│  │ lo   = 127.0.0.1                   │  │
-│  │ app:8080  sidecar:15000            │  │
-│  └────────────────────────────────────┘  │
-└──────────────────────────────────────────┘
+```d2 title="Tổng quan"
+direction: down
+node: Node {
+  root: root network namespace {
+    dataplane: route / bridge / tunnel / eBPF
+    pod: Pod network namespace {
+      eth: eth0 = 10.244.1.25
+      lo: lo = 127.0.0.1
+      containers: "app:8080\nsidecar:15000"
+    }
+    dataplane <-> pod.eth: veth
+  }
+}
 ```
 
 Pod networking phải trả lời ba câu hỏi:
@@ -91,21 +91,21 @@ Service không sửa được application chỉ bind loopback.
 
 Flow tổng quát khi tạo Pod:
 
-```mermaid
-sequenceDiagram
-    participant K as kubelet
-    participant R as CRI runtime
-    participant C as CNI plugin
-    participant I as IPAM
-    K->>R: RunPodSandbox
-    R->>R: Create network namespace
-    R->>C: CNI ADD + namespace path
-    C->>I: Allocate Pod IP
-    I-->>C: IP, gateway, routes
-    C->>C: Create interface + data-plane state
-    C-->>R: CNI result
-    R->>R: Start containers in sandbox
-    R-->>K: Pod sandbox ready
+```d2 title="2. Pod sandbox và network namespace"
+shape: sequence_diagram
+K: "kubelet"
+R: "CRI runtime"
+C: "CNI plugin"
+I: "IPAM"
+K -> R: "RunPodSandbox"
+R -> R: "Create network namespace"
+R -> C: "CNI ADD + namespace path"
+C -> I: "Allocate Pod IP"
+I -> C: "IP, gateway, routes" {style.stroke-dash: 4}
+C -> C: "Create interface + data-plane state"
+C -> R: "CNI result" {style.stroke-dash: 4}
+R -> R: "Start containers in sandbox"
+R -> K: "Pod sandbox ready" {style.stroke-dash: 4}
 ```
 
 Khi xóa Pod, runtime gọi `CNI DEL`. Nếu Node crash hoặc runtime không cleanup, stale IP allocation/interface có thể còn lại; CNI cần cơ chế garbage collection hoặc reconciliation.

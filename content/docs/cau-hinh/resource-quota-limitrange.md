@@ -30,16 +30,25 @@ Trong cluster dùng chung, resource configuration ở từng Pod chưa đủ. Pl
 - `LimitRange`: kiểm soát/default cho **một Container, Pod hoặc PVC**.
 - `ResourceQuota`: giới hạn **tổng consumption hoặc object count của Namespace**.
 
-```text
-Namespace team-a
-├── LimitRange
-│   ├── default request/limit cho mỗi container
-│   ├── min/max mỗi container
-│   └── max limit/request ratio
-└── ResourceQuota
-    ├── tổng CPU/memory requests/limits
-    ├── tổng storage/PVC
-    └── số Pods/Services/Secrets/Jobs...
+```d2 title="Tổng quan"
+direction: right
+n1: "Namespace team-a"
+n2: "LimitRange"
+n3: "default request/limit cho mỗi container"
+n4: "min/max mỗi container"
+n5: "max limit/request ratio"
+n6: "ResourceQuota"
+n7: "tổng CPU/memory requests/limits"
+n8: "tổng storage/PVC"
+n9: "số Pods/Services/Secrets/Jobs..."
+n1 -> n2
+n2 -> n3
+n2 -> n4
+n2 -> n5
+n1 -> n6
+n6 -> n7
+n6 -> n8
+n6 -> n9
 ```
 
 > [!IMPORTANT]
@@ -62,14 +71,21 @@ Cả hai là namespaced API objects và chỉ ảnh hưởng object mới/update
 
 Luồng khái niệm khi tạo Pod:
 
-```mermaid
-flowchart LR
-    U[kubectl/GitOps create Pod] --> A[API Server admission]
-    A --> L[LimitRange defaults + validation]
-    L --> Q[ResourceQuota accounting]
-    Q --> V[Schema/policy validations]
-    V -->|Pass| E[Persist Pod]
-    V -->|Fail| F[Reject 403/422]
+```d2 title="2. Admission flow"
+direction: right
+U: "kubectl/GitOps create Pod"
+A: "API Server admission"
+L: "LimitRange defaults + validation"
+Q: "ResourceQuota accounting"
+V: "Schema/policy validations"
+E: "Persist Pod"
+F: "Reject 403/422"
+U -> A
+A -> L
+L -> Q
+Q -> V
+V -> E: "Pass"
+V -> F: "Fail"
 ```
 
 Thứ tự plugin chi tiết phụ thuộc implementation/config của API server, nhưng cần ghi nhớ ba điểm:
@@ -246,19 +262,26 @@ Nếu có nhiều LimitRange, lựa chọn default có thể không deterministi
 
 Không có LimitRange:
 
-```text
-ResourceQuota yêu cầu requests.cpu
-→ Pod không khai báo request
-→ admission reject
+```d2 title="5. Kết hợp ResourceQuota và LimitRange"
+direction: right
+n1: "ResourceQuota yêu cầu requests.cpu"
+n2: "Pod không khai báo request"
+n3: "admission reject"
+n1 -> n2
+n2 -> n3
 ```
 
 Có LimitRange:
 
-```text
-Pod thiếu request
-→ LimitRange inject 100m
-→ ResourceQuota cộng 100m
-→ accept nếu còn quota
+```d2 title="5. Kết hợp ResourceQuota và LimitRange"
+direction: right
+n1: "Pod thiếu request"
+n2: "LimitRange inject 100m"
+n3: "ResourceQuota cộng 100m"
+n4: "accept nếu còn quota"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Đây là pattern baseline tốt, nhưng defaults không thay thế sizing. Nếu mọi application dùng default `100m/128Mi`, HPA, scheduling và SLO vẫn có thể sai.

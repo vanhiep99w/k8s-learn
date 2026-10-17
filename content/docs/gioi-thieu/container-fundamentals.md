@@ -28,14 +28,17 @@ Container đóng gói ứng dụng cùng runtime, thư viện và cấu hình fi
 
 Container không phải một máy ảo thu nhỏ. Nó là một hoặc nhiều process được cô lập, nhưng vẫn dùng chung kernel của host.
 
-```text
-┌────────────────────────────────────────────┐
-│ Host kernel                                │
-├──────────────┬──────────────┬──────────────┤
-│ Container A  │ Container B  │ Container C  │
-│ app + libs   │ app + libs   │ app + libs   │
-│ isolated PID │ isolated net │ resource cap │
-└──────────────┴──────────────┴──────────────┘
+```d2 title="Tổng quan"
+direction: down
+host: Host {
+  kernel: Host kernel
+  a: "Container A\napp + libs\nisolated PID"
+  b: "Container B\napp + libs\nisolated net"
+  c: "Container C\napp + libs\nresource cap"
+  kernel -- a
+  kernel -- b
+  kernel -- c
+}
 ```
 
 > [!IMPORTANT]
@@ -55,14 +58,21 @@ Trước Container, deployment thường phụ thuộc mạnh vào server:
 
 Container chuyển đơn vị release từ “một tập lệnh cài đặt” thành “một image bất biến”.
 
-```mermaid
-flowchart LR
-    A[Source code] --> B[Build]
-    B --> C[Container Image]
-    C --> D[Registry]
-    D --> E[Development]
-    D --> F[Testing]
-    D --> G[Production]
+```d2 title="1. Vấn đề Container giải quyết"
+direction: right
+A: "Source code"
+B: "Build"
+C: "Container Image"
+D: "Registry"
+E: "Development"
+F: "Testing"
+G: "Production"
+A -> B
+B -> C
+C -> D
+D -> E
+D -> F
+D -> G
 ```
 
 Cùng một digest của image nên được promote qua các môi trường. Không nên build lại cùng source riêng cho từng môi trường vì kết quả có thể khác nhau.
@@ -125,18 +135,21 @@ Cách dễ nhất để hiểu vòng đời Container là: **Container chạy ch
 
 Ví dụ, nếu command chính là `nginx`, Container chạy trong lúc `nginx` còn chạy. Nếu `nginx` dừng hoặc gặp lỗi, Container chuyển sang trạng thái `exited`; filesystem tạm của Container vẫn còn cho đến khi Container bị xóa.
 
-```text
-Image
-  │ create
-  ▼
-created ── start ──▶ running ── process chính kết thúc ──▶ exited
-                       │                                      │
-                       │ pause / unpause                      │ start / restart
-                       ▼                                      └──────────────▶ running
-                    paused
-                                                              │ remove
-                                                              ▼
-                                                            removed
+```d2 title="2.4 Container lifecycle"
+direction: right
+image: Image
+created: created
+running: running
+paused: paused
+exited: exited
+removed: removed
+image -> created: create
+created -> running: start
+running -> exited: process chính kết thúc
+running -> paused: pause
+paused -> running: unpause
+exited -> running: start / restart
+exited -> removed: remove
 ```
 
 | Trạng thái | Điều gì đang xảy ra? |
@@ -172,15 +185,19 @@ Container không phải là một “máy tính nhỏ” nằm bên trong host. 
 
 Có thể nhớ bốn mảnh ghép như sau:
 
-```text
-Process của ứng dụng
-│
-├── namespaces ───── quyết định process nhìn thấy những gì
-├── cgroups ──────── quyết định process dùng được bao nhiêu tài nguyên
-├── security rules ─ quyết định process được phép làm gì
-└── filesystem ───── cung cấp file từ image và một writable layer
-
-Tất cả vẫn chạy bằng kernel của host.
+```d2 title="3. Container hoạt động như thế nào"
+direction: right
+process: Process của ứng dụng
+namespaces: "namespaces\nprocess nhìn thấy những gì"
+cgroups: "cgroups\nprocess dùng bao nhiêu tài nguyên"
+security: "security rules\nprocess được phép làm gì"
+fs: "filesystem\nimage + writable layer"
+kernel: Tất cả vẫn chạy bằng kernel của host
+process -- namespaces
+process -- cgroups
+process -- security
+process -- fs
+process -- kernel
 ```
 
 Khi chạy `docker run nginx`, Docker không khởi động một hệ điều hành mới. Runtime lấy command từ image, tạo process `nginx`, chuẩn bị filesystem rồi yêu cầu kernel áp dụng isolation và giới hạn tài nguyên cho process đó.
@@ -194,12 +211,11 @@ Namespace không phải là một “cái hộp” hay một kernel riêng. Nó 
 
 Có thể hiểu mối quan hệ như sau:
 
-```text
-Linux namespaces + cgroups + filesystem + security rules
-                              │
-                              │ được runtime cấu hình
-                              ▼
-                    Process chạy trong Container
+```d2 title="3.1 Namespaces: tạo góc nhìn riêng cho Container"
+direction: right
+features: "Linux namespaces + cgroups\n+ filesystem + security rules"
+process: Process chạy trong Container
+features -> process: được runtime cấu hình
 ```
 
 Trên một máy Linux có nhiều danh sách dùng chung, chẳng hạn:
@@ -213,19 +229,23 @@ Nếu không có namespaces, các process trên máy sẽ đọc cùng những d
 
 Vì vậy, ứng dụng trong Container có cảm giác như nó đang có process, network và filesystem riêng, dù tất cả vẫn nằm trên cùng host. Kernel vẫn quản lý toàn bộ resource; namespace chỉ thay đổi process đó được nhìn thấy phần nào.
 
-```text
-                         Linux host
-┌─────────────────────────────────────────────────────────┐
-│ Linux kernel quản lý tất cả process và resource         │
-│                                                         │
-│  Namespace của A             Namespace của B            │
-│  ┌────────────────────┐      ┌────────────────────┐     │
-│  │ nginx: PID 1       │      │ node: PID 1        │     │
-│  │ IP: 172.17.0.2     │      │ IP: 172.17.0.3     │     │
-│  │ filesystem của A   │      │ filesystem của B   │     │
-│  └────────────────────┘      └────────────────────┘     │
-│         Container A                 Container B         │
-└─────────────────────────────────────────────────────────┘
+```d2 title="3.1 Namespaces: tạo góc nhìn riêng cho Container"
+direction: down
+host: Linux host {
+  kernel: "Linux kernel quản lý\ntất cả process và resource"
+  a: Container A {
+    namespace: Namespace của A {
+      app: "nginx: PID 1\nIP: 172.17.0.2\nfilesystem của A"
+    }
+  }
+  b: Container B {
+    namespace: Namespace của B {
+      app: "node: PID 1\nIP: 172.17.0.3\nfilesystem của B"
+    }
+  }
+  kernel -- a.namespace.app
+  kernel -- b.namespace.app
+}
 ```
 
 #### Ví dụ 1: PID namespace
@@ -341,18 +361,23 @@ Các nguyên tắc nên áp dụng:
 
 Các tên Docker, containerd, CRI-O và runc dễ gây nhầm vì chúng nằm ở **những tầng khác nhau**, không phải tất cả đều là công cụ thay thế trực tiếp cho nhau.
 
-```text
-Chạy local:
-Docker CLI / Podman
-        │
-        ▼
-containerd hoặc lớp quản lý tương đương
-        │
-        ▼
-runc / crun ──▶ Linux kernel
-
-Trên Kubernetes Node:
-kubelet ── CRI ──▶ containerd / CRI-O ──▶ runc / crun ──▶ Linux kernel
+```d2 title="3.4 Runtime: ai tạo các process này?"
+direction: right
+local: Chạy local {
+  cli: Docker CLI / Podman
+  manager: "containerd hoặc\nlớp quản lý tương đương"
+  runtime: runc / crun
+  kernel: Linux kernel
+  cli -> manager -> runtime -> kernel
+}
+k8s: Trên Kubernetes Node {
+  k: kubelet
+  manager: containerd / CRI-O
+  runtime: runc / crun
+  kernel: Linux kernel
+  k -> manager: CRI
+  manager -> runtime -> kernel
+}
 ```
 
 | Thành phần | Nhiệm vụ chính |
@@ -381,17 +406,17 @@ Container = process + filesystem từ image + isolation + resource limits
 
 Registry lưu và phân phối image. Ví dụ: Docker Hub, GitHub Container Registry, Amazon ECR, Google Artifact Registry hoặc registry nội bộ.
 
-```mermaid
-sequenceDiagram
-    participant Dev as Developer
-    participant CI as CI Pipeline
-    participant Reg as Registry
-    participant Node as Kubernetes Node
-    Dev->>CI: Push source code
-    CI->>CI: Test và build image
-    CI->>Reg: Push image + digest
-    Node->>Reg: Pull image
-    Node->>Node: Create container
+```d2 title="4. Registry và vòng đời Image"
+shape: sequence_diagram
+Dev: "Developer"
+CI: "CI Pipeline"
+Reg: "Registry"
+Node: "Kubernetes Node"
+Dev -> CI: "Push source code"
+CI -> CI: "Test và build image"
+CI -> Reg: "Push image + digest"
+Node -> Reg: "Pull image"
+Node -> Node: "Create container"
 ```
 
 Một pipeline tốt thường gồm:

@@ -44,19 +44,26 @@ Một Pod chứa:
 
 Ví dụ phổ biến nhất là một Pod có một container:
 
-```text
-Pod web
-└── container nginx
+```d2 title="Pod là gì?"
+direction: right
+n1: "Pod web"
+n2: "container nginx"
+n1 -> n2
 ```
 
 Một Pod cũng có thể có nhiều container phối hợp chặt chẽ:
 
-```text
-Pod web
-├── container application
-├── container log-sidecar
-├── Pod IP dùng chung
-└── volume dùng chung
+```d2 title="Pod là gì?"
+direction: right
+n1: "Pod web"
+n2: "container application"
+n3: "container log-sidecar"
+n4: "Pod IP dùng chung"
+n5: "volume dùng chung"
+n1 -> n2
+n1 -> n3
+n1 -> n4
+n1 -> n5
 ```
 
 Tất cả container trong một Pod luôn được đặt trên **cùng một Node** và có cùng vòng đời cấp Pod. Kubernetes không thể đặt container `application` ở `node-a` nhưng đặt `log-sidecar` của cùng Pod ở `node-b`.
@@ -71,16 +78,25 @@ Pod không phải một máy ảo thu nhỏ. Nó là một “vỏ chạy” hay
 
 Container runtime như containerd có thể tạo container. Tuy nhiên, Kubernetes cần một đơn vị chung để gắn nhiều thông tin vận hành vào workload:
 
-```text
-Pod
-├── Container image và command
-├── Network identity
-├── Volume
-├── Resource requests/limits
-├── Security context
-├── Health probes
-├── Scheduling constraints
-└── Restart policy
+```d2 title="Vì sao Kubernetes cần Pod thay vì chạy container trực tiếp?"
+direction: right
+n1: "Pod"
+n2: "Container image và command"
+n3: "Network identity"
+n4: "Volume"
+n5: "Resource requests/limits"
+n6: "Security context"
+n7: "Health probes"
+n8: "Scheduling constraints"
+n9: "Restart policy"
+n1 -> n2
+n1 -> n3
+n1 -> n4
+n1 -> n5
+n1 -> n6
+n1 -> n7
+n1 -> n8
+n1 -> n9
 ```
 
 Nếu Kubernetes chỉ quản lý từng container riêng lẻ, việc phối hợp hai container cần dùng chung network và volume sẽ phức tạp hơn. Pod tạo ra một ranh giới rõ:
@@ -104,15 +120,23 @@ Một container không tự trở thành Pod. Manifest Pod nói cho Kubernetes b
 
 Pod là điểm nối giữa workload controller và hạ tầng Node.
 
-```mermaid
-flowchart LR
-    D[Deployment] --> RS[ReplicaSet]
-    RS --> P1[Pod 1]
-    RS --> P2[Pod 2]
-    P1 --> C1[Container]
-    P2 --> C2[Container]
-    P1 --> N1[Node A]
-    P2 --> N2[Node B]
+```d2 title="Pod nằm ở đâu trong Kubernetes?"
+direction: right
+D: "Deployment"
+RS: "ReplicaSet"
+P1: "Pod 1"
+P2: "Pod 2"
+C1: "Container"
+C2: "Container"
+N1: "Node A"
+N2: "Node B"
+D -> RS
+RS -> P1
+RS -> P2
+P1 -> C1
+P2 -> C2
+P1 -> N1
+P2 -> N2
 ```
 
 Đọc sơ đồ từ trái sang phải:
@@ -139,26 +163,39 @@ Pod vẫn là đơn vị runtime cuối cùng dù bạn bắt đầu từ contro
 
 Mô hình phổ biến nhất là **một application container trong mỗi Pod**:
 
-```text
-Pod api-1 → container api
-Pod api-2 → container api
-Pod api-3 → container api
+```d2 title="Một Pod nên có bao nhiêu container?"
+direction: right
+n1: "Pod api-1"
+n2: "container api"
+n3: "Pod api-2"
+n4: "container api"
+n5: "Pod api-3"
+n6: "container api"
+n1 -> n2
+n3 -> n4
+n5 -> n6
 ```
 
 Muốn có ba bản sao, hãy tạo ba Pod thay vì đặt ba container giống nhau vào một Pod.
 
-```text
-Không nên dùng để scale:
-Pod
-├── api container 1
-├── api container 2
-└── api container 3
-
-Nên dùng:
-Deployment replicas=3
-├── Pod 1 → api container
-├── Pod 2 → api container
-└── Pod 3 → api container
+```d2 title="Một Pod nên có bao nhiêu container?"
+direction: right
+wrong: Không nên dùng để scale {
+  pod: Pod {
+    a: api container 1
+    b: api container 2
+    c: api container 3
+  }
+}
+right: Nên dùng {
+  deployment: Deployment replicas=3
+  p1: Pod 1 {api: api container}
+  p2: Pod 2 {api: api container}
+  p3: Pod 3 {api: api container}
+  deployment -> p1
+  deployment -> p2
+  deployment -> p3
+}
 ```
 
 ### Khi nào nhiều container nên ở cùng Pod?
@@ -394,20 +431,20 @@ Restart policy áp dụng cho việc restart container trong **cùng Pod trên c
 
 Khi chạy `kubectl apply`, nhiều thành phần phối hợp để đưa Pod từ YAML thành container đang chạy.
 
-```mermaid
-sequenceDiagram
-    participant U as kubectl
-    participant A as API Server
-    participant S as Scheduler
-    participant K as kubelet
-    participant R as Container runtime
-    U->>A: Gửi Pod manifest
-    A->>A: Validate và lưu Pod
-    S->>A: Quan sát Pod chưa có Node
-    S->>A: Bind Pod vào một Node
-    K->>A: Quan sát Pod được giao
-    K->>R: Tạo sandbox, pull image, chạy container
-    K->>A: Cập nhật Pod status
+```d2 title="Pod được tạo và chạy như thế nào?"
+shape: sequence_diagram
+U: "kubectl"
+A: "API Server"
+S: "Scheduler"
+K: "kubelet"
+R: "Container runtime"
+U -> A: "Gửi Pod manifest"
+A -> A: "Validate và lưu Pod"
+S -> A: "Quan sát Pod chưa có Node"
+S -> A: "Bind Pod vào một Node"
+K -> A: "Quan sát Pod được giao"
+K -> R: "Tạo sandbox, pull image, chạy\ncontainer"
+K -> A: "Cập nhật Pod status"
 ```
 
 Luồng theo từng bước:
@@ -522,10 +559,13 @@ Hai container trong cùng Pod cũng được schedule cùng nhau. Kubernetes kh�
 
 Mỗi Pod thường nhận một IP trong cluster. IP này thuộc về **Pod**, không thuộc riêng một container.
 
-```text
-Pod web
-├── Pod IP: 10.244.1.8
-└── nginx lắng nghe port 80
+```d2 title="Pod IP, `containerPort` và cách truy cập Pod"
+direction: right
+n1: "Pod web"
+n2: "Pod IP: 10.244.1.8"
+n3: "nginx lắng nghe port 80"
+n1 -> n2
+n1 -> n3
 ```
 
 ### Pod IP không phải endpoint ổn định
@@ -566,8 +606,13 @@ kubectl port-forward pod/web 8080:80 -n pod-lab
 
 Luồng:
 
-```text
-localhost:8080 → kubectl port-forward → Pod web port 80
+```d2 title="Dùng port-forward trong lab"
+direction: right
+n1: "localhost:8080"
+n2: "kubectl port-forward"
+n3: "Pod web port 80"
+n1 -> n2
+n2 -> n3
 ```
 
 Ở terminal khác:
@@ -595,18 +640,13 @@ Mỗi Pod có identity gồm:
 
 UID mới là identity duy nhất của object. Một Pod mới có thể dùng lại cùng name sau khi Pod cũ bị xóa, nhưng đó vẫn là object khác.
 
-```text
-Pod web
-name = web
-UID  = aaa-111
-IP   = 10.244.1.8
-        │
-        └── bị xóa
-
-Pod web mới
-name = web
-UID  = bbb-222
-IP   = 10.244.2.9
+```d2 title="Pod là tài nguyên tạm thời"
+direction: right
+old: "Pod web\nname=web\nUID=aaa-111\nIP=10.244.1.8"
+removed: bị xóa
+new: "Pod web mới\nname=web\nUID=bbb-222\nIP=10.244.2.9"
+old -> removed
+removed -> new: Tạo lại
 ```
 
 Hệ quả thực tế:
@@ -641,10 +681,15 @@ Từ bên ngoài, hai Pod có thể chạy cùng image và label nên trông gi�
 
 Khi process trong container kết thúc và `restartPolicy` yêu cầu restart:
 
-```text
-Pod web, UID aaa, IP 10.244.1.8
-├── container nginx ID 1 → crash
-└── container nginx ID 2 → kubelet tạo lại trong cùng Pod
+```d2 title="Container restart"
+direction: right
+pod: "Pod web\nUID aaa, IP 10.244.1.8" {
+  old: container nginx ID 1
+  crash: crash
+  new: container nginx ID 2
+  old -> crash
+  crash -> new: kubelet tạo lại trong cùng Pod
+}
 ```
 
 Những gì thường giữ nguyên:
@@ -661,9 +706,14 @@ Container ID và restart count thay đổi.
 
 Khi Deployment rollout, Pod bị xóa hoặc Node failure cần thay workload:
 
-```text
-Pod cũ UID aaa → bị xóa
-Pod mới UID bbb → controller tạo
+```d2 title="Pod replacement"
+direction: right
+n1: "Pod cũ UID aaa"
+n2: "bị xóa"
+n3: "Pod mới UID bbb"
+n4: "controller tạo"
+n1 -> n2
+n3 -> n4
 ```
 
 Những gì có thể thay đổi:
@@ -688,9 +738,13 @@ Bảng so sánh:
 
 Pod trần là Pod được tạo trực tiếp mà không có Deployment, StatefulSet, DaemonSet hoặc Job làm owner.
 
-```text
-Bạn → tạo Pod trực tiếp
-      └── không có workload controller duy trì replacement
+```d2 title="Vì sao production không nên tạo Pod trần?"
+direction: right
+user: Bạn
+pod: tạo Pod trực tiếp
+controller: không có workload controller duy trì replacement
+user -> pod
+pod -- controller
 ```
 
 Nếu xóa Pod trần:
@@ -705,14 +759,24 @@ Kubelet có thể restart container trong Pod theo `restartPolicy`, nhưng kubel
 
 Với Deployment:
 
-```text
-Deployment desired replicas=3
-├── Pod A
-├── Pod B → bị xóa
-└── Pod C
-
-Deployment phát hiện chỉ còn 2
-└── tạo Pod D → trở lại 3
+```d2 mode=steps title="Vì sao production không nên tạo Pod trần?"
+direction: right
+deployment: Deployment desired replicas=3
+A: Pod A
+B: Pod B
+C: Pod C
+deployment -> A
+deployment -> B
+deployment -> C
+steps: {
+  deleted: {B: Pod B bị xóa}
+  replacement: {
+    B: null
+    deployment: Deployment phát hiện chỉ còn 2
+    D: Tạo Pod D → trở lại 3
+    deployment -> D
+  }
+}
 ```
 
 Dùng Pod trần cho:
@@ -796,12 +860,15 @@ resources:
 
 Scheduler cộng requests của các container trong Pod rồi tìm Node đủ capacity.
 
-```text
-Pod request 500m CPU, 512Mi memory
-        │
-        ├── node-a còn 200m → không fit
-        ├── node-b còn 1 CPU, 1Gi → có thể fit
-        └── node-c bị taint → còn phải kiểm tra toleration
+```d2 title="Requests dùng để schedule"
+direction: right
+pod: "Pod request\n500m CPU, 512Mi memory"
+a: "node-a còn 200m\nkhông fit"
+b: "node-b còn 1 CPU, 1Gi\ncó thể fit"
+c: "node-c bị taint\ncòn phải kiểm tra toleration"
+pod -> a
+pod -> b
+pod -> c
 ```
 
 Request quá cao có thể làm Pod `Pending`. Request quá thấp khiến Scheduler đặt quá nhiều workload lên Node so với nhu cầu thật.
@@ -870,10 +937,13 @@ Pod security không chỉ là một field. Nó còn phụ thuộc image, admissi
 
 Static Pod được kubelet trên một Node quản lý trực tiếp từ manifest local, không do API Server hoặc Scheduler tạo.
 
-```text
-File manifest trên node-a
-└── kubelet node-a
-    └── chạy Static Pod trên chính node-a
+```d2 title="Static Pod"
+direction: right
+n1: "File manifest trên node-a"
+n2: "kubelet node-a"
+n3: "chạy Static Pod trên chính node-a"
+n1 -> n2
+n2 -> n3
 ```
 
 Static Pod luôn gắn với kubelet đó. Use case phổ biến là chạy các control-plane component trong cluster được bootstrap theo mô hình như kubeadm.
@@ -882,9 +952,11 @@ Static Pod luôn gắn với kubelet đó. Use case phổ biến là chạy các
 
 Kubelet tạo một mirror Pod object trên API Server để người vận hành có thể nhìn thấy Static Pod bằng `kubectl`.
 
-```text
-Static Pod thật trên Node
-└── mirror Pod trên API Server để quan sát
+```d2 title="Mirror Pod"
+direction: right
+n1: "Static Pod thật trên Node"
+n2: "mirror Pod trên API Server để quan sát"
+n1 -> n2
 ```
 
 Sửa hoặc xóa mirror Pod không thay đổi source manifest local đang được kubelet quản lý. Kubelet có thể tạo lại mirror Pod.
@@ -1066,14 +1138,31 @@ Xóa Namespace sẽ xóa Pod và resource khác bên trong.
 
 Debug Pod theo thứ tự:
 
-```text
-Pod đã được schedule chưa?
-├── Chưa → xem Scheduling Events
-└── Rồi
-    ├── Container chưa tạo → xem image, volume, Secret, CNI
-    ├── Container crash → xem logs và exit code
-    ├── Container chạy nhưng chưa Ready → xem probes và dependency
-    └── Pod hoạt động nhưng client không truy cập được → xem port, Service, NetworkPolicy
+```d2 title="Troubleshooting"
+direction: right
+n1: "Pod đã được schedule chưa?"
+n2: "Chưa"
+n3: "xem Scheduling Events"
+n4: "Rồi"
+n5: "Container chưa tạo"
+n6: "xem image, volume, Secret, CNI"
+n7: "Container crash"
+n8: "xem logs và exit code"
+n9: "Container chạy nhưng chưa Ready"
+n10: "xem probes và dependency"
+n11: "Pod hoạt động nhưng client không truy\ncập được"
+n12: "xem port, Service, NetworkPolicy"
+n2 -> n3
+n1 -> n2
+n1 -> n4
+n5 -> n6
+n4 -> n5
+n7 -> n8
+n4 -> n7
+n9 -> n10
+n4 -> n9
+n11 -> n12
+n4 -> n11
 ```
 
 Bộ command nền tảng:
@@ -1202,13 +1291,19 @@ Distroless image có thể không có cả `sh`. Khi đó cân nhắc ephemeral 
 
 Kiểm tra theo đường đi:
 
-```text
-Process có listen đúng port/address?
-→ Pod có Ready không?
-→ Service selector có chọn Pod không?
-→ EndpointSlice có endpoint không?
-→ NetworkPolicy có chặn không?
-→ Ingress/Gateway/LoadBalancer có đúng không?
+```d2 title="Không truy cập được ứng dụng"
+direction: right
+n1: "Process có listen đúng port/address?"
+n2: "Pod có Ready không?"
+n3: "Service selector có chọn Pod không?"
+n4: "EndpointSlice có endpoint không?"
+n5: "NetworkPolicy có chặn không?"
+n6: "Ingress/Gateway/LoadBalancer có đúng\nkhông?"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
 ```
 
 Trong Pod:
@@ -1278,31 +1373,50 @@ Với production, sửa Pod template của controller và dùng rollout phù h�
 
 Mental model ngắn nhất:
 
-```text
-Controller tạo Pod
-→ Scheduler chọn Node cho Pod
-→ kubelet chạy container trên Node đó
-→ Pod giữ nguyên trên Node trong lifecycle của UID
-→ khi cần thay thế, controller tạo Pod mới có UID mới
+```d2 title="Tóm tắt"
+direction: right
+n1: "Controller tạo Pod"
+n2: "Scheduler chọn Node cho Pod"
+n3: "kubelet chạy container trên Node đó"
+n4: "Pod giữ nguyên trên Node trong lifecycle\ncủa UID"
+n5: "khi cần thay thế, controller tạo Pod mới\ncó UID mới"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Các thành phần chính:
 
-```text
-Pod
-├── metadata: name, namespace, labels, UID
-├── spec
-│   ├── containers
-│   ├── volumes
-│   ├── resources
-│   ├── security
-│   ├── probes
-│   └── restartPolicy
-└── status
-    ├── phase
-    ├── conditions
-    ├── Pod IP và Node
-    └── containerStatuses
+```d2 title="Tóm tắt"
+direction: right
+n1: "Pod"
+n2: "metadata: name, namespace, labels, UID"
+n3: "spec"
+n4: "containers"
+n5: "volumes"
+n6: "resources"
+n7: "security"
+n8: "probes"
+n9: "restartPolicy"
+n10: "status"
+n11: "phase"
+n12: "conditions"
+n13: "Pod IP và Node"
+n14: "containerStatuses"
+n1 -> n2
+n1 -> n3
+n3 -> n4
+n3 -> n5
+n3 -> n6
+n3 -> n7
+n3 -> n8
+n3 -> n9
+n1 -> n10
+n10 -> n11
+n10 -> n12
+n10 -> n13
+n10 -> n14
 ```
 
 Năm điều quan trọng nhất:

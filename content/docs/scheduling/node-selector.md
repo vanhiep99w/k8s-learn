@@ -29,17 +29,15 @@ description: "Cách dùng Node label, nodeSelector và required/preferred Node A
 - `requiredDuringSchedulingIgnoredDuringExecution` biểu diễn hard constraint với expression phong phú.
 - `preferredDuringSchedulingIgnoredDuringExecution` thêm điểm ưu tiên nhưng không chặn Pod khỏi Node khác.
 
-```text
-Node labels + Pod placement rules
-              │
-              ▼
-Filter hard requirements
-              │
-              ▼
-Score soft preferences
-              │
-              ▼
-Bind Pod vào Node phù hợp nhất
+```d2 title="Tổng quan"
+direction: down
+n1: "Node labels + Pod placement rules"
+n2: "Filter hard requirements"
+n3: "Score soft preferences"
+n4: "Bind Pod vào Node phù hợp nhất"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 `IgnoredDuringExecution` nghĩa scheduler kiểm tra rule lúc placement; thay đổi label sau đó không tự evict Pod đang chạy chỉ vì affinity không còn match.

@@ -29,14 +29,13 @@ description: "Lifecycle CSI VolumeSnapshot, VolumeSnapshotContent và VolumeSnap
 
 `VolumeSnapshot` yêu cầu CSI storage backend tạo point-in-time snapshot của Volume đứng sau PVC. API model tương tự PVC/PV:
 
-```text
-VolumeSnapshot (namespaced request)
-        │ bind một-một
-        ▼
-VolumeSnapshotContent (cluster-scoped representation)
-        │
-        ▼
-Snapshot asset trong storage backend
+```d2 title="Tổng quan"
+direction: down
+n1: "VolumeSnapshot (namespaced request)"
+n2: "VolumeSnapshotContent (cluster-scoped\nrepresentation)"
+n3: "Snapshot asset trong storage backend"
+n1 -> n2: "bind một-một"
+n2 -> n3
 ```
 
 `VolumeSnapshotClass` chọn CSI driver, parameters và deletion policy. Snapshot APIs là CRDs thuộc `snapshot.storage.k8s.io`, không phải core API; distribution/platform phải cài CRDs, snapshot controller và CSI snapshotter.
@@ -70,19 +69,19 @@ Snapshot **không tự là backup hoàn chỉnh**:
 
 ## 3. Kiến trúc và lifecycle
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant A as API Server
-    participant SC as Snapshot controller
-    participant ES as external-snapshotter
-    participant D as CSI driver/backend
-    U->>A: Create VolumeSnapshot(source PVC)
-    SC->>A: Create VolumeSnapshotContent
-    ES->>D: CreateSnapshot(volumeHandle)
-    D-->>ES: snapshotHandle
-    ES->>A: Update status
-    SC->>A: Bind + readyToUse=true
+```d2 title="3. Kiến trúc và lifecycle"
+shape: sequence_diagram
+U: "User"
+A: "API Server"
+SC: "Snapshot controller"
+ES: "external-snapshotter"
+D: "CSI driver/backend"
+U -> A: "Create VolumeSnapshot(source PVC)"
+SC -> A: "Create VolumeSnapshotContent"
+ES -> D: "CreateSnapshot(volumeHandle)"
+D -> ES: "snapshotHandle" {style.stroke-dash: 4}
+ES -> A: "Update status"
+SC -> A: "Bind + readyToUse=true"
 ```
 
 Thành phần:
@@ -244,12 +243,17 @@ Snapshot capture blocks ở một thời điểm gần như khi máy mất đi�
 
 Application flush/checkpoint và tạm dừng write hoặc dùng database-native backup API trước snapshot. Workflow:
 
-```text
-Pre-hook: stop writes / flush / checkpoint
-→ tạo snapshot
-→ chờ backend xác nhận capture phù hợp
-→ post-hook: resume writes
-→ verify snapshot metadata
+```d2 title="8.2 Application-consistent"
+direction: right
+n1: "Pre-hook: stop writes / flush /\ncheckpoint"
+n2: "tạo snapshot"
+n3: "chờ backend xác nhận capture phù hợp"
+n4: "post-hook: resume writes"
+n5: "verify snapshot metadata"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Giữ quiesce window ngắn và có timeout/rollback để tránh application bị freeze nếu snapshot controller lỗi.

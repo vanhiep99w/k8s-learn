@@ -15,15 +15,23 @@ Kustomize giải quyết việc này bằng cách giữ resource đầu vào và
 
 Kustomize không phải template engine. Nó không thực hiện thay thế chuỗi `${ENV}` trên toàn bộ YAML. Thay vào đó, Kustomize đọc object có cấu trúc, nhận diện `kind`, `metadata.name`, field trong Pod template và các quan hệ resource, rồi áp dụng generator/transformer theo cấu hình.
 
-```mermaid
-flowchart LR
-  A[Base resources] --> B[kustomization.yaml]
-  C[Overlay resources] --> B
-  D[Patches / generators / images] --> B
-  B --> E[kubectl kustomize]
-  E --> F[Rendered YAML]
-  F --> G{Review}
-  G -->|apply -k| H[API Server]
+```d2 title="Cách Kustomize xử lý manifest"
+direction: right
+A: "Base resources"
+B: "kustomization.yaml"
+C: "Overlay resources"
+D: "Patches / generators / images"
+E: "kubectl kustomize"
+F: "Rendered YAML"
+G: "Review" {shape: diamond}
+H: "API Server"
+A -> B
+C -> B
+D -> B
+B -> E
+E -> F
+F -> G
+G -> H: "apply -k"
 ```
 
 Output render là điểm giao tiếp quan trọng: mọi người review output này thay vì đoán nhiều lớp kế thừa sẽ tạo ra object nào.

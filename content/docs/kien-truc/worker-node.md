@@ -28,19 +28,28 @@ description: "Giải thích Worker Node, vòng đời từ PodSpec đến Contai
 
 Worker Node là máy vật lý hoặc VM cung cấp CPU, memory, network và storage attachment để chạy workload. Control Plane quyết định **workload nên chạy ở đâu**; Node components quyết định **làm thế nào hiện thực PodSpec trên máy đó**.
 
-```text
-Control Plane
-    │ Pod đã có spec.nodeName
-    ▼
-┌──────────────── Worker Node ────────────────┐
-│ kubelet                                     │
-│   ├── Container Runtime ──▶ Pod sandbox     │
-│   ├── CNI / network agent ─▶ Pod network    │
-│   ├── CSI node plugin ─────▶ Volume mount   │
-│   └── probes/status ───────▶ API Server     │
-│                                             │
-│ system processes + Pods + node-level agents │
-└─────────────────────────────────────────────┘
+```d2 title="Tổng quan"
+direction: down
+cp: Control Plane
+api: API Server
+node: Worker Node {
+  icon: https://icons.d2lang.com/essentials/112-server.svg
+  kubelet: kubelet
+  runtime: Container Runtime
+  network: CNI / network agent
+  storage: CSI node plugin
+  status: probes/status
+  sandbox: Pod sandbox
+  podnet: Pod network
+  mount: Volume mount
+  processes: "system processes + Pods\n+ node-level agents"
+  kubelet -> runtime -> sandbox
+  kubelet -> network -> podnet
+  kubelet -> storage -> mount
+  kubelet -> status
+}
+cp -> node.kubelet: Pod đã có spec.nodeName
+node.status -> api
 ```
 
 > [!IMPORTANT]
@@ -111,26 +120,25 @@ Logging, metrics và runtime security agent thường chạy một Pod trên m�
 
 ## 3. Từ Pod được schedule đến Container Running
 
-```mermaid
-sequenceDiagram
-    participant API as API Server
-    participant K as kubelet
-    participant CSI as CSI Node Plugin
-    participant CRI as Container Runtime
-    participant CNI as CNI Plugin
-    participant App as App Container
-
-    API-->>K: Pod bound to this Node
-    K->>K: Validate PodSpec and dependencies
-    K->>CSI: Stage/publish required volumes
-    K->>CRI: Create Pod sandbox
-    CRI->>CNI: Configure network namespace
-    CNI-->>CRI: Pod IP/network ready
-    K->>CRI: Pull images
-    K->>CRI: Start init containers in order
-    K->>CRI: Start app containers
-    K->>App: Run startup/readiness/liveness probes
-    K->>API: Update Pod status and conditions
+```d2 title="3. Từ Pod được schedule đến Container Running"
+shape: sequence_diagram
+API: "API Server"
+K: "kubelet"
+CSI: "CSI Node Plugin"
+CRI: "Container Runtime"
+CNI: "CNI Plugin"
+App: "App Container"
+API -> K: "Pod bound to this Node" {style.stroke-dash: 4}
+K -> K: "Validate PodSpec and dependencies"
+K -> CSI: "Stage/publish required volumes"
+K -> CRI: "Create Pod sandbox"
+CRI -> CNI: "Configure network namespace"
+CNI -> CRI: "Pod IP/network ready" {style.stroke-dash: 4}
+K -> CRI: "Pull images"
+K -> CRI: "Start init containers in order"
+K -> CRI: "Start app containers"
+K -> App: "Run startup/readiness/liveness\nprobes"
+K -> API: "Update Pod status and conditions"
 ```
 
 ### 3.1 Pod sandbox
@@ -283,8 +291,17 @@ CNI lỗi thường biểu hiện bằng Events như failed to create Pod sandbo
 
 Với persistent volume, flow có thể gồm:
 
-```text
-Provision → Attach → Stage → Publish/Mount → Container start
+```d2 title="7.3 Volume lifecycle"
+direction: right
+n1: "Provision"
+n2: "Attach"
+n3: "Stage"
+n4: "Publish/Mount"
+n5: "Container start"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Một số bước chạy ở CSI controller, một số tại Node. `Multi-Attach` hoặc mount failure cần xác định lỗi ở topology, attachment, CSI node plugin hay filesystem.

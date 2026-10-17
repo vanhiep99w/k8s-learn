@@ -29,22 +29,22 @@ description: "Kubernetes DNS deep-dive: Service/Pod records, search domain, ndot
 
 Kubernetes DNS cung cấp tên ổn định cho Service và một số Pod identity. CoreDNS thường chạy dưới dạng Deployment trong `kube-system`, đứng sau Service tên `kube-dns` để giữ compatibility.
 
-```mermaid
-sequenceDiagram
-    participant P as Client Pod
-    participant S as kube-dns Service VIP:53
-    participant C as CoreDNS Pod
-    participant A as Kubernetes API cache
-    participant U as Upstream DNS
-    P->>S: A api.production.svc.cluster.local
-    S->>C: UDP/TCP 53
-    C->>A: Service/EndpointSlice cache
-    C-->>P: ClusterIP hoặc endpoint IP
-    P->>S: A example.com
-    S->>C: Query external name
-    C->>U: Forward query
-    U-->>C: Public/private answer
-    C-->>P: Cached answer
+```d2 title="Tổng quan"
+shape: sequence_diagram
+P: "Client Pod"
+S: "kube-dns Service VIP:53"
+C: "CoreDNS Pod"
+A: "Kubernetes API cache"
+U: "Upstream DNS"
+P -> S: "A api.production.svc.cluster.local"
+S -> C: "UDP/TCP 53"
+C -> A: "Service/EndpointSlice cache"
+C -> P: "ClusterIP hoặc endpoint IP" {style.stroke-dash: 4}
+P -> S: "A example.com"
+S -> C: "Query external name"
+C -> U: "Forward query"
+U -> C: "Public/private answer" {style.stroke-dash: 4}
+C -> P: "Cached answer" {style.stroke-dash: 4}
 ```
 
 DNS failure có blast radius lớn: application thường báo database/API timeout dù network path tới IP vẫn hoạt động.

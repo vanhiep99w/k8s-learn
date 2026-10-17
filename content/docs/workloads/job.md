@@ -42,12 +42,21 @@ Ví dụ, bạn cần chạy một chương trình để:
 
 Các công việc này có điểm chung: process không cần chạy mãi. Khi làm xong, process thoát với exit code `0`.
 
-```text
-Job
-└── tạo Pod
-    └── chạy task
-        ├── exit code 0     → thành công
-        └── exit code khác  → thất bại, Job có thể thử lại
+```d2 title="Job là gì?"
+direction: right
+n1: "Job"
+n2: "tạo Pod"
+n3: "chạy task"
+n4: "exit code 0"
+n5: "thành công"
+n6: "exit code khác"
+n7: "thất bại, Job có thể thử lại"
+n1 -> n2
+n2 -> n3
+n4 -> n5
+n3 -> n4
+n6 -> n7
+n3 -> n6
 ```
 
 Điểm quan trọng nhất cần nhớ:
@@ -80,12 +89,23 @@ Bốn resource này giải quyết bốn nhu cầu khác nhau.
 
 Có thể chọn nhanh bằng câu hỏi sau:
 
-```text
-Process phải chạy liên tục?
-├── Có  → Deployment
-└── Không, chạy xong rồi dừng
-    ├── Chạy một lần      → Job
-    └── Chạy theo lịch    → CronJob
+```d2 title="Job khác Pod, Deployment và CronJob như thế nào?"
+direction: right
+n1: "Process phải chạy liên tục?"
+n2: "Có"
+n3: "Deployment"
+n4: "Không, chạy xong rồi dừng"
+n5: "Chạy một lần"
+n6: "Job"
+n7: "Chạy theo lịch"
+n8: "CronJob"
+n2 -> n3
+n1 -> n2
+n1 -> n4
+n5 -> n6
+n4 -> n5
+n7 -> n8
+n4 -> n7
 ```
 
 Ví dụ:
@@ -98,19 +118,29 @@ Ví dụ:
 
 Job controller liên tục so sánh trạng thái mong muốn với trạng thái thật trong cluster.
 
-```mermaid
-flowchart TD
-    A[Tạo Job] --> B[Job controller tạo Pod]
-    B --> C[Container chạy task]
-    C --> D{Process thoát thế nào?}
-    D -->|Exit code 0| E[Pod Succeeded]
-    D -->|Exit code khác| F[Pod hoặc container thất bại]
-    F --> G{Còn được retry?}
-    G -->|Có| B
-    G -->|Không| H[Job Failed]
-    E --> I{Đủ số lần thành công?}
-    I -->|Chưa| B
-    I -->|Đủ| J[Job Complete]
+```d2 title="Job hoạt động ra sao?"
+direction: down
+A: "Tạo Job"
+B: "Job controller tạo Pod"
+C: "Container chạy task"
+D: "Process thoát thế nào?" {shape: diamond}
+E: "Pod Succeeded"
+F: "Pod hoặc container thất bại"
+G: "Còn được retry?" {shape: diamond}
+H: "Job Failed"
+I: "Đủ số lần thành công?" {shape: diamond}
+J: "Job Complete"
+A -> B
+B -> C
+C -> D
+D -> E: "Exit code 0"
+D -> F: "Exit code khác"
+F -> G
+G -> B: "Có"
+G -> H: "Không"
+E -> I
+I -> B: "Chưa"
+I -> J: "Đủ"
 ```
 
 Có ba trạng thái dễ bị nhầm:
@@ -356,16 +386,16 @@ Một task có thể thất bại vì command sai, input không hợp lệ, depe
 
 Với `restartPolicy: Never`, luồng đơn giản là:
 
-```text
-Pod 1 → exit 1 → Failed
-                  │
-                  └── Job tạo Pod 2
-
-Pod 2 → exit 1 → Failed
-                  │
-                  └── Job tạo Pod 3
-
-Pod 3 → exit 0 → Succeeded → Job Complete
+```d2 title="Job xử lý lỗi và retry như thế nào?"
+direction: right
+p1: Pod 1
+f1: exit 1 / Failed
+p2: Job tạo Pod 2
+f2: exit 1 / Failed
+p3: Job tạo Pod 3
+ok: exit 0 / Succeeded
+complete: Job Complete
+p1 -> f1 -> p2 -> f2 -> p3 -> ok -> complete
 ```
 
 ### Giới hạn retry bằng `backoffLimit`
@@ -461,14 +491,14 @@ Có thể hiểu như sau:
 - `completions: 6`: Job cần **tổng cộng 6 lần thành công**.
 - `parallelism: 2`: tại một thời điểm, Job yêu cầu chạy **tối đa khoảng 2 Pod**.
 
-```text
-Mục tiêu: 6 lần thành công
-
-Đợt 1: Pod A + Pod B  → 2 lần thành công
-Đợt 2: Pod C + Pod D  → 2 lần thành công
-Đợt 3: Pod E + Pod F  → 2 lần thành công
-                               │
-                               └── tổng 6/6 → Complete
+```d2 title="Chạy nhiều task bằng completions và parallelism"
+direction: right
+goal: "Mục tiêu: 6 lần thành công"
+batch1: "Đợt 1: Pod A + Pod B\n2 lần thành công"
+batch2: "Đợt 2: Pod C + Pod D\n2 lần thành công"
+batch3: "Đợt 3: Pod E + Pod F\n2 lần thành công"
+complete: tổng 6/6 → Complete
+goal -> batch1 -> batch2 -> batch3 -> complete
 ```
 
 `completions` trả lời câu hỏi **“cần làm xong bao nhiêu phần?”**. `parallelism` trả lời câu hỏi **“cho phép làm đồng thời bao nhiêu phần?”**.
@@ -783,14 +813,31 @@ Xóa Namespace sẽ xóa cả Job và Pod bên trong. Nếu không xóa thủ c�
 
 Khi Job không hoàn thành, debug theo thứ tự `Job → Pod → container`, không xóa ngay rồi tạo lại.
 
-```text
-Job có tạo Pod không?
-├── Không → xem Job Events, quota, admission và quyền
-└── Có
-    ├── Pod Pending → xem scheduling, resource, image pull, volume
-    ├── Pod Running quá lâu → xem logs, dependency và timeout
-    ├── Pod Failed → xem exit code, OOM, command và logs
-    └── Pod Succeeded nhưng Job chưa Complete → xem completions còn thiếu
+```d2 title="Troubleshooting"
+direction: right
+n1: "Job có tạo Pod không?"
+n2: "Không"
+n3: "xem Job Events, quota, admission và\nquyền"
+n4: "Có"
+n5: "Pod Pending"
+n6: "xem scheduling, resource, image pull,\nvolume"
+n7: "Pod Running quá lâu"
+n8: "xem logs, dependency và timeout"
+n9: "Pod Failed"
+n10: "xem exit code, OOM, command và logs"
+n11: "Pod Succeeded nhưng Job chưa Complete"
+n12: "xem completions còn thiếu"
+n2 -> n3
+n1 -> n2
+n1 -> n4
+n5 -> n6
+n4 -> n5
+n7 -> n8
+n4 -> n7
+n9 -> n10
+n4 -> n9
+n11 -> n12
+n4 -> n11
 ```
 
 ### Job không tạo Pod
@@ -935,13 +982,25 @@ metadata:
 
 Mental model ngắn nhất của Job là:
 
-```text
-Job
-└── tạo và theo dõi Pod
-    ├── Pod thành công đủ số lần → Job Complete
-    └── Pod thất bại
-        ├── còn retry → tạo/chạy lại
-        └── hết retry hoặc quá deadline → Job Failed
+```d2 title="Tóm tắt"
+direction: right
+n1: "Job"
+n2: "tạo và theo dõi Pod"
+n3: "Pod thành công đủ số lần"
+n4: "Job Complete"
+n5: "Pod thất bại"
+n6: "còn retry"
+n7: "tạo/chạy lại"
+n8: "hết retry hoặc quá deadline"
+n9: "Job Failed"
+n1 -> n2
+n3 -> n4
+n2 -> n3
+n2 -> n5
+n6 -> n7
+n5 -> n6
+n8 -> n9
+n5 -> n8
 ```
 
 Các field chính:

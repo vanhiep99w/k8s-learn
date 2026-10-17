@@ -32,14 +32,21 @@ Resource configuration trả lời hai câu hỏi khác nhau:
 - **Request**: workload cần bao nhiêu resource để Scheduler chọn Node và hệ thống phân bổ tương đối khi tranh chấp?
 - **Limit**: workload được phép dùng tối đa bao nhiêu trước khi kernel/runtime can thiệp?
 
-```mermaid
-flowchart LR
-    P[Pod requests] --> S[kube-scheduler]
-    S --> N[Node có allocatable phù hợp]
-    P --> K[kubelet + runtime]
-    K --> C[cgroups]
-    C --> CPU[CPU weight/quota]
-    C --> MEM[Memory accounting/OOM]
+```d2 title="Tổng quan"
+direction: right
+P: "Pod requests"
+S: "kube-scheduler"
+N: "Node có allocatable phù hợp"
+K: "kubelet + runtime"
+C: "cgroups"
+CPU: "CPU weight/quota"
+MEM: "Memory accounting/OOM"
+P -> S
+S -> N
+P -> K
+K -> C
+C -> CPU
+C -> MEM
 ```
 
 Ví dụ:
@@ -125,8 +132,15 @@ Request quá cao:
 
 CPU là resource “compressible”: kernel trì hoãn execution thay vì kill process khi vượt quota.
 
-```text
-Nhu cầu CPU > limit → cgroup hết quota trong period → process bị throttle → chạy lại ở period sau
+```d2 title="2.2 CPU limit và throttling"
+direction: right
+n1: "Nhu cầu CPU > limit"
+n2: "cgroup hết quota trong period"
+n3: "process bị throttle"
+n4: "chạy lại ở period sau"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Triệu chứng:
@@ -154,12 +168,17 @@ Nếu usage vượt request và Node thiếu memory, Pod dễ trở thành evict
 
 ### 3.2 Memory limit và `OOMKilled`
 
-```text
-Application allocate memory
-→ cgroup usage chạm limit
-→ kernel OOM kill process
-→ container exit (thường 137)
-→ kubelet restart theo restartPolicy
+```d2 title="3.2 Memory limit và `OOMKilled`"
+direction: right
+n1: "Application allocate memory"
+n2: "cgroup usage chạm limit"
+n3: "kernel OOM kill process"
+n4: "container exit (thường 137)"
+n5: "kubelet restart theo restartPolicy"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Kiểm tra:

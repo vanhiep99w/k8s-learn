@@ -27,10 +27,13 @@ description: "Hiểu ownerReferences, cascading deletion, propagation policy, fi
 
 Kubernetes không chỉ tạo resources; nó còn quản lý dependency và deletion thông qua owner references, garbage collector, finalizers và các controller cleanup chuyên biệt.
 
-```text
-Deployment
-└── ReplicaSet
-    └── Pods
+```d2 title="Tổng quan"
+direction: right
+n1: "Deployment"
+n2: "ReplicaSet"
+n3: "Pods"
+n1 -> n2
+n2 -> n3
 ```
 
 Khi xóa Deployment, garbage collector có thể xóa ReplicaSets và Pods phụ thuộc. Nhưng PVC, external load balancer, cloud disk hoặc custom resources có thể có lifecycle khác.
@@ -123,13 +126,19 @@ Finalizer là key trong `metadata.finalizers` báo rằng controller phải clea
 
 Delete flow:
 
-```mermaid
-flowchart LR
-    A[DELETE request] --> B[Set deletionTimestamp]
-    B --> C[Controller sees finalizer]
-    C --> D[Cleanup external/dependent state]
-    D --> E[Remove finalizer]
-    E --> F[API deletes object]
+```d2 title="3. Finalizers"
+direction: right
+A: "DELETE request"
+B: "Set deletionTimestamp"
+C: "Controller sees finalizer"
+D: "Cleanup external/dependent state"
+E: "Remove finalizer"
+F: "API deletes object"
+A -> B
+B -> C
+C -> D
+D -> E
+E -> F
 ```
 
 Ví dụ:

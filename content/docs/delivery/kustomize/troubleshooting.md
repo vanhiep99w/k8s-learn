@@ -7,8 +7,17 @@ description: "Chẩn đoán lỗi khi build, render, validate và apply Kustomiz
 
 Hãy xác định lỗi xảy ra ở lớp nào trước khi sửa file:
 
-```text
-filesystem/YAML → Kustomize build → API validation/admission → controller rollout → application
+```d2 title="Troubleshooting Kustomize"
+direction: right
+n1: "filesystem/YAML"
+n2: "Kustomize build"
+n3: "API validation/admission"
+n4: "controller rollout"
+n5: "application"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Lỗi ở lớp sau không chứng minh lớp trước sai. Một manifest render thành công vẫn có thể tham chiếu image không tồn tại hoặc bị policy của cluster từ chối.

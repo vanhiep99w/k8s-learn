@@ -28,23 +28,25 @@ description: "Kiến trúc Control Plane Kubernetes, data flow, High Availabilit
 
 Control Plane là miền quản trị của Kubernetes. Nó tiếp nhận desired state, lưu cluster state, thực thi policy, đưa ra scheduling decision và chạy các control loop. Workload tiếp tục chạy trong một khoảng thời gian khi Control Plane tạm thời mất kết nối, nhưng cluster không thể tạo, sửa hoặc tự phục hồi đầy đủ cho đến khi Control Plane hoạt động lại.
 
-```text
-                         Client traffic
-                              │
-                        Load Balancer
-                              │
-              ┌───────────────┼───────────────┐
-              ▼               ▼               ▼
-        API Server A    API Server B    API Server C
-              └───────────────┬───────────────┘
-                              │
-                    ┌─────────┴─────────┐
-                    │    etcd quorum    │
-                    │ member 1/2/3      │
-                    └───────────────────┘
-
-        Scheduler replicas       Controller Manager replicas
-          one active leader          one active leader/group
+```d2 title="Tổng quan"
+direction: down
+client: Client traffic
+lb: Load Balancer
+apis: API Server replicas {
+  a: API Server A
+  b: API Server B
+  c: API Server C
+}
+etcd: "etcd quorum\nmember 1/2/3" {shape: cylinder}
+scheduler: "Scheduler replicas\none active leader"
+controller: "Controller Manager replicas\none active leader/group"
+client -> lb
+lb -> apis.a
+lb -> apis.b
+lb -> apis.c
+apis.a -> etcd
+apis.b -> etcd
+apis.c -> etcd
 ```
 
 > [!IMPORTANT]
@@ -116,26 +118,25 @@ Component tùy chọn này tương tác với cloud API cho Node lifecycle, rout
 
 ### 3.1 Write path
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant LB as Load Balancer
-    participant API as kube-apiserver
-    participant A as Admission chain
-    participant E as etcd
-    participant Ctrl as Controller
-
-    C->>LB: HTTPS API request
-    LB->>API: Route request
-    API->>API: Authenticate + authorize
-    API->>A: Mutate + validate
-    A-->>API: Allowed object
-    API->>E: Transactional write
-    E-->>API: Committed revision
-    API-->>C: API response
-    E-->>API: Watch change
-    API-->>Ctrl: Watch event
-    Ctrl->>API: Reconcile child/status
+```d2 title="3.1 Write path"
+shape: sequence_diagram
+C: "Client"
+LB: "Load Balancer"
+API: "kube-apiserver"
+A: "Admission chain"
+E: "etcd"
+Ctrl: "Controller"
+C -> LB: "HTTPS API request"
+LB -> API: "Route request"
+API -> API: "Authenticate + authorize"
+API -> A: "Mutate + validate"
+A -> API: "Allowed object" {style.stroke-dash: 4}
+API -> E: "Transactional write"
+E -> API: "Committed revision" {style.stroke-dash: 4}
+API -> C: "API response" {style.stroke-dash: 4}
+E -> API: "Watch change" {style.stroke-dash: 4}
+API -> Ctrl: "Watch event" {style.stroke-dash: 4}
+Ctrl -> API: "Reconcile child/status"
 ```
 
 Request thành công nghĩa object đã được chấp nhận và persist, không nghĩa mọi controller đã hoàn tất.
@@ -272,8 +273,19 @@ Thiết kế đúng luôn quan sát state hiện tại trước khi hành độn
 
 Pipeline bảo mật khái niệm:
 
-```text
-TLS → Authentication → Authorization → Admission → Validation → Storage
+```d2 title="7.2 Identity và policy"
+direction: right
+n1: "TLS"
+n2: "Authentication"
+n3: "Authorization"
+n4: "Admission"
+n5: "Validation"
+n6: "Storage"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
 ```
 
 Cần áp dụng:

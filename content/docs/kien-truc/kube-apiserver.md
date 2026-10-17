@@ -28,17 +28,23 @@ description: "Luồng xử lý request của kube-apiserver: authentication, aut
 
 `kube-apiserver` là frontend của Kubernetes Control Plane. Mọi actor quan trọng—`kubectl`, Scheduler, controllers, kubelet, Operator và CI/CD—đều dùng API Server để đọc hoặc thay đổi cluster state.
 
-```text
-Client
-  │ HTTPS request
-  ▼
-Authentication
-  → Authorization
-  → Mutating admission
-  → Object/schema validation
-  → Validating admission
-  → Storage/version conversion
-  → etcd
+```d2 title="Tổng quan"
+direction: down
+n1: "Client"
+n2: "Authentication"
+n3: "Authorization"
+n4: "Mutating admission"
+n5: "Object/schema validation"
+n6: "Validating admission"
+n7: "Storage/version conversion"
+n8: "etcd"
+n1 -> n2: "HTTPS request"
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
+n7 -> n8
 ```
 
 Trình tự chi tiết có thể khác theo loại request, nhưng mô hình trên giúp xác định request bị từ chối ở lớp nào.
@@ -75,28 +81,27 @@ Trong kiến trúc chuẩn, API Server là component duy nhất giao tiếp tr�
 
 ## 2. Luồng xử lý request
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant API as kube-apiserver
-    participant Authn as Authentication
-    participant Authz as Authorization
-    participant Mut as Mutating Admission
-    participant Val as Validation + Validating Admission
-    participant E as etcd
-
-    C->>API: HTTPS request
-    API->>Authn: Xác định user/groups
-    Authn-->>API: Identity hoặc 401
-    API->>Authz: Verb + resource + namespace
-    Authz-->>API: Allow/Deny/NoOpinion
-    API->>Mut: Default hoặc mutate object
-    Mut-->>API: Mutated object
-    API->>Val: Validate schema và policy
-    Val-->>API: Allowed object
-    API->>E: Read/write transaction
-    E-->>API: Revision/data
-    API-->>C: Status hoặc object response
+```d2 title="2. Luồng xử lý request"
+shape: sequence_diagram
+C: "Client"
+API: "kube-apiserver"
+Authn: "Authentication"
+Authz: "Authorization"
+Mut: "Mutating Admission"
+Val: "Validation + Validating Admission"
+E: "etcd"
+C -> API: "HTTPS request"
+API -> Authn: "Xác định user/groups"
+Authn -> API: "Identity hoặc 401" {style.stroke-dash: 4}
+API -> Authz: "Verb + resource + namespace"
+Authz -> API: "Allow/Deny/NoOpinion" {style.stroke-dash: 4}
+API -> Mut: "Default hoặc mutate object"
+Mut -> API: "Mutated object" {style.stroke-dash: 4}
+API -> Val: "Validate schema và policy"
+Val -> API: "Allowed object" {style.stroke-dash: 4}
+API -> E: "Read/write transaction"
+E -> API: "Revision/data" {style.stroke-dash: 4}
+API -> C: "Status hoặc object response" {style.stroke-dash: 4}
 ```
 
 ### 2.1 HTTP request thành Kubernetes attributes
@@ -123,6 +128,47 @@ Authorization dựa trên các attributes này, không chỉ HTTP method.
 | `429 Too Many Requests` | Flow control/throttling |
 | Webhook timeout | Admission dependency |
 | `5xx` | API Server, storage, extension API hoặc webhook |
+
+Hai response rút gọn dưới đây minh họa cùng một thao tác LIST Pods: khi được cấp quyền và khi RBAC từ chối. User `demo-reader` và `resourceVersion` là dữ liệu minh họa; component chỉ trình bày transcript, không gửi HTTP request. Response `200` với `items: []` chỉ cho biết danh sách hiện rỗng, không bảo đảm workload đã sẵn sàng.
+
+```protocol-exchange
+title: LIST Pods qua Kubernetes API
+variants:
+  - id: allowed
+    title: Được phép list Pods
+    request:
+      method: GET
+      url: /api/v1/namespaces/demo/pods
+      headers:
+        - id: accept
+          name: Accept
+          value: application/json
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - id: content-type
+          name: Content-Type
+          value: application/json
+      body:
+        kind: json
+        json: |-
+          {"kind":"PodList","apiVersion":"v1","metadata":{"resourceVersion":"12345"},"items":[]}
+  - id: forbidden
+    title: Đã xác thực nhưng thiếu quyền
+    request:
+      method: GET
+      url: /api/v1/namespaces/demo/pods
+    response:
+      status: 403
+      statusText: Forbidden
+      body:
+        kind: json
+        json: |-
+          {"kind":"Status","apiVersion":"v1","status":"Failure","message":"User demo-reader cannot list pods in namespace demo","reason":"Forbidden","code":403}
+```
+
+Thông tin xác thực không được đưa vào transcript. Khi kiểm tra cluster thật, dùng kubeconfig phù hợp thay vì chép credential vào tài liệu.
 
 ---
 
@@ -256,8 +302,13 @@ kubectl apply --dry-run=server -f app.yaml
 
 Client có thể gửi một served version; API Server chuyển sang internal representation rồi storage version. Khi đọc, object được chuyển lại version client yêu cầu.
 
-```text
-apps/v1 request → internal representation → storage representation
+```d2 title="6.2 API version conversion"
+direction: right
+n1: "apps/v1 request"
+n2: "internal representation"
+n3: "storage representation"
+n1 -> n2
+n2 -> n3
 ```
 
 CRD có nhiều version có thể dùng conversion webhook. Webhook này trở thành dependency của read/write path liên quan.

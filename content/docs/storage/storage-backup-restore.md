@@ -30,20 +30,20 @@ description: "Thiết kế backup/restore cho stateful workload Kubernetes theo 
 
 Backup là bản dữ liệu có thể dùng để phục hồi sau một tập failure scenario đã xác định. Restore là quy trình dựng lại hệ thống và xác minh application hoạt động đúng. Một job báo `Completed`, một snapshot `readyToUse` hoặc một object tồn tại trong bucket chưa chứng minh khả năng recovery.
 
-```text
-Production state
-├── Application data
-├── WAL/binlog/transaction log
-├── Kubernetes desired state
-├── Secret/key/certificate references
-├── StorageClass/CSI assumptions
-└── External dependencies
-        │ backup + catalog + retention
-        ▼
-Isolated recovery point
-        │ restore + validation + cutover
-        ▼
-Recovered service đạt RPO/RTO
+```d2 title="Tổng quan"
+direction: right
+state: Production state {
+  data: Application data
+  wal: WAL/binlog/transaction log
+  k8s: Kubernetes desired state
+  secret: Secret/key/certificate references
+  csi: StorageClass/CSI assumptions
+  ext: External dependencies
+}
+point: Isolated recovery point
+service: Recovered service đạt RPO/RTO
+state -> point: "backup + catalog\n+ retention"
+point -> service: "restore + validation\n+ cutover"
 ```
 
 Kubernetes không có một API core tự backup toàn bộ workload. Platform thường kết hợp database-native tool, CSI snapshot, object storage và tool backup Kubernetes resources.
@@ -134,12 +134,17 @@ Order service và payment service có backup riêng ở hai thời điểm khác
 
 Pre/post hooks phải có timeout và luôn resume writes khi backup thất bại:
 
-```text
-Acquire backup lock
-→ flush/checkpoint
-→ capture recovery point
-→ verify capture accepted
-→ release lock trong success/failure path
+```d2 title="4.4 Quiesce an toàn"
+direction: right
+n1: "Acquire backup lock"
+n2: "flush/checkpoint"
+n3: "capture recovery point"
+n4: "verify capture accepted"
+n5: "release lock trong success/failure path"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Không để database read-only vô hạn vì snapshot controller timeout.
@@ -148,16 +153,24 @@ Không để database read-only vô hạn vì snapshot controller timeout.
 
 Một kiến trúc điển hình:
 
-```mermaid
-flowchart LR
-    A[Stateful workload] --> Q[Quiesce / database backup API]
-    Q --> S[CSI snapshot hoặc data mover]
-    A --> L[WAL / logical dump]
-    S --> O[Backup repository ngoài failure domain]
-    L --> O
-    K[Kubernetes resources / GitOps metadata] --> O
-    O --> C[Catalog + checksum + retention]
-    C --> R[Isolated restore environment]
+```d2 title="5. Kiến trúc backup"
+direction: right
+A: "Stateful workload"
+Q: "Quiesce / database backup API"
+S: "CSI snapshot hoặc data mover"
+L: "WAL / logical dump"
+O: "Backup repository ngoài failure\ndomain"
+K: "Kubernetes resources / GitOps\nmetadata"
+C: "Catalog + checksum + retention"
+R: "Isolated restore environment"
+A -> Q
+Q -> S
+A -> L
+S -> O
+L -> O
+K -> O
+O -> C
+C -> R
 ```
 
 Các control plane cần có:

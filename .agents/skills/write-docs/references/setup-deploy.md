@@ -8,7 +8,7 @@ Dùng reference này khi nhiệm vụ bao gồm tạo hoặc thay đổi runtime
 - [Cấu trúc tối thiểu](#cấu-trúc-tối-thiểu)
 - [Navigation](#navigation)
 - [Đăng ký MDX components](#đăng-ký-mdx-components)
-- [Mermaid support](#mermaid-support)
+- [D2 và docs-kit](#d2-và-docs-kit)
 - [Cloudflare Pages](#cloudflare-pages)
 - [Validation](#validation)
 - [Troubleshooting](#troubleshooting)
@@ -72,7 +72,12 @@ Page renderer thường truyền components vào body:
 <MDX
   components={{
     ...defaultMdxComponents,
-    MermaidDiagram,
+    D2Diagram,
+    D2InteractiveDiagram,
+    TerminalSession,
+    CodeWalkthrough,
+    CodeDiff,
+    ProtocolExchange,
     Callout,
     Card,
     Cards,
@@ -89,37 +94,28 @@ Page renderer thường truyền components vào body:
 
 Import component từ package/path phù hợp với version đang cài. Không giả định API của latest version tương thích với repository.
 
-## Mermaid support
+## D2 và docs-kit
 
-Một cách triển khai phổ biến là biến fenced code `mermaid` thành client component qua remark plugin:
+Website dùng `@vanhiep99w/docs-kit` với Node.js 22+ khi build. Plugin chỉ chạy trong `source.config.ts`, không import renderer vào client:
 
 ```ts
-function remarkMermaid() {
-  return (tree: import('mdast').Root) => {
-    visit(tree, 'code', (node, index, parent) => {
-      if (node.lang !== 'mermaid' || index === undefined || !parent) return;
+import { remarkD2 } from '@vanhiep99w/docs-kit/d2';
 
-      (parent.children as unknown[])[index] = {
-        type: 'mdxJsxFlowElement',
-        name: 'MermaidDiagram',
-        attributes: [
-          { type: 'mdxJsxAttribute', name: 'chart', value: node.value },
-        ],
-        children: [],
-      };
-    });
-  };
-}
+// Trong mdxOptions.remarkPlugins; giữ nguyên các plugin khác.
+[remarkD2, {
+  cacheDir: '.next/cache/docs-kit/d2',
+  sketch: false,
+  scale: 1,
+  interactive: true,
+  defaultCaption: 'Sơ đồ',
+}]
 ```
 
-Đăng ký plugin trong `source.config.ts` theo API của `fumadocs-mdx` đang dùng. Client component phải:
+Đăng ký `D2Diagram`, `D2InteractiveDiagram` từ các subpath `components/d2`, `components/d2-interactive` và import `@vanhiep99w/docs-kit/styles/d2.css` sau CSS Fumadocs. Không cần D2 CLI, Go hoặc server render; SVG light/dark được build sẵn, viewer lazy-load khi bấm Explore.
 
-- Import Mermaid ở client side nếu static rendering không có DOM.
-- Tạo ID an toàn và riêng cho mỗi diagram.
-- Tránh cập nhật DOM sau khi component unmount.
-- Hiển thị lỗi hữu ích hoặc ít nhất không làm hỏng cả page khi diagram sai.
+Các plugin/component/CSS bổ sung đã đăng ký: Terminal Session, Code Walkthrough, Code Diff và Protocol Exchange. Xem `fumadocs-components.md` cùng source hiện tại để chọn descriptor đúng version. Không thêm provider/adapter Source Explorer nếu chưa có manifest và source artifacts.
 
-Kiểm tra implementation hiện có trước khi thay thế.
+Giữ cache ngoài output deploy, không commit cache. Pipeline chỉ nhận nội dung tin cậy trong repository; SVG được nhúng trực tiếp, không phải sanitizer cho public input. Kiểm tra build và browser, kể cả no-JavaScript fallback, theme và mobile.
 
 ## Cloudflare Pages
 
@@ -152,7 +148,7 @@ Kiểm tra thủ công:
 - Sidebar order.
 - Internal link có trailing slash.
 - Search index nếu có.
-- Mermaid và MDX component.
+- D2 và MDX/docs-kit component (Explore, theme, copy, chuyển bước/scenario).
 - Static assets trên base/output path.
 - 404 page và metadata.
 
@@ -162,7 +158,8 @@ Kiểm tra thủ công:
 |---|---|
 | Page không hiện sidebar | Category/root `meta.json` và slug |
 | Build lỗi MDX | Dòng được báo, JSX props, fence và component registration |
-| Mermaid không render | Remark plugin, client component và diagram syntax |
+| D2 build lỗi | Source location, D2 syntax, reserved keywords, metadata, cache/worker |
+| Viewer không tương tác | Component registration, CSS và browser console/lazy chunk |
 | Link redirect hoặc 404 | Site route, trailing slash và static output path |
 | Cloudflare không thấy asset | Build output directory và `wrangler.toml` |
 | Route conflict | App Router files trùng với catch-all route |

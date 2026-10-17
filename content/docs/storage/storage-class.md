@@ -67,10 +67,17 @@ Giả sử ba team cùng yêu cầu PVC 100Gi:
 
 Dung lượng `100Gi` không đủ để phân biệt ba nhu cầu. `accessModes` cũng không mô tả đầy đủ tier hiệu năng, mã hóa, topology hay reclaim policy. StorageClass bổ sung lớp lựa chọn đó:
 
-```text
-PVC của dev       ── chọn class general    ──> storage phổ thông
-PVC của database  ── chọn class database   ──> block storage hiệu năng cao
-PVC chia sẻ file  ── chọn class shared-rwx ──> network filesystem
+```d2 title="1. Bài toán StorageClass giải quyết"
+direction: right
+dev: PVC của dev
+db: PVC của database
+file: PVC chia sẻ file
+general: storage phổ thông
+database: block storage hiệu năng cao
+shared: network filesystem
+dev -> general: chọn class general
+db -> database: chọn class database
+file -> shared: chọn class shared-rwx
 ```
 
 Nhờ vậy:
@@ -96,14 +103,21 @@ Có thể hình dung việc xin storage giống như đặt một mặt hàng t�
 
 Quan hệ cốt lõi là:
 
-```mermaid
-flowchart LR
-    A[Platform tạo StorageClass] --> B[Application tạo PVC và chọn class]
-    B --> C[Provisioner đọc cấu hình class]
-    C --> D[Storage backend tạo volume thật]
-    D --> E[Kubernetes tạo PV]
-    E --> F[PV bind với PVC]
-    F --> G[Pod mount PVC]
+```d2 title="2. Mental model: StorageClass là mẫu lựa chọn storage"
+direction: right
+A: "Platform tạo StorageClass"
+B: "Application tạo PVC và chọn class"
+C: "Provisioner đọc cấu hình class"
+D: "Storage backend tạo volume thật"
+E: "Kubernetes tạo PV"
+F: "PV bind với PVC"
+G: "Pod mount PVC"
+A -> B
+B -> C
+C -> D
+D -> E
+E -> F
+F -> G
 ```
 
 ### Những điều StorageClass không làm
@@ -157,17 +171,16 @@ Provisioner sau đó gọi storage backend để tạo volume thật.
 
 Kubernetes tạo một PV đại diện cho volume vừa cấp. PV và PVC chuyển sang trạng thái `Bound` theo quan hệ một-một:
 
-```text
-StorageClass general       PVC production/app-data
-       │                    class=general, size=20Gi
-       └──────────────┬───────────────┘
-                      ▼
-              provisioner tạo volume
-                      ▼
-          PV pvc-<uid> ↔ PVC app-data
-                      │
-                      ▼
-               storage backend asset
+```d2 title="Bước 3: PV được tạo và bind với PVC"
+direction: right
+sc: StorageClass general
+pvc: "PVC production/app-data\nclass=general, size=20Gi"
+provisioner: provisioner tạo volume
+binding: PV pvc-<uid> ↔ PVC app-data
+asset: storage backend asset {shape: cylinder}
+sc -> provisioner
+pvc -> provisioner
+provisioner -> binding -> asset
 ```
 
 ### Bước 4: Pod sử dụng PVC
@@ -420,12 +433,13 @@ Nếu PVC được tạo khi chưa có default và field `storageClassName` chư
 
 `Immediate` là default khi field bị bỏ trống. Volume được bind hoặc tạo ngay sau khi PVC xuất hiện, ngay cả khi chưa có Pod.
 
-```text
-Tạo PVC
-   ↓
-Tạo/bind volume ngay
-   ↓
-Sau đó mới tạo và schedule Pod
+```d2 title="Immediate"
+direction: down
+n1: "Tạo PVC"
+n2: "Tạo/bind volume ngay"
+n3: "Sau đó mới tạo và schedule Pod"
+n1 -> n2
+n2 -> n3
 ```
 
 Behavior này đơn giản nếu storage có thể truy cập từ mọi Node phù hợp. Nhưng với disk chỉ tồn tại trong một zone, provisioner có thể tạo disk ở `zone-a` trước khi biết Pod chỉ có thể chạy ở `zone-b`. Kết quả là PVC đã `Bound` nhưng Pod không schedule được.
@@ -434,21 +448,21 @@ Behavior này đơn giản nếu storage có thể truy cập từ mọi Node ph
 
 `WaitForFirstConsumer` trì hoãn bind/provision đến khi có Pod thực sự dùng PVC:
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant A as API Server
-    participant S as Scheduler
-    participant C as CSI provisioner
-    participant B as Storage backend
-    U->>A: Tạo PVC
-    A-->>U: PVC Pending, chờ consumer
-    U->>A: Tạo Pod dùng PVC
-    S->>S: Xét CPU, taint, affinity và topology
-    S->>C: Chọn topology khả thi
-    C->>B: Tạo volume trong topology đó
-    C->>A: Tạo PV và bind PVC
-    S->>A: Gán Pod vào Node
+```d2 title="WaitForFirstConsumer"
+shape: sequence_diagram
+U: "User"
+A: "API Server"
+S: "Scheduler"
+C: "CSI provisioner"
+B: "Storage backend"
+U -> A: "Tạo PVC"
+A -> U: "PVC Pending, chờ consumer" {style.stroke-dash: 4}
+U -> A: "Tạo Pod dùng PVC"
+S -> S: "Xét CPU, taint, affinity và topology"
+S -> C: "Chọn topology khả thi"
+C -> B: "Tạo volume trong topology đó"
+C -> A: "Tạo PV và bind PVC"
+S -> A: "Gán Pod vào Node"
 ```
 
 Với mode này, PVC `Pending` cùng Event `waiting for first consumer` trước khi có Pod là behavior bình thường, không phải lỗi.
@@ -475,8 +489,15 @@ reclaimPolicy: Delete
 
 Luồng thường là:
 
-```text
-Xóa PVC → PV được reclaim → provisioner xóa volume thật → PV biến mất
+```d2 title="Delete"
+direction: right
+n1: "Xóa PVC"
+n2: "PV được reclaim"
+n3: "provisioner xóa volume thật"
+n4: "PV biến mất"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 `Delete` giảm orphan volume và chi phí, phù hợp khi dữ liệu có thể tạo lại hoặc đã có backup/guardrail đầy đủ. Nhưng xóa nhầm PVC có thể dẫn đến mất backing volume.
@@ -518,12 +539,13 @@ StorageClass thường được nhắc cùng dynamic provisioning, nhưng nó c�
 
 Với static provisioning, administrator tạo storage asset và PV trước. PVC sau đó bind với PV phù hợp, trong đó `storageClassName` là một tiêu chí so khớp:
 
-```text
-PV tĩnh:  storageClassName=local-storage
-PVC:      storageClassName=local-storage
-                         ↓
-                    Có thể bind nếu size,
-              access mode, volume mode,... cũng khớp
+```d2 title="10. StorageClass với static provisioning"
+direction: right
+pv: "PV tĩnh\nstorageClassName=local-storage"
+pvc: "PVC\nstorageClassName=local-storage"
+match: "Có thể bind nếu size, access mode,\nvolume mode,… cũng khớp" {shape: diamond}
+pv -- match
+pvc -- match
 ```
 
 Ví dụ local PersistentVolume thường dùng class không có automatic provisioner:
@@ -653,9 +675,17 @@ Trong PV, so sánh:
 
 Đây là cách nối mental model thành object thật:
 
-```text
-PVC → StorageClass → provisioner
-  └→ PV → CSI volumeHandle → storage backend asset
+```d2 title="Bước 3: Trace một PVC đang có"
+direction: right
+pvc: PVC
+storageClass: StorageClass
+provisioner: provisioner
+pv: PV
+handle: CSI volumeHandle
+asset: storage backend asset {shape: cylinder}
+pvc -> storageClass -> provisioner
+pvc -- pv
+pv -> handle -> asset
 ```
 
 > [!NOTE]

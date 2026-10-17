@@ -63,10 +63,13 @@ spec:
 
 Deployment scale Pods cũ xuống trước khi tạo Pods mới.
 
-```text
-old: ███ → 0
-new: 0   → ███
-      downtime gap
+```d2 mode=steps title="2. Recreate"
+direction: right
+old: "old: 3 replicas\nnew: 0 replicas"
+steps: {
+  stop: {old: "old: 0 replicas\nnew: 0 replicas\ndowntime gap"}
+  start: {old: "old: 0 replicas\nnew: 3 replicas"}
+}
 ```
 
 Phù hợp khi:
@@ -93,9 +96,14 @@ spec:
 
 Deployment tăng Pods mới và giảm Pods cũ theo từng bước.
 
-```text
-old: ███ → ██ → █ → 0
-new: 0   → █  → ██ → ███
+```d2 mode=steps title="3. Rolling Update"
+direction: right
+state: "old: 3 replicas\nnew: 0 replicas"
+steps: {
+  first: {state: "old: 2 replicas\nnew: 1 replica"}
+  second: {state: "old: 1 replica\nnew: 2 replicas"}
+  complete: {state: "old: 0 replicas\nnew: 3 replicas"}
+}
 ```
 
 Phù hợp mặc định cho stateless service khi version cũ và mới có thể cùng phục vụ.
@@ -115,10 +123,14 @@ Rolling update phân phối traffic dựa trên số endpoints, không bảo đ�
 
 Blue và green là hai môi trường/workload hoàn chỉnh. Chỉ một màu nhận production traffic; màu còn lại được validate trước khi switch.
 
-```text
-                   ┌── Deployment blue (v1)
-Client → Service ──┤   selector: track=blue
-                   └── Deployment green (v2)
+```d2 title="4. Blue-green"
+direction: right
+client: Client
+service: "Service\nselector: track=blue"
+blue: Deployment blue (v1)
+green: Deployment green (v2)
+client -> service -> blue
+service -- green: Chưa chọn {style.stroke-dash: 4}
 ```
 
 Switch bằng cách đổi Service selector:
@@ -151,11 +163,14 @@ Blue-green không có nghĩa rollback dữ liệu. Nếu green đã ghi dữ li�
 
 Canary đưa một phần traffic vào version mới rồi tăng dần:
 
-```text
-Step 1: v1 95% | v2 5%
-Step 2: v1 75% | v2 25%
-Step 3: v1 50% | v2 50%
-Step 4: v2 100%
+```d2 mode=steps title="5. Canary"
+direction: right
+traffic: "Step 1\nv1: 95% | v2: 5%"
+steps: {
+  second: {traffic: "Step 2\nv1: 75% | v2: 25%"}
+  third: {traffic: "Step 3\nv1: 50% | v2: 50%"}
+  promote: {traffic: "Step 4\nv2: 100%"}
+}
 ```
 
 ### 5.1 Canary bằng replica ratio
@@ -249,14 +264,21 @@ PodDisruptionBudget bảo vệ voluntary disruptions, không điều khiển to�
 
 Một promotion flow tốt:
 
-```mermaid
-flowchart LR
-    A[Deploy candidate] --> B[Smoke test]
-    B --> C[Small traffic]
-    C --> D[Analyze metrics]
-    D -->|Good| E[Increase traffic]
-    E --> F[Full promotion]
-    D -->|Bad| G[Abort / rollback]
+```d2 title="9. Progressive delivery và observability"
+direction: right
+A: "Deploy candidate"
+B: "Smoke test"
+C: "Small traffic"
+D: "Analyze metrics"
+E: "Increase traffic"
+F: "Full promotion"
+G: "Abort / rollback"
+A -> B
+B -> C
+C -> D
+D -> E: "Good"
+E -> F
+D -> G: "Bad"
 ```
 
 Automation cần guardrails:

@@ -27,18 +27,19 @@ description: "Expose metadata, Pod/Node identity và resource requests/limits v�
 
 Downward API cho container biết thông tin về **chính Pod/container của nó** mà không cần Kubernetes client, ServiceAccount token hoặc gọi API server.
 
-```text
-Pod metadata/spec/status
-├── metadata.name
-├── metadata.namespace
-├── metadata.uid
-├── labels / annotations
-├── Pod IP / Node name
-└── container requests / limits
-          ↓
-   fieldRef / resourceFieldRef
-          ↓
- environment variables hoặc files
+```d2 title="Tổng quan"
+direction: right
+pod: Pod metadata/spec/status {
+  name: metadata.name
+  ns: metadata.namespace
+  uid: metadata.uid
+  labels: labels / annotations
+  network: Pod IP / Node name
+  resources: container requests / limits
+}
+ref: fieldRef / resourceFieldRef
+expose: environment variables hoặc files
+pod -> ref -> expose
 ```
 
 Tên “downward” mô tả dữ liệu đi từ Kubernetes control plane/kubelet **xuống** workload.

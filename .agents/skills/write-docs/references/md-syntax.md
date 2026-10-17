@@ -9,7 +9,7 @@
 - [Table](#table)
 - [Admonition](#admonition)
 - [JSX/MDX component](#jsxmdx-component)
-- [Mermaid](#mermaid)
+- [D2](#d2)
 - [Lỗi thường gặp](#lỗi-thường-gặp)
 
 ## Frontmatter
@@ -125,21 +125,23 @@ Dùng nháy đôi cho string prop và `{}` cho JavaScript expression. Chỉ dùn
 
 Nội dung bên trong component phải tuân theo syntax mà component/version hiện tại hỗ trợ. Chạy build thay vì giả định Markdown lồng nhau luôn parse đúng.
 
-## Mermaid
+## D2
 
-Không indent code fence:
+Không indent code fence; thêm caption qua `title`:
 
 ````markdown
-```mermaid
-sequenceDiagram
-    Client->>API: Request
-    API-->>Client: Response
+```d2 title="Gọi Kubernetes API"
+shape: sequence_diagram
+client: Client
+api: API Server
+client -> api: Request
+api -> client: Response {style.stroke-dash: 4}
 ```
 ````
 
-Mỗi node ID nên ngắn và ổn định; đặt label mô tả trong `[]`. Tránh ký tự đặc biệt phức tạp trong label nếu parser báo lỗi.
+Mỗi node ID nên ngắn, ổn định và không trùng reserved keyword. Đặt nhãn có ký tự đặc biệt trong chuỗi quoted. Xem `fumadocs-components.md` để chọn viewer hoặc diagram mode phù hợp.
 
-Diagram phải có đoạn dẫn và phần giải thích. Nếu diagram quá rộng, chia theo phase/layer thay vì giảm font đến mức khó đọc.
+Diagram phải có đoạn dẫn và phần giải thích. Nếu quá rộng, chia theo phase/layer thay vì giảm font đến mức khó đọc. Giữ text cho log, output lệnh và cây thư mục.
 
 ## Lỗi thường gặp
 
@@ -149,6 +151,6 @@ Diagram phải có đoạn dẫn và phần giải thích. Nếu diagram quá r�
 | Link redirect/404 | Dùng source path hoặc thiếu `/` cuối | Đổi sang site route có trailing slash |
 | Code không highlight | Fence thiếu language | Thêm `bash`, `yaml`, `json`, `text`,... |
 | JSX không compile | Props/syntax sai hoặc component chưa đăng ký | Kiểm tra renderer và build error |
-| Mermaid không render | Fence bị indent hoặc syntax sai | Bỏ indent, kiểm tra diagram riêng |
+| D2 không build | Syntax sai, reserved keyword hoặc meta không hợp lệ | Đọc lỗi có file/vị trí fence và kiểm tra diagram riêng |
 | TOC sai hierarchy | Bỏ cấp heading hoặc anchor thủ công sai | Sắp lại H2 → H3 → H4 và cập nhật TOC |
 | Table vỡ | Thiếu dòng trống hoặc cell quá phức tạp | Tách block và đơn giản hóa table |

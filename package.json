@@ -3,6 +3,9 @@
   "type": "module",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -11,10 +14,10 @@
   },
   "dependencies": {
     "@types/mdx": "^2.0.14",
+    "@vanhiep99w/docs-kit": "^0.9.0",
     "fumadocs-core": "^16.11.5",
     "fumadocs-mdx": "^15.2.0",
     "fumadocs-ui": "^16.11.5",
-    "mermaid": "^11.13.0",
     "next": "^16.2.10",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

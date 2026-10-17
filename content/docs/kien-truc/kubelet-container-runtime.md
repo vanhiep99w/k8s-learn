@@ -30,16 +30,26 @@ description: "Giải thích kubelet, CRI, Pod sandbox, image/container lifecycle
 
 kubelet biến PodSpec trong Kubernetes API thành Container đang chạy trên một Node. Nó không tự hiện thực mọi chi tiết mà điều phối Container Runtime qua CRI, network plugin qua runtime/CNI integration và storage qua volume/CSI subsystem.
 
-```text
-PodSpec từ API
-      │
-      ▼
-    kubelet
-      ├── CRI Runtime Service ──▶ Pod sandbox + Containers
-      ├── CRI Image Service ────▶ Pull/list/remove images
-      ├── Volume Manager ───────▶ CSI / local mounts
-      ├── Probe Manager ────────▶ startup/readiness/liveness
-      └── Status Manager ───────▶ API Server
+```d2 title="Tổng quan"
+direction: right
+api: PodSpec từ API
+k: kubelet
+runtime: CRI Runtime Service
+sandbox: Pod sandbox + Containers
+image: CRI Image Service
+images: Pull/list/remove images
+volume: Volume Manager
+mount: CSI / local mounts
+probe: Probe Manager
+probes: startup/readiness/liveness
+status: Status Manager
+server: API Server
+api -> k
+k -> runtime -> sandbox
+k -> image -> images
+k -> volume -> mount
+k -> probe -> probes
+k -> status -> server
 ```
 
 > [!IMPORTANT]
@@ -88,23 +98,22 @@ Node lỗi → Control Plane/controller tạo replacement trên Node khác
 
 ## 2. Pod lifecycle trên Node
 
-```mermaid
-sequenceDiagram
-    participant API as API Server
-    participant K as kubelet
-    participant V as Volume Manager/CSI
-    participant R as CRI Runtime
-    participant N as CNI
-
-    API-->>K: Assigned PodSpec
-    K->>V: Prepare volumes
-    K->>R: RunPodSandbox
-    R->>N: ADD network
-    N-->>R: Pod IP configured
-    K->>R: PullImage
-    K->>R: Create/Start init containers
-    K->>R: Create/Start app containers
-    K->>API: PodIP, phase, conditions, containerStatuses
+```d2 title="2. Pod lifecycle trên Node"
+shape: sequence_diagram
+API: "API Server"
+K: "kubelet"
+V: "Volume Manager/CSI"
+R: "CRI Runtime"
+N: "CNI"
+API -> K: "Assigned PodSpec" {style.stroke-dash: 4}
+K -> V: "Prepare volumes"
+K -> R: "RunPodSandbox"
+R -> N: "ADD network"
+N -> R: "Pod IP configured" {style.stroke-dash: 4}
+K -> R: "PullImage"
+K -> R: "Create/Start init containers"
+K -> R: "Create/Start app containers"
+K -> API: "PodIP, phase, conditions,\ncontainerStatuses"
 ```
 
 ### 2.1 Pod worker

@@ -27,11 +27,21 @@ description: "Deep-dive ConfigMap: data model, cách kubelet inject qua env/volu
 
 ConfigMap là namespaced API object lưu dữ liệu **không nhạy cảm** dưới dạng key-value. Mục tiêu là tách configuration theo môi trường khỏi container image:
 
-```text
-Một image bất biến
-├── dev        → ConfigMap app-config-dev
-├── staging    → ConfigMap app-config-staging
-└── production → ConfigMap app-config-production
+```d2 title="Tổng quan"
+direction: right
+n1: "Một image bất biến"
+n2: "dev"
+n3: "ConfigMap app-config-dev"
+n4: "staging"
+n5: "ConfigMap app-config-staging"
+n6: "production"
+n7: "ConfigMap app-config-production"
+n2 -> n3
+n1 -> n2
+n4 -> n5
+n1 -> n4
+n6 -> n7
+n1 -> n6
 ```
 
 Pod có thể consume ConfigMap qua:
@@ -245,8 +255,13 @@ Mount volume vào `/etc/app` che nội dung vốn có của directory trong imag
 
 Không cập nhật trong container đang chạy:
 
-```text
-ConfigMap đổi → Pod spec không đổi → process environment không đổi
+```d2 title="5.1 Environment và arguments"
+direction: right
+n1: "ConfigMap đổi"
+n2: "Pod spec không đổi"
+n3: "process environment không đổi"
+n1 -> n2
+n2 -> n3
 ```
 
 Cần restart/rollout.
@@ -255,17 +270,17 @@ Cần restart/rollout.
 
 Kubelet theo dõi ConfigMap được mount và cập nhật file theo **eventual consistency**:
 
-```mermaid
-sequenceDiagram
-    participant U as User/GitOps
-    participant A as API Server
-    participant K as kubelet
-    participant V as Projected volume
-    participant P as Application
-    U->>A: Update ConfigMap
-    A-->>K: Watch/cache thấy version mới
-    K->>V: Atomic projection update
-    P->>V: Đọc file mới
+```d2 title="5.2 Projected volume"
+shape: sequence_diagram
+U: "User/GitOps"
+A: "API Server"
+K: "kubelet"
+V: "Projected volume"
+P: "Application"
+U -> A: "Update ConfigMap"
+A -> K: "Watch/cache thấy version mới" {style.stroke-dash: 4}
+K -> V: "Atomic projection update"
+P -> V: "Đọc file mới"
 ```
 
 Độ trễ phụ thuộc kubelet sync period và change-detection strategy (`Watch` mặc định, cache TTL hoặc polling). Không thiết kế với giả định update tức thời.

@@ -28,12 +28,22 @@ description: "Giải thích Kubernetes API, resource, object, group/version/kind
 
 Kubernetes API cho phép đọc và thay đổi trạng thái các object như Pod, Deployment, Namespace, ConfigMap và Event. Người dùng, `kubectl`, controller, Scheduler, kubelet và các hệ thống bên ngoài đều giao tiếp thông qua API Server.
 
-```text
-kubectl ───────┐
-controllers ───┼──▶ kube-apiserver ───▶ etcd
-scheduler ─────┤           ▲
-kubelet ───────┤           │
-operators ─────┘       watch/list/update
+```d2 title="Tổng quan"
+direction: right
+kubectl: kubectl
+controllers: controllers
+scheduler: scheduler
+kubelet: kubelet
+operators: operators
+api: kube-apiserver
+etcd: etcd {shape: cylinder}
+kubectl -> api
+controllers -> api
+scheduler -> api
+kubelet -> api
+operators -> api
+api -> etcd
+api.tooltip: "watch/list/update"
 ```
 
 Mỗi cluster tự công bố các API mà nó phục vụ. Vì cluster có thể cài thêm CRD hoặc tắt API nhất định, cách đúng để biết resource khả dụng là dùng API discovery trên chính cluster đó.
@@ -354,8 +364,13 @@ Một object có thể do nhiều actor quan sát, nhưng cần hiểu actor nà
 
 Controller đặt `metadata.ownerReferences` để thể hiện ownership. Ví dụ:
 
-```text
-Deployment → ReplicaSet → Pods
+```d2 title="9.1 Owner references"
+direction: right
+n1: "Deployment"
+n2: "ReplicaSet"
+n3: "Pods"
+n1 -> n2
+n2 -> n3
 ```
 
 Garbage collector có thể xóa dependents khi owner bị xóa, tùy propagation policy.

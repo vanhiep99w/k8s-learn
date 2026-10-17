@@ -32,13 +32,19 @@ description: "CNI deep-dive: giao tiếp giữa runtime và plugin, ADD/DEL/CHEC
 
 Container Network Interface (CNI) là specification mô tả cách container runtime gọi plugin để cấu hình network cho container/sandbox. Trong Kubernetes, runtime dùng CNI để hiện thực phần Pod networking của [Kubernetes Networking Model](/networking/networking-model/).
 
-```mermaid
-flowchart LR
-    K[kubelet] -->|CRI| R[containerd / CRI-O]
-    R -->|CNI ADD, DEL, CHECK| P[CNI plugin chain]
-    P --> I[IPAM]
-    P --> D[Route / bridge / tunnel / eBPF / cloud NIC]
-    P --> N[NetworkPolicy data plane]
+```d2 title="Tổng quan"
+direction: right
+K: "kubelet"
+R: "containerd / CRI-O"
+P: "CNI plugin chain"
+I: "IPAM"
+D: "Route / bridge / tunnel / eBPF /\ncloud NIC"
+N: "NetworkPolicy data plane"
+K -> R: "CRI"
+R -> P: "CNI ADD, DEL, CHECK"
+P -> I
+P -> D
+P -> N
 ```
 
 > [!IMPORTANT]
@@ -58,21 +64,21 @@ Kubernetes yêu cầu plugin tương thích CNI v0.4.0 trở lên và khuyến n
 
 Kubelet không trực tiếp chạy CNI ở Kubernetes hiện đại. Kubelet gọi runtime qua CRI; runtime quản lý CNI configuration và gọi plugin.
 
-```mermaid
-sequenceDiagram
-    participant K as kubelet
-    participant R as CRI runtime
-    participant C as CNI
-    participant A as CNI agent/controller
-    K->>R: RunPodSandbox
-    R->>R: Create netns
-    R->>C: ADD(containerID, netns, ifName)
-    C->>A: Allocate/program state nếu cần
-    C-->>R: IPs, routes, DNS
-    R-->>K: Sandbox ready
-    Note over K,R: Containers start sau khi network setup thành công
-    K->>R: Stop/Remove sandbox
-    R->>C: DEL
+```d2 title="2. CNI nằm ở đâu trong Pod lifecycle"
+shape: sequence_diagram
+K: "kubelet"
+R: "CRI runtime"
+C: "CNI"
+A: "CNI agent/controller"
+K -> R: "RunPodSandbox"
+R -> R: "Create netns"
+R -> C: "ADD(containerID, netns, ifName)"
+C -> A: "Allocate/program state nếu cần"
+C -> R: "IPs, routes, DNS" {style.stroke-dash: 4}
+R -> K: "Sandbox ready" {style.stroke-dash: 4}
+K."Containers start sau khi network\nsetup thành công"
+K -> R: "Stop/Remove sandbox"
+R -> C: "DEL"
 ```
 
 Từ Kubernetes 1.24, các kubelet flag cũ như `--network-plugin` và `--cni-bin-dir` đã bị loại bỏ; runtime chịu trách nhiệm CNI integration.

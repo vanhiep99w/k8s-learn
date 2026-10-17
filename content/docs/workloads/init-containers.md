@@ -26,11 +26,15 @@ description: "Dùng Init Containers để chuẩn bị dữ liệu, chờ depend
 
 Init Containers là các container chạy **trước** application containers. Chúng phù hợp với công việc chuẩn bị cục bộ cho một Pod: tạo file cấu hình, đổi permission, tải artifact hoặc kiểm tra dependency tối thiểu.
 
-```text
-init-1 ──success──▶ init-2 ──success──▶ app containers start
-   │                    │
- failure              failure
-   └──── retry            └──── retry
+```d2 title="Tổng quan"
+direction: right
+first: init-1
+second: init-2
+app: app containers start
+first -> second: success
+second -> app: success
+first -> first: failure / retry
+second -> second: failure / retry
 ```
 
 Mỗi init container thông thường phải hoàn thành thành công theo thứ tự khai báo. Nếu init container chưa hoàn tất, application containers chưa chạy.
@@ -57,14 +61,12 @@ Application container không chạy song song với init container thông thư�
 
 Filesystem riêng của init container biến mất khi container kết thúc, nhưng dữ liệu ghi vào shared volume vẫn còn:
 
-```text
-init container writes /work/config.json
-             │
-             ▼
-         emptyDir volume
-             │
-             ▼
-app reads /app/config/config.json
+```d2 title="1.1 Dữ liệu tồn tại qua bước init"
+direction: right
+init: init container writes /work/config.json
+volume: emptyDir volume
+app: app reads /app/config/config.json
+init -> volume -> app
 ```
 
 ---

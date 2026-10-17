@@ -29,20 +29,16 @@ description: "Giải thích scheduling cycle, filtering, scoring, binding, resou
 
 `kube-scheduler` quan sát Pod chưa được gán Node và chọn Node phù hợp nhất. Quyết định này dựa trên resource requests, policy và trạng thái snapshot của cluster tại thời điểm scheduling.
 
-```text
-Unscheduled Pod
-      │
-      ▼
-Scheduling Queue
-      │
-      ▼
-Filter Nodes ──▶ Score feasible Nodes ──▶ Select Node
-                                              │
-                                              ▼
-                                      Reserve/Permit/Bind
-                                              │
-                                              ▼
-                                      Pod.spec.nodeName
+```d2 title="Tổng quan"
+direction: right
+pod: Unscheduled Pod
+queue: Scheduling Queue
+filter: Filter Nodes
+score: Score feasible Nodes
+select: Select Node
+bind: Reserve/Permit/Bind
+node: Pod.spec.nodeName
+pod -> queue -> filter -> score -> select -> bind -> node
 ```
 
 > [!IMPORTANT]
@@ -76,22 +72,21 @@ Cluster Autoscaler có thể phản ứng khi Pod unschedulable bằng cách tă
 
 ## 2. Scheduling cycle từ đầu đến cuối
 
-```mermaid
-sequenceDiagram
-    participant API as API Server
-    participant Q as Scheduling Queue
-    participant S as Scheduler
-    participant N as Node snapshot
-    participant K as kubelet
-
-    API-->>Q: Pod without nodeName
-    Q-->>S: Next Pod
-    S->>N: Filter Nodes
-    N-->>S: Feasible Nodes
-    S->>N: Score and normalize
-    S->>S: Select highest score
-    S->>API: Reserve/Permit/PreBind/Bind
-    API-->>K: Pod assigned to this Node
+```d2 title="2. Scheduling cycle từ đầu đến cuối"
+shape: sequence_diagram
+API: "API Server"
+Q: "Scheduling Queue"
+S: "Scheduler"
+N: "Node snapshot"
+K: "kubelet"
+API -> Q: "Pod without nodeName" {style.stroke-dash: 4}
+Q -> S: "Next Pod" {style.stroke-dash: 4}
+S -> N: "Filter Nodes"
+N -> S: "Feasible Nodes" {style.stroke-dash: 4}
+S -> N: "Score and normalize"
+S -> S: "Select highest score"
+S -> API: "Reserve/Permit/PreBind/Bind"
+API -> K: "Pod assigned to this Node" {style.stroke-dash: 4}
 ```
 
 Scheduling Framework chia xử lý thành hai phase lớn:
@@ -283,13 +278,19 @@ PersistentVolume có thể chỉ dùng được trong zone cụ thể. `WaitForF
 
 Khi Pod priority cao không schedule được, scheduler có thể chọn victim Pods priority thấp để tạo chỗ, nếu preemption giúp giải quyết constraint.
 
-```text
-High-priority Pod unschedulable
-  → evaluate candidate Nodes
-  → identify lower-priority victims
-  → nominate Node
-  → evict/delete victims through control flow
-  → schedule when resources become available
+```d2 title="9. Preemption và priority"
+direction: right
+n1: "High-priority Pod unschedulable"
+n2: "evaluate candidate Nodes"
+n3: "identify lower-priority victims"
+n4: "nominate Node"
+n5: "evict/delete victims through control\nflow"
+n6: "schedule when resources become available"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
 ```
 
 Preemption không giải quyết:

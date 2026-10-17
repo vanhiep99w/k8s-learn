@@ -28,9 +28,18 @@ description: "Phân biệt emptyDir, local ephemeral storage, projected, CSI inl
 
 Ephemeral Volume đi theo lifecycle của Pod. Nó phù hợp với scratch data, cache có thể tái tạo, file trao đổi giữa sidecar và application, hoặc dữ liệu đầu vào read-only. Khi Pod bị xóa, Kubernetes không hứa giữ dữ liệu để Pod kế tiếp dùng lại.
 
-```text
-Pod được tạo → Ephemeral Volume được chuẩn bị → containers sử dụng
-Pod bị xóa  → Volume được dọn            → dữ liệu không còn contract tồn tại
+```d2 title="Tổng quan"
+direction: right
+n1: "Pod được tạo"
+n2: "Ephemeral Volume được chuẩn bị"
+n3: "containers sử dụng"
+n4: "Pod bị xóa"
+n5: "Volume được dọn"
+n6: "dữ liệu không còn contract tồn tại"
+n1 -> n2
+n2 -> n3
+n4 -> n5
+n5 -> n6
 ```
 
 Điểm chung là lifecycle, không phải backing storage. Một ephemeral Volume có thể nằm trên Node disk, RAM, storage do CSI driver chuẩn bị hoặc một PVC tự động được tạo rồi garbage-collect.
@@ -196,20 +205,20 @@ spec:
 
 Thay `scratch-class` bằng StorageClass hỗ trợ dynamic provisioning. Controller tạo PVC cùng Namespace, tên mặc định theo `<pod-name>-<volume-name>`, và đặt Pod làm owner. Khi Pod bị xóa, garbage collector xóa PVC.
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant A as API Server
-    participant E as Ephemeral controller
-    participant P as CSI provisioner
-    U->>A: Create Pod với volumeClaimTemplate
-    E->>A: Create PVC, owner=Pod
-    P->>P: Create backing volume
-    P->>A: Create PV và bind PVC
-    A-->>U: Pod có thể mount Volume
-    U->>A: Delete Pod
-    E->>A: Garbage collection PVC
-    P->>P: Reclaim theo PV/StorageClass policy
+```d2 title="6. Generic ephemeral Volume"
+shape: sequence_diagram
+U: "User"
+A: "API Server"
+E: "Ephemeral controller"
+P: "CSI provisioner"
+U -> A: "Create Pod với volumeClaimTemplate"
+E -> A: "Create PVC, owner=Pod"
+P -> P: "Create backing volume"
+P -> A: "Create PV và bind PVC"
+A -> U: "Pod có thể mount Volume" {style.stroke-dash: 4}
+U -> A: "Delete Pod"
+E -> A: "Garbage collection PVC"
+P -> P: "Reclaim theo PV/StorageClass policy"
 ```
 
 `reclaimPolicy: Retain` có thể làm backing asset sống sau PVC. Khi đó Volume chỉ “ephemeral” ở API ownership; operator phải dọn asset và chi phí còn lại.

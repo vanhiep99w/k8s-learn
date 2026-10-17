@@ -28,13 +28,19 @@ description: "Hiểu Kubernetes Secret từ data model, cách mount/inject, upda
 
 Secret là namespaced API object chứa lượng nhỏ dữ liệu nhạy cảm như password, token, private key hoặc certificate. Secret tách credential khỏi image và Pod template, cho phép quản lý lifecycle độc lập.
 
-```mermaid
-flowchart LR
-    V[Vault / secret source] --> O[Operator hoặc pipeline]
-    O --> S[Kubernetes Secret]
-    S --> K[kubelet trên Node chạy Pod]
-    K --> P[Volume hoặc environment]
-    P --> A[Application]
+```d2 title="Tổng quan"
+direction: right
+V: "Vault / secret source"
+O: "Operator hoặc pipeline"
+S: "Kubernetes Secret"
+K: "kubelet trên Node chạy Pod"
+P: "Volume hoặc environment"
+A: "Application"
+V -> O
+O -> S
+S -> K
+K -> P
+P -> A
 ```
 
 Secret giống ConfigMap về cách consume nhưng có semantics và integration dành cho dữ liệu nhạy cảm.
@@ -175,19 +181,31 @@ Bảng sau nhóm các type theo **thành phần sử dụng**, vì đó là khá
 
 Có thể chia bảng thành ba nhóm để dễ nhớ:
 
-```text
-Credential của application
-├── Opaque
-├── basic-auth
-├── ssh-auth
-└── tls
-
-Credential để Kubernetes thực hiện việc thay Pod
-└── dockerconfigjson / dockercfg → kubelet pull image
-
-Credential phục vụ chính Kubernetes
-├── service-account-token → workload identity kiểu legacy
-└── bootstrap token       → Node tham gia cluster
+```d2 title="3.1 Chọn type nào?"
+direction: right
+n1: "Credential của application"
+n2: "Opaque"
+n3: "basic-auth"
+n4: "ssh-auth"
+n5: "tls"
+n6: "Credential để Kubernetes thực hiện việc\nthay Pod"
+n7: "dockerconfigjson / dockercfg"
+n8: "kubelet pull image"
+n9: "Credential phục vụ chính Kubernetes"
+n10: "service-account-token"
+n11: "workload identity kiểu legacy"
+n12: "bootstrap token"
+n13: "Node tham gia cluster"
+n1 -> n2
+n1 -> n3
+n1 -> n4
+n1 -> n5
+n7 -> n8
+n6 -> n7
+n10 -> n11
+n9 -> n10
+n12 -> n13
+n9 -> n12
 ```
 
 ### 3.2 `Opaque`: lựa chọn mặc định cho application
@@ -338,14 +356,15 @@ data:
 
 Khai báo type này **không tự bật HTTPS**. Một consumer phải tham chiếu Secret, ví dụ Ingress controller đọc `tls.crt`/`tls.key`, hoặc Pod mount hai key thành file:
 
-```text
-TLS Secret được tạo
-        ↓
-Ingress/Pod tham chiếu Secret
-        ↓
-consumer nạp certificate + private key
-        ↓
-consumer mở TLS listener
+```d2 title="3.5 `kubernetes.io/tls`: certificate và private key theo cặp"
+direction: down
+n1: "TLS Secret được tạo"
+n2: "Ingress/Pod tham chiếu Secret"
+n3: "consumer nạp certificate + private key"
+n4: "consumer mở TLS listener"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 API server yêu cầu hai key tồn tại nhưng không thay thế quy trình certificate validation của consumer. Cần kiểm tra tối thiểu:
@@ -371,16 +390,17 @@ Command này vẫn yêu cầu quyền đọc Secret. Không dùng nó trong CI l
 
 Đây là type dễ nhầm nhất vì application container thường **không đọc Secret**. Consumer thực sự là kubelet trên Node:
 
-```text
-Pod.imagePullSecrets
-        ↓
-kubelet lấy Secret cùng Namespace
-        ↓
-đọc key .dockerconfigjson
-        ↓
-authenticate với registry và pull image
-        ↓
-container mới có thể start
+```d2 title="3.6 `kubernetes.io/dockerconfigjson`: credential để kubelet pull image"
+direction: down
+n1: "Pod.imagePullSecrets"
+n2: "kubelet lấy Secret cùng Namespace"
+n3: "đọc key .dockerconfigjson"
+n4: "authenticate với registry và pull image"
+n5: "container mới có thể start"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Secret chứa một key tên chính xác là `.dockerconfigjson`; value sau khi decode có cấu trúc tương tự `$HOME/.docker/config.json`:
@@ -449,14 +469,15 @@ type: kubernetes.io/service-account-token
 
 Lifecycle khác Secret thông thường:
 
-```text
-Tạo ServiceAccount
-        ↓
-Tạo Secret có annotation trỏ tới ServiceAccount
-        ↓
-controller xác minh ServiceAccount
-        ↓
-controller điền annotation UID, token và CA data
+```d2 title="3.7 `kubernetes.io/service-account-token`: long-lived token kiểu legacy"
+direction: down
+n1: "Tạo ServiceAccount"
+n2: "Tạo Secret có annotation trỏ tới\nServiceAccount"
+n3: "controller xác minh ServiceAccount"
+n4: "controller điền annotation UID, token và\nCA data"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 API server chỉ yêu cầu annotation `kubernetes.io/service-account.name`; token chưa cần tồn tại lúc tạo vì controller sẽ bổ sung sau. Nếu ServiceAccount sai tên hoặc controller không hoạt động, Secret có thể tồn tại nhưng không có token dùng được.
@@ -495,18 +516,19 @@ Secret tương ứng thường:
 
 Luồng sử dụng điển hình:
 
-```text
-Cluster admin tạo bootstrap token có TTL ngắn
-        ↓
-Node mới dùng token để bắt đầu xác thực
-        ↓
-Node xác minh cluster identity và gửi CSR
-        ↓
-CSR được approve theo policy
-        ↓
-Node nhận credential dài hạn riêng
-        ↓
-bootstrap token hết hạn hoặc bị thu hồi
+```d2 title="3.8 `bootstrap.kubernetes.io/token`: đưa Node mới vào cluster"
+direction: down
+n1: "Cluster admin tạo bootstrap token có TTL\nngắn"
+n2: "Node mới dùng token để bắt đầu xác thực"
+n3: "Node xác minh cluster identity và gửi\nCSR"
+n4: "CSR được approve theo policy"
+n5: "Node nhận credential dài hạn riêng"
+n6: "bootstrap token hết hạn hoặc bị thu hồi"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
 ```
 
 Bootstrap token chỉ là credential khởi đầu; an toàn của quy trình còn phụ thuộc CA pinning/discovery, CSR approval và việc thu hồi token. Không đưa token vào image hoặc manifest dùng lại lâu dài. Ưu tiên để cluster lifecycle tooling tạo token với TTL và audit phù hợp thay vì tự author Secret.
@@ -663,10 +685,13 @@ File mode được áp dụng trong volume nhưng runtime user/group và `fsGrou
 
 Volume được khai báo cấp Pod nhưng chỉ container có `volumeMount` mới thấy path đó:
 
-```text
-Pod
-├── frontend: không mount signing-key
-└── signer: mount signing-key read-only
+```d2 title="5.4 Chỉ expose cho container cần dùng"
+direction: right
+n1: "Pod"
+n2: "frontend: không mount signing-key"
+n3: "signer: mount signing-key read-only"
+n1 -> n2
+n1 -> n3
 ```
 
 Việc tách container giảm exposure nếu frontend bị path traversal/RCE, nhưng hai container vẫn chia sẻ network và một số Pod boundaries; cần hardening bổ sung.
@@ -702,17 +727,17 @@ Projected volume có độ trễ kubelet sync + cache/watch propagation. Không 
 
 Database password rotation an toàn thường là:
 
-```mermaid
-sequenceDiagram
-    participant DB as Database
-    participant SM as Secret manager
-    participant K as Kubernetes
-    participant A as Application
-    DB->>DB: Tạo credential mới song song
-    SM->>K: Publish version mới
-    K->>A: Rollout/reload
-    A->>DB: Xác minh dùng credential mới
-    DB->>DB: Thu hồi credential cũ
+```d2 title="6.2 Rotation không chỉ là “đổi Secret”"
+shape: sequence_diagram
+DB: "Database"
+SM: "Secret manager"
+K: "Kubernetes"
+A: "Application"
+DB -> DB: "Tạo credential mới song song"
+SM -> K: "Publish version mới"
+K -> A: "Rollout/reload"
+A -> DB: "Xác minh dùng credential mới"
+DB -> DB: "Thu hồi credential cũ"
 ```
 
 Cần overlap window hoặc dual credentials. Nếu revoke cũ trước khi tất cả Pods reload, request sẽ lỗi. Theo dõi rollout, authentication failure và version adoption.

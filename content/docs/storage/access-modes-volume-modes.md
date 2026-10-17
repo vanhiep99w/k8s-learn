@@ -118,27 +118,32 @@ Cả PVC và PersistentVolume (PV) đều có thông tin về mode, nhưng vai t
 
 Với static provisioning, binder so sánh PVC và PV:
 
-```text
-PVC yêu cầu: RWO + Filesystem + 20Gi
-                     │
-                     ▼
-PV cung cấp: RWO + Filesystem + 50Gi
-                     │
-                     ▼
-                   Bind
+```d2 title="2. Access mode nằm ở đâu trong luồng PVC và PV"
+direction: down
+n1: "PVC yêu cầu: RWO + Filesystem + 20Gi"
+n2: "PV cung cấp: RWO + Filesystem + 50Gi"
+n3: "Bind"
+n1 -> n2
+n2 -> n3
 ```
 
 Nếu mode không tương thích, PVC tiếp tục `Pending` dù class và dung lượng có vẻ đúng.
 
 Với dynamic provisioning, provisioner nhận yêu cầu từ PVC và tạo volume/PV có capability phù hợp, nếu driver/backend hỗ trợ.
 
-```mermaid
-flowchart LR
-    C[PVC yêu cầu mode] --> P[Binder hoặc CSI provisioner]
-    V[PV/backend capability] --> P
-    P --> M{Mode tương thích?}
-    M -->|Có| B[PV và PVC Bound]
-    M -->|Không| F[PVC Pending hoặc provisioning fail]
+```d2 title="2. Access mode nằm ở đâu trong luồng PVC và PV"
+direction: right
+C: "PVC yêu cầu mode"
+P: "Binder hoặc CSI provisioner"
+V: "PV/backend capability"
+M: "Mode tương thích?" {shape: diamond}
+B: "PV và PVC Bound"
+F: "PVC Pending hoặc provisioning fail"
+C -> P
+V -> P
+P -> M
+M -> B: "Có"
+M -> F: "Không"
 ```
 
 ### Một volume chỉ bind với một PVC
@@ -164,22 +169,34 @@ Một PV có thể quảng bá nhiều access mode mà backend hỗ trợ, nhưn
 
 ### Hình dung theo Node và Pod
 
-```text
-RWO
-Node A: Pod 1 ─┐
-        Pod 2 ─┴─ volume read-write
-Node B: không đồng thời mount read-write volume đó
-
-ROX
-Node A: Pod 1 ─── volume read-only
-Node B: Pod 2 ─── volume read-only
-
-RWX
-Node A: Pod 1 ─── volume read-write
-Node B: Pod 2 ─── volume read-write
-
-RWOP
-Node A hoặc B: chỉ một Pod được dùng volume
+```d2 title="Hình dung theo Node và Pod"
+direction: down
+grid-columns: 2
+rwo: RWO {
+  a: "Node A\nPod 1 + Pod 2"
+  v: volume
+  b: "Node B\nkhông đồng thời mount\nread-write volume đó"
+  a -> v: read-write
+}
+rox: ROX {
+  a: Node A / Pod 1
+  b: Node B / Pod 2
+  v: volume
+  a -> v: read-only
+  b -> v: read-only
+}
+rwx: RWX {
+  a: Node A / Pod 1
+  b: Node B / Pod 2
+  v: volume
+  a -> v: read-write
+  b -> v: read-write
+}
+rwop: RWOP {
+  pod: "Node A hoặc B\nchỉ một Pod"
+  v: volume
+  pod -> v: read-write
+}
 ```
 
 Backend/CSI driver quyết định mode nào khả dụng. Ví dụ phổ biến:
@@ -206,10 +223,15 @@ Ngay cả ROX cũng không nên được xem là security boundary duy nhất. N
 
 `ReadWriteOnce` nói về **một Node**. Nhiều Pod trên cùng Node vẫn có thể cùng mount và ghi volume RWO:
 
-```text
-Node worker-a
-├── Pod database-old ─┐
-└── Pod database-new ─┴─ PVC RWO
+```d2 title="4. RWO không có nghĩa là chỉ một Pod"
+direction: right
+node: Node worker-a {
+  old: Pod database-old
+  new: Pod database-new
+  pvc: PVC RWO
+  old -> pvc
+  new -> pvc
+}
 ```
 
 Vì vậy, RWO không phải singleton lock. Những tình huống có thể tạo nhiều Pod gồm:
@@ -650,16 +672,17 @@ kubectl delete namespace block-mode-lab
 
 Mode ảnh hưởng nhiều giai đoạn khác nhau:
 
-```text
-PVC/PV binding
-      ↓
-Scheduler chọn Node phù hợp topology
-      ↓
-Controller/CSI attach volume nếu cần
-      ↓
-Kubelet/CSI node plugin mount hoặc map device
-      ↓
-Application thực hiện I/O
+```d2 title="13. Scheduling, attach và concurrent access"
+direction: down
+n1: "PVC/PV binding"
+n2: "Scheduler chọn Node phù hợp topology"
+n3: "Controller/CSI attach volume nếu cần"
+n4: "Kubelet/CSI node plugin mount hoặc map\ndevice"
+n5: "Application thực hiện I/O"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 | Giai đoạn | Mode ảnh hưởng thế nào | Lỗi thường thấy |

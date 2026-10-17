@@ -45,12 +45,17 @@ https://shop.example.com/api    → Service api:80
 
 Ingress giải quyết bài toán này bằng các rule hiểu HTTP: **hostname nào**, **path nào** và **Service backend nào**. Thay vì tạo một public load balancer riêng cho từng Service, nhiều Service có thể dùng chung entry point HTTP/HTTPS.
 
-```mermaid
-flowchart LR
-    C[Client ngoài cluster] --> A[Địa chỉ public của controller]
-    A -->|Host shop.example.com, path /api| I[Ingress rule]
-    I --> S[Service api port 80]
-    S --> P[Pod ready port 8080]
+```d2 title="Ingress giải quyết vấn đề gì?"
+direction: right
+C: "Client ngoài cluster"
+A: "Địa chỉ public của controller"
+I: "Ingress rule"
+S: "Service api port 80"
+P: "Pod ready port 8080"
+C -> A
+A -> I: "Host shop.example.com, path /api"
+I -> S
+S -> P
 ```
 
 Ingress phù hợp với HTTP và HTTPS. Nó không phải API chung để expose mọi TCP/UDP port. Với protocol khác, thường cần `Service` type `LoadBalancer`, `NodePort`, Gateway API phù hợp hoặc extension riêng của controller.
@@ -73,13 +78,19 @@ Từ “Ingress” thường được dùng cho hai thứ khác nhau. Phân bi�
 
 Hãy hình dung `Ingress` resource là **bản hướng dẫn**, còn Ingress controller là **người thực hiện bản hướng dẫn đó**.
 
-```mermaid
-flowchart LR
-    M[Ingress YAML] --> API[Kubernetes API]
-    API -->|watch| CTL[Ingress controller]
-    CTL -->|cấu hình| DP[Proxy hoặc cloud load balancer]
-    CL[Client] --> DP
-    DP --> S[Service backend]
+```d2 title="Hai mảnh ghép bắt buộc"
+direction: right
+M: "Ingress YAML"
+API: "Kubernetes API"
+CTL: "Ingress controller"
+DP: "Proxy hoặc cloud load balancer"
+CL: "Client"
+S: "Service backend"
+M -> API
+API -> CTL: "watch"
+CTL -> DP: "cấu hình"
+CL -> DP
+DP -> S
 ```
 
 Control flow ở nửa trên cập nhật cấu hình. Traffic flow ở nửa dưới vận chuyển request. Request của người dùng không đi “qua” object YAML hoặc API server.
@@ -123,30 +134,33 @@ https://shop.example.com/api/orders?id=42
 7. Service và EndpointSlice cho biết các backend ready, ví dụ Pod `10.244.2.15:8080`.
 8. Data plane forward request tới một backend rồi trả response về client.
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant D as DNS
-    participant IC as Ingress data plane
-    participant S as Service api:80
-    participant P as Pod api:8080
-    C->>D: shop.example.com là địa chỉ nào?
-    D-->>C: địa chỉ public của Ingress
-    C->>IC: HTTPS /api/orders, Host shop.example.com
-    IC->>IC: match host + path, terminate TLS
-    IC->>S: chọn backend Service api:80
-    S->>P: forward tới endpoint ready
-    P-->>C: HTTP response
+```d2 title="Một request đi qua Ingress như thế nào?"
+shape: sequence_diagram
+C: "Client"
+D: "DNS"
+IC: "Ingress data plane"
+S: "Service api:80"
+P: "Pod api:8080"
+C -> D: "shop.example.com là địa chỉ nào?"
+D -> C: "địa chỉ public của Ingress" {style.stroke-dash: 4}
+C -> IC: "HTTPS /api/orders, Host\nshop.example.com"
+IC -> IC: "match host + path, terminate TLS"
+IC -> S: "chọn backend Service api:80"
+S -> P: "forward tới endpoint ready"
+P -> C: "HTTP response" {style.stroke-dash: 4}
 ```
 
 Sơ đồ dùng Service như một bước logic. Controller cụ thể có thể gọi Service `ClusterIP`, hoặc đọc EndpointSlice rồi gọi Pod trực tiếp. Điều được Ingress API đảm bảo là rule reference **Service và Service port**; packet flow chi tiết phụ thuộc controller.
 
 Một cách nhớ ngắn gọn:
 
-```text
-DNS tìm entry point
-→ Ingress chọn Service bằng host/path
-→ Service chọn Pod ready
+```d2 title="Một request đi qua Ingress như thế nào?"
+direction: right
+n1: "DNS tìm entry point"
+n2: "Ingress chọn Service bằng host/path"
+n3: "Service chọn Pod ready"
+n1 -> n2
+n2 -> n3
 ```
 
 ## Đọc một Ingress manifest từ URL
@@ -376,8 +390,13 @@ curl -sv --resolve shop.example.com:80:203.0.113.10 \
 
 **TLS termination** nghĩa là client thiết lập HTTPS tới Ingress data plane; controller giải mã TLS, đọc HTTP host/path rồi thường forward HTTP plaintext tới backend.
 
-```text
-Client == HTTPS ==> Ingress controller ---- HTTP ----> Service/Pod
+```d2 title="Bật HTTPS bằng TLS termination"
+direction: right
+client: Client
+ingress: Ingress controller
+backend: Service/Pod
+client -> ingress: HTTPS
+ingress -> backend: HTTP
 ```
 
 Đây là behavior mà Ingress API cơ bản giả định. TLS từ controller tới backend, TLS passthrough và mTLS phụ thuộc controller hoặc API khác.
@@ -502,13 +521,19 @@ Application chỉ nên tin các header này khi request đến từ proxy range 
 
 Ingress route tới Service, nhưng Service chỉ hữu ích khi có endpoint sẵn sàng. Chuỗi phụ thuộc là:
 
-```text
-Ingress rule
-→ Service tồn tại và port đúng
-→ selector chọn đúng Pod
-→ readiness thành công
-→ EndpointSlice có endpoint ready
-→ application thực sự listen đúng targetPort
+```d2 title="Backend, readiness và lỗi 503"
+direction: right
+n1: "Ingress rule"
+n2: "Service tồn tại và port đúng"
+n3: "selector chọn đúng Pod"
+n4: "readiness thành công"
+n5: "EndpointSlice có endpoint ready"
+n6: "application thực sự listen đúng\ntargetPort"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
 ```
 
 Kiểm tra chuỗi này:

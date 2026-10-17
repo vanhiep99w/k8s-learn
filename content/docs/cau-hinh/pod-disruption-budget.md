@@ -28,11 +28,21 @@ description: "Thiết kế PodDisruptionBudget cho drain, autoscaler và mainten
 
 PodDisruptionBudget (PDB) giới hạn số Pods của một application có thể bị **voluntary disruption** cùng lúc. Nó phối hợp availability của application với các thao tác quản trị như drain Node hoặc cluster autoscaler scale-down.
 
-```text
-3 Pods, maxUnavailable: 1
-├── 3 healthy → cho phép evict 1
-├── 2 healthy → không cho evict thêm
-└── Pod replacement Ready → cho phép eviction tiếp theo
+```d2 title="Tổng quan"
+direction: right
+n1: "3 Pods, maxUnavailable: 1"
+n2: "3 healthy"
+n3: "cho phép evict 1"
+n4: "2 healthy"
+n5: "không cho evict thêm"
+n6: "Pod replacement Ready"
+n7: "cho phép eviction tiếp theo"
+n2 -> n3
+n1 -> n2
+n4 -> n5
+n1 -> n4
+n6 -> n7
+n1 -> n6
 ```
 
 PDB không giữ Pod luôn chạy. Nó là guard cho **Eviction API**, không phải controller tạo replicas.
@@ -80,23 +90,28 @@ Bảng sau tóm tắt phạm vi bảo vệ của PDB:
 
 ## 2. Eviction API và reconciliation flow
 
-```mermaid
-sequenceDiagram
-    participant O as Operator/drain
-    participant A as API Server
-    participant P as PDB controller/status
-    participant W as Workload controller
-    O->>A: Evict Pod A
-    A->>P: Kiểm tra matching PDB + disruptionsAllowed
-    alt Budget cho phép
-      A-->>O: Eviction accepted
-      A->>A: Pod A terminating
-      W->>A: Tạo replacement Pod
-      P->>P: Chờ replacement Ready
-    else Budget không cho phép
-      A-->>O: 429 Too Many Requests
-      O->>A: Retry sau
-    end
+Chọn scenario để so sánh hai kết quả loại trừ nhau của cùng một yêu cầu eviction.
+
+```d2 mode=tabs title="Eviction API: budget cho phép hoặc từ chối"
+shape: sequence_diagram
+O: "Operator/drain"
+A: "API Server"
+P: "PDB controller/status"
+W: "Workload controller"
+O -> A: "Evict Pod A"
+A -> P: "Kiểm tra matching PDB +\ndisruptionsAllowed"
+scenarios: {
+  "Budget cho phép": {
+    A -> O: "Eviction accepted" {style.stroke-dash: 4}
+    A -> A: "Pod A terminating"
+    W -> A: "Tạo replacement Pod"
+    P -> P: "Chờ replacement Ready"
+  }
+  "Budget không cho phép": {
+    A -> O: "429 Too Many Requests" {style.stroke-dash: 4}
+    O -> A: "Retry sau"
+  }
+}
 ```
 
 Eviction là policy-aware delete request. Client nên retry có backoff khi `429`, không bypass bằng delete trừ runbook được phê duyệt.
@@ -176,8 +191,15 @@ Một Pod match nhiều PDB phải thỏa tất cả budget khi eviction, dễ l
 
 PDB coi Pod healthy khi condition `Ready=True`. Vì vậy readiness probe ảnh hưởng trực tiếp `currentHealthy`.
 
-```text
-Probe sai → Pod NotReady → disruptionsAllowed giảm về 0 → drain bị kẹt
+```d2 title="4.3 Healthy nghĩa là Ready"
+direction: right
+n1: "Probe sai"
+n2: "Pod NotReady"
+n3: "disruptionsAllowed giảm về 0"
+n4: "drain bị kẹt"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 PDB không tự kiểm tra business health ngoài Pod Ready condition.

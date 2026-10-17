@@ -27,10 +27,15 @@ description: "Hướng dẫn cài kubectl, Docker và kind để tạo local Kub
 
 Môi trường được khuyến nghị cho phần lớn lab trong repo:
 
-```text
-Laptop → Docker hoặc Podman → kind nodes → Kubernetes cluster
-                                      ↑
-                                   kubectl
+```d2 title="Tổng quan"
+direction: right
+laptop: Laptop
+engine: Docker hoặc Podman
+nodes: kind nodes
+cluster: Kubernetes cluster
+kubectl: kubectl
+laptop -> engine -> nodes -> cluster
+kubectl -> nodes
 ```
 
 `kind` là viết tắt của **Kubernetes IN Docker**. Mỗi Kubernetes Node được chạy dưới dạng Container. Cách này nhanh, dễ tạo lại và phù hợp để học API, workloads, networking cơ bản, security và troubleshooting.

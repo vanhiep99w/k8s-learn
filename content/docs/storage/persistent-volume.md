@@ -37,11 +37,11 @@ Kubernetes cần một object để biết storage asset đó là gì, có dung 
 
 Điểm dễ nhầm nhất là: **PV không chứa bytes dữ liệu trong API server**. Dữ liệu thật nằm trên storage backend. PV chỉ lưu thông tin để Kubernetes và storage driver tìm, bind, attach, mount và reclaim asset đó.
 
-```text
-Storage backend asset        PersistentVolume
-cloud disk / NFS / SAN  <──>  hồ sơ trong Kubernetes
-chứa bytes dữ liệu            chứa capacity, mode, class,
-                              topology, volume handle,...
+```d2 title="Tổng quan"
+direction: right
+asset: "Storage backend asset\ncloud disk / NFS / SAN\nchứa bytes dữ liệu" {shape: cylinder}
+pv: "PersistentVolume\nhồ sơ trong Kubernetes\ncapacity, mode, class, topology,\nvolume handle,…"
+asset -- pv: đại diện
 ```
 
 Nếu chỉ nhớ năm điều, hãy nhớ:
@@ -90,13 +90,19 @@ Storage model đầy đủ có các thành phần sau:
 
 Quan hệ giữa chúng:
 
-```mermaid
-flowchart LR
-    B[Storage backend asset] <--> D[CSI driver]
-    D <--> PV[PersistentVolume cluster-scoped]
-    PV <--> PVC[PersistentVolumeClaim namespaced]
-    PVC --> P[Pod]
-    SC[StorageClass] -. hướng dẫn provision .-> D
+```d2 title="2. Mental model: PV là hồ sơ của storage thật"
+direction: right
+B: "Storage backend asset"
+D: "CSI driver"
+PV: "PersistentVolume cluster-scoped"
+PVC: "PersistentVolumeClaim namespaced"
+P: "Pod"
+SC: "StorageClass"
+B <-> D
+D <-> PV
+PV <-> PVC
+PVC -> P
+SC -> D: "hướng dẫn provision" {style.stroke-dash: 4}
 ```
 
 Có thể đọc sơ đồ từ phải sang trái:
@@ -161,12 +167,13 @@ Administrator thực hiện trước các bước:
 2. Tạo PV mô tả asset đó.
 3. Chờ một PVC phù hợp bind với PV.
 
-```text
-Administrator tạo asset → tạo PV Available
-                               ↓
-                         PVC phù hợp xuất hiện
-                               ↓
-                         PV ↔ PVC Bound
+```d2 title="Static provisioning"
+direction: right
+asset: Administrator tạo asset
+pv: tạo PV Available
+pvc: PVC phù hợp xuất hiện
+bound: PV ↔ PVC Bound
+asset -> pv -> pvc -> bound
 ```
 
 Static provisioning phù hợp khi:
@@ -182,12 +189,17 @@ Static provisioning phù hợp khi:
 
 Application tạo PVC chọn một StorageClass. Provisioner tạo storage asset và PV dành riêng cho PVC đó:
 
-```text
-PVC → StorageClass → CSI provisioner
-                     ├─ tạo backend volume
-                     └─ tạo PV
-                            ↓
-                       PV ↔ PVC Bound
+```d2 title="Dynamic provisioning"
+direction: right
+pvc: PVC
+sc: StorageClass
+provisioner: CSI provisioner
+asset: tạo backend volume
+pv: tạo PV
+bound: PV ↔ PVC Bound
+pvc -> sc -> provisioner
+provisioner -> asset
+provisioner -> pv -> bound
 ```
 
 Dynamic provisioning là cách phổ biến cho application self-service. Application bundle thường khai báo PVC, không khai báo PV vendor-specific.
@@ -198,14 +210,20 @@ Xem luồng controller chi tiết tại [Dynamic Provisioning](/storage/dynamic-
 
 PVC mô tả nhu cầu; control plane tìm PV phù hợp hoặc yêu cầu provisioner tạo PV mới. Khi match thành công, PV và PVC bind độc quyền với nhau.
 
-```mermaid
-flowchart TD
-    C[PVC mới] --> M{Có PV phù hợp?}
-    M -->|Có| B[Bind PV với PVC]
-    M -->|Không| D{Có dynamic provisioner phù hợp?}
-    D -->|Có| N[Tạo backend volume và PV mới]
-    N --> B
-    D -->|Không| P[PVC tiếp tục Pending]
+```d2 title="5. PV bind với PVC như thế nào"
+direction: down
+C: "PVC mới"
+M: "Có PV phù hợp?" {shape: diamond}
+B: "Bind PV với PVC"
+D: "Có dynamic provisioner phù hợp?" {shape: diamond}
+N: "Tạo backend volume và PV mới"
+P: "PVC tiếp tục Pending"
+C -> M
+M -> B: "Có"
+M -> D: "Không"
+D -> N: "Có"
+N -> B
+D -> P: "Không"
 ```
 
 Với PV tĩnh, binder xét các điều kiện chính:
@@ -311,15 +329,21 @@ Không tự sửa `volumeHandle` để trỏ sang disk khác. Mapping sai có th
 
 PV đi qua các trạng thái chính:
 
-```text
-Provisioning
-    ↓
-Available ── bind PVC ──> Bound ── xóa PVC ──> Released
-                                                    │
-                                                    ├─ Retain: xử lý thủ công
-                                                    └─ Delete: xóa asset/PV
-
-Automated reclaim lỗi ──> Failed
+```d2 title="7. Lifecycle và phase của PV"
+direction: right
+provisioning: Provisioning
+available: Available
+bound: Bound
+released: Released
+retain: "Retain\nxử lý thủ công"
+delete: "Delete\nxóa asset/PV"
+failed: Failed
+provisioning -> available
+available -> bound: bind PVC
+bound -> released: xóa PVC
+released -> retain
+released -> delete
+released -> failed: Automated reclaim lỗi {style.stroke-dash: 4}
 ```
 
 | Phase | Ý nghĩa | Hành động thường gặp |
@@ -355,8 +379,13 @@ persistentVolumeReclaimPolicy: Delete
 
 Với driver hỗ trợ, luồng thường là:
 
-```text
-Xóa PVC → xóa backing storage asset → xóa PV
+```d2 title="Delete"
+direction: right
+n1: "Xóa PVC"
+n2: "xóa backing storage asset"
+n3: "xóa PV"
+n1 -> n2
+n2 -> n3
 ```
 
 PV được dynamic provision kế thừa policy từ StorageClass; StorageClass mặc định dùng `Delete` nếu không khai báo `reclaimPolicy`.
@@ -371,11 +400,13 @@ persistentVolumeReclaimPolicy: Retain
 
 Luồng thường là:
 
-```text
-Xóa PVC → PV Released → PV và backing asset còn lại
-                         ↓
-                 operator quyết định recover,
-                    sanitize hoặc delete
+```d2 title="Retain"
+direction: right
+delete: Xóa PVC
+released: PV Released
+retained: PV và backing asset còn lại
+operator: operator quyết định recover / sanitize / delete
+delete -> released -> retained -> operator
 ```
 
 `Retain` tạo cơ hội phục hồi thủ công nhưng không phải backup. Volume vẫn có thể hỏng hoặc bị xóa ngoài Kubernetes, đồng thời tiếp tục phát sinh chi phí.
@@ -565,12 +596,13 @@ kubectl get pv "$PV" \
 
 Đây là trace cần hiểu:
 
-```text
-PVC storage-lab/pv-observe
-          ↓ bind
-PV pvc-<uid>
-          ↓ csi.volumeHandle
-storage asset thật trên backend
+```d2 title="11. Thực hành quan sát một PV động"
+direction: right
+pvc: PVC storage-lab/pv-observe
+pv: PV pvc-<uid>
+asset: storage asset thật trên backend
+pvc -- pv: bind
+pv -> asset: csi.volumeHandle
 ```
 
 Trước cleanup, xem reclaim policy và xác nhận dữ liệu lab không cần giữ:

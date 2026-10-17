@@ -1,7 +1,7 @@
 ---
 name: write-docs
 description: >
-  Hướng dẫn tạo mới, mở rộng và review tài liệu kỹ thuật tiếng Việt có độ chi tiết cao, mạch đọc tự nhiên, cấu trúc dễ theo dõi và ví dụ có thể kiểm chứng. Dùng khi viết hoặc cải thiện Markdown/MDX trong content/docs, tổ chức navigation Fumadocs, sử dụng Callout/Cards/Steps/Tabs/Accordion/TypeTable/Mermaid, hoặc kiểm tra chất lượng và build website tài liệu Next.js + Fumadocs + Cloudflare. Mỗi tài liệu được quyết định phạm vi và độ dài độc lập; không áp giới hạn độ dài và không rút gọn để giống tài liệu khác.
+  Hướng dẫn tạo mới, mở rộng và review tài liệu kỹ thuật tiếng Việt có độ chi tiết cao, mạch đọc tự nhiên, cấu trúc dễ theo dõi và ví dụ có thể kiểm chứng. Dùng khi viết hoặc cải thiện Markdown/MDX trong content/docs, tổ chức navigation Fumadocs, sử dụng Callout/Cards/Steps/Tabs/Accordion/TypeTable/D2 và docs-kit, hoặc kiểm tra chất lượng và build website tài liệu Next.js + Fumadocs + Cloudflare. Mỗi tài liệu được quyết định phạm vi và độ dài độc lập; không áp giới hạn độ dài và không rút gọn để giống tài liệu khác.
 ---
 
 # write-docs
@@ -87,11 +87,11 @@ Xem tiêu chí và ví dụ chi tiết trong [`references/writing-quality.md`](r
 - Giải thích mục đích trước code, chú thích field không hiển nhiên, rồi cung cấp lệnh xác minh và expected result.
 - Dùng placeholder nhất quán và nói rõ giá trị nào phải thay.
 - Dùng table khi người đọc cần so sánh cùng một tập tiêu chí; không dùng table cho prose dài hoặc quy trình tuần tự.
-- Dùng Mermaid cho flow, sequence, state và quan hệ; dùng code block cho config/command; dùng Steps cho quy trình có thứ tự.
+- Ưu tiên D2 (`@vanhiep99w/docs-kit`) cho flow, sequence, state và quan hệ; dùng code block cho config/command/output/cây thư mục; dùng Steps cho quy trình có thứ tự. Không thêm Mermaid vì renderer cũ đã được thay bằng D2.
 - Mỗi diagram phải có đoạn dẫn nhập và phần diễn giải điểm cần quan sát. Không dùng diagram chỉ để trang trí.
 - Nêu trade-off và điều kiện áp dụng; tránh biến recommendation có điều kiện thành quy tắc tuyệt đối.
 
-Đọc [`references/fumadocs-components.md`](references/fumadocs-components.md) khi cần MDX component hoặc Mermaid.
+Đọc [`references/fumadocs-components.md`](references/fumadocs-components.md) khi cần MDX component, D2 hoặc các viewer của docs-kit.
 
 ## Workflow tạo tài liệu mới
 

@@ -30,13 +30,19 @@ Container image cung cấp root filesystem ban đầu, nhưng writable layer c�
 
 Một Pod có thể dùng nhiều Volume; mỗi container tự chọn Volume nào được mount và mount ở đâu:
 
-```text
-Pod
-├── Volume shared-work
-│   ├── mounted /work trong container producer
-│   └── mounted /input trong container consumer
-└── Volume config
-    └── mounted read-only /etc/app trong cả hai container
+```d2 title="Tổng quan"
+direction: right
+n1: "Pod"
+n2: "Volume shared-work"
+n3: "mounted /work trong container producer"
+n4: "mounted /input trong container consumer"
+n5: "Volume config"
+n6: "mounted read-only /etc/app trong cả hai\ncontainer"
+n1 -> n2
+n2 -> n3
+n2 -> n4
+n1 -> n5
+n5 -> n6
 ```
 
 Volume là abstraction ở cấp Pod. `volumeMounts` chỉ xác định Volume được gắn vào đâu trong filesystem của từng container. Việc dữ liệu được lưu ở đâu, có tồn tại sau khi Pod bị xóa hay có thể được truy cập từ nhiều Node hay không phụ thuộc vào **volume type** và storage backend. Chỉ khai báo `volumeMounts` không tự làm cho dữ liệu trở thành persistent storage.
@@ -68,11 +74,15 @@ Khai báo Volume có hai phía:
 1. `.spec.volumes[]` xác định nguồn dữ liệu hoặc storage.
 2. `.spec.containers[].volumeMounts[]` xác định đường dẫn mà từng container nhìn thấy.
 
-```mermaid
-flowchart LR
-    S[Volume source] --> V[spec.volumes name=data]
-    V --> M1[app mountPath=/var/lib/app]
-    V --> M2[sidecar mountPath=/backup readOnly]
+```d2 title="2. Volume được khai báo và mount như thế nào"
+direction: right
+S: "Volume source"
+V: "spec.volumes name=data"
+M1: "app mountPath=/var/lib/app"
+M2: "sidecar mountPath=/backup readOnly"
+S -> V
+V -> M1
+V -> M2
 ```
 
 Tên Volume nối hai phía. `mountPath` không phải đường dẫn trên Node và không tự tạo persistent storage. Khi mount vào một thư mục đã có dữ liệu từ image, mount che nội dung cũ tại đường dẫn đó trong lúc container chạy; dữ liệu image không bị copy tự động vào Volume.

@@ -25,12 +25,15 @@ description: "Hiểu ReplicaSet controller duy trì số Pod, cách selector và
 
 ReplicaSet bảo đảm luôn có một số lượng Pod phù hợp với `spec.replicas` và label selector.
 
-```text
-desired=3
-current matching Pods=2
-         │
-         ▼
-ReplicaSet controller creates 1 Pod
+```d2 title="Tổng quan"
+direction: right
+spec: desired=3
+actual: current matching Pods=2
+controller: ReplicaSet controller
+create: creates 1 Pod
+spec -> controller
+actual -> controller
+controller -> create
 ```
 
 Nếu có 4 matching Pods trong khi desired là 3, controller chọn một Pod để xóa. Đây là reconciliation liên tục, không phải command “tạo ba Pods” chạy một lần.
@@ -50,15 +53,21 @@ ReplicaSet controller lặp lại:
 4. Tạo Pods nếu thiếu hoặc xóa Pods nếu thừa.
 5. Cập nhật status.
 
-```mermaid
-flowchart TD
-    A[ReplicaSet spec replicas=3] --> B[Count matching active Pods]
-    B --> C{Current vs desired}
-    C -- 2 < 3 --> D[Create Pod from template]
-    C -- 4 > 3 --> E[Delete excess Pod]
-    C -- 3 = 3 --> F[No-op]
-    D --> B
-    E --> B
+```d2 title="1. Reconciliation của ReplicaSet"
+direction: down
+A: "ReplicaSet spec replicas=3"
+B: "Count matching active Pods"
+C: "Current vs desired" {shape: diamond}
+D: "Create Pod from template"
+E: "Delete excess Pod"
+F: "No-op"
+A -> B
+B -> C
+C -> D: "2 < 3"
+C -> E: "4 > 3"
+C -> F: "3 = 3"
+D -> B
+E -> B
 ```
 
 ReplicaSet không bảo đảm ba Pod đều Ready. Nó chủ yếu duy trì số Pod; availability phụ thuộc scheduling, image, application và probes.
@@ -258,13 +267,19 @@ Tổng số Pod chạy có thể thành 4, nhưng ReplicaSet chỉ xem 3 Pod cò
 
 Quan hệ:
 
-```text
-Deployment web
-├── ReplicaSet web-7c9... (revision cũ, replicas=0)
-└── ReplicaSet web-65f... (revision mới, replicas=3)
-    ├── Pod
-    ├── Pod
-    └── Pod
+```d2 title="4. ReplicaSet và Deployment"
+direction: right
+n1: "Deployment web"
+n2: "ReplicaSet web-7c9... (revision cũ,\nreplicas=0)"
+n3: "ReplicaSet web-65f... (revision mới,\nreplicas=3)"
+n4: "Pod"
+n5: "Pod"
+n6: "Pod"
+n1 -> n2
+n1 -> n3
+n3 -> n4
+n3 -> n5
+n3 -> n6
 ```
 
 Khi Pod template thay đổi, Deployment tạo ReplicaSet mới và scale giữa ReplicaSets theo strategy. ReplicaSet tự nó không rollout template update theo cách an toàn.
@@ -401,14 +416,17 @@ kubectl delete replicaset web -n workloads-lab
 
 Có thể hình dung như sau:
 
-```text
-Trước khi xóa:
-ReplicaSet/web
-└── Pods owner=ReplicaSet/web
-
-Sau khi xóa mặc định:
-ReplicaSet/web bị xóa
-Pods con cũng bị garbage collector xóa
+```d2 mode=steps title="6.1 Xóa mặc định: ReplicaSet và Pods con đều bị dọn"
+direction: right
+rs: ReplicaSet/web
+pods: Pods owner=ReplicaSet/web
+rs -> pods: ownerReference
+steps: {
+  deleted: {
+    rs: ReplicaSet/web bị xóa
+    pods: Pods con bị garbage collector xóa
+  }
+}
 ```
 
 `kubectl delete` có thể trả về trước khi mọi Pod biến mất hoàn toàn, vì Pod còn trải qua giai đoạn graceful termination. Kiểm tra bằng:
@@ -429,18 +447,26 @@ kubectl delete replicaset web -n workloads-lab --cascade=orphan
 
 Sau thao tác này, trạng thái sẽ giống như:
 
-```text
-Trước khi orphan:
-ReplicaSet/web
-└── web-abc   owner=ReplicaSet/web
-└── web-def   owner=ReplicaSet/web
-└── web-ghi   owner=ReplicaSet/web
-
-Sau khi orphan:
-ReplicaSet/web không còn
-web-abc   owner=<none>   vẫn chạy
-web-def   owner=<none>   vẫn chạy
-web-ghi   owner=<none>   vẫn chạy
+```d2 mode=steps title="6.2 Orphan deletion: xóa ReplicaSet nhưng giữ Pods lại"
+direction: right
+rs: ReplicaSet/web
+a: "web-abc\nowner=ReplicaSet/web"
+b: "web-def\nowner=ReplicaSet/web"
+c: "web-ghi\nowner=ReplicaSet/web"
+rs -> a
+rs -> b
+rs -> c
+steps: {
+  orphan: {
+    rs: ReplicaSet/web không còn
+    a: "web-abc\nowner=<none>, vẫn chạy"
+    b: "web-def\nowner=<none>, vẫn chạy"
+    c: "web-ghi\nowner=<none>, vẫn chạy"
+    (rs -> a)[0]: null
+    (rs -> b)[0]: null
+    (rs -> c)[0]: null
+  }
+}
 ```
 
 Kiểm tra owner của Pods:

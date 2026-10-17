@@ -12,7 +12,7 @@ description: "Orientation for the k8s-learn Vietnamese Kubernetes curriculum and
 The repository currently has two distinct concerns:
 
 1. **Learning content:** 182 Markdown pages arranged into 16 curriculum categories plus the root landing page. The `gioi-thieu/`, `kien-truc/`, `workloads/`, `cau-hinh/`, `networking/`, and `storage/` categories contain substantive lessons; most remaining category pages are curriculum placeholders.
-2. **Documentation runtime:** Next.js 15, React 19, Fumadocs, custom remark transforms, Mermaid rendering, static search, and Cloudflare Pages deployment.
+2. **Documentation runtime:** Next.js 16, React 19, Fumadocs, custom remark transforms, docs-kit build-time D2 and example viewers, static search, and Cloudflare Pages deployment.
 
 This is not a Kubernetes controller, cluster configuration repository, or backend service. No database, authentication subsystem, business API, test suite, or site-deployment Kubernetes manifests are present in the inspected source.
 
@@ -22,7 +22,7 @@ This is not a Kubernetes controller, cluster configuration repository, or backen
 |---|---|---|
 | Understand how the site builds and serves pages | `source.config.ts`, `src/lib/source.ts`, `src/app/[[...slug]]/page.tsx` | [Site architecture](architecture.md) |
 | Add or complete a Kubernetes lesson | `content/docs/meta.json`, the target category's `meta.json`, adjacent lessons | [Curriculum and content map](content-map.md) |
-| Change local development, build, search, styling, or deployment | `package.json`, `next.config.mjs`, `src/`, `wrangler.toml` | [Development and operations](development.md) |
+| Change local development, build, search, styling, or deployment | `package.json`, `next.config.mjs`, `src/`, `source.config.ts`, `wrangler.toml` | [Development and operations](development.md) |
 | Understand the public learning sequence | `content/docs/meta.json` and category `meta.json` files | [Curriculum and content map](content-map.md) |
 
 ## Repository layout
@@ -37,7 +37,7 @@ This is not a Kubernetes controller, cluster configuration repository, or backen
 ├── src/
 │   ├── app/[[...slug]]/          # Catch-all Fumadocs layout and page renderer
 │   ├── app/api/search/route.ts   # Build-time static search endpoint
-│   ├── components/mermaid.tsx    # Client-side Mermaid SVG rendering
+│   ├── components/              # Site-specific components (docs-kit renderers imported from npm)
 │   └── lib/source.ts             # Fumadocs source loader
 ├── source.config.ts              # Content source and remark transforms
 ├── next.config.mjs               # Static export, dist directory, trailing slashes
