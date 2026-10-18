@@ -42,11 +42,12 @@ This is not a Kubernetes controller, cluster configuration repository, or backen
 ├── source.config.ts              # Content source and remark transforms
 ├── next.config.mjs               # Static export, dist directory, trailing slashes
 ├── wrangler.toml                 # Cloudflare Pages output configuration
-├── .agents/skills/write-docs/    # Repository-specific content-authoring skill
 └── wiki/                         # Repository knowledge for humans and coding agents
 ```
 
 Generated directories such as `.source/`, `.next/`, `dist/`, and `.wrangler/` are ignored by `.gitignore` and are not source-of-truth inputs.
+
+Authoring skills now live once in the parent collection at `../.agents/skills/fumadocs-technical-writer/` and `../.agents/skills/fumadocs-project-init/`, relative to this repo root. Local skill copies have been removed; a standalone clone must be given access to the shared skills explicitly.
 
 ## Run the site
 

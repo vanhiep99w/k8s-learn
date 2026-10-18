@@ -11,7 +11,7 @@ Most work belongs to one of three change classes:
 
 | Change class | Primary files | Required context |
 |---|---|---|
-| Curriculum content | `content/docs/**/*.md`, category `meta.json`, sometimes root `content/docs/meta.json` | `AGENTS.md`, target metadata and adjacent lessons, `.agents/skills/write-docs/SKILL.md` |
+| Curriculum content | `content/docs/**/*.md`, category `meta.json`, sometimes root `content/docs/meta.json` | `AGENTS.md`, target metadata and adjacent lessons, shared `../.agents/skills/fumadocs-technical-writer/SKILL.md` in the parent collection |
 | Site/runtime behavior | `src/`, `source.config.ts`, `next.config.mjs`, `tsconfig.json` | [Site architecture](architecture.md) and representative content pages |
 | Build/deployment | `package.json`, `next.config.mjs`, `wrangler.toml`, `.gitignore` | Static export contract, output directory, Cloudflare environment outside the repository |
 
@@ -76,7 +76,7 @@ Choose the canonical owner for the concept. Use cross-links when a lab, troubles
 
 ### 2. Read repository-specific writing guidance
 
-Load `.agents/skills/write-docs/SKILL.md` and the references relevant to the page. The checked-in guidance requires Vietnamese content and preserves English technical terms, code, command names, and identifiers.
+Load `../.agents/skills/fumadocs-technical-writer/SKILL.md` from the parent collection and only its references relevant to the page. Local skill copies have been removed; a standalone clone needs explicit access to the shared skill. Preserve this repo's Vietnamese prose and English technical terms, code, commands and identifiers.
 
 Use completed pages as stronger style evidence than placeholders:
 
@@ -179,7 +179,7 @@ Do not move remark configuration back into `next.config.mjs` without understandi
 
 ### D2 and docs-kit
 
-D2 is compiled to light/dark SVG at build time; there is no browser compiler or Mermaid renderer. Read the contracts in [Site architecture](architecture.md) and the authoring examples in `.agents/skills/write-docs/references/fumadocs-components.md`.
+D2 is compiled to light/dark SVG at build time; there is no browser compiler or Mermaid renderer. Read the contracts in [Site architecture](architecture.md), then compare the installed docs-kit version with `../docs-kit/README.md` in the parent collection and this repo's actual plugin/component registration. Do not follow a generic Mermaid example from the shared skill against this host's renderer.
 
 - `npm run build` validates D2 syntax and viewer YAML descriptors, including file/fence locations in errors.
 - Browser checks cover SVG layout, Explore lazy-loading, zoom/fit/expansion, theme, keyboard behavior, and mobile overflow.

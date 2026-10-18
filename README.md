@@ -44,4 +44,4 @@ Giữ log, output lệnh, công thức và cây thư mục ở dạng text. Ch�
 
 Cấu hình plugin nằm trong `source.config.ts`; component được đăng ký ở `src/app/[[...slug]]/page.tsx`; CSS được import một lần trong `src/app/globals.css`. Cache D2 ở `.next/cache/docs-kit/d2` (đã được gitignore). Build lỗi sẽ chỉ ra file/vị trí diagram hoặc descriptor sai.
 
-Hướng dẫn tác giả và schema tóm tắt: `.agents/skills/write-docs/references/fumadocs-components.md`. Kiểm tra bằng `npm run build` và xem thử trang trên browser sau khi thay đổi diagram/component.
+Skill biên soạn chung nằm ở `../.agents/skills/fumadocs-technical-writer/SKILL.md` trong thư mục tập hợp `my-docs`; không còn bản skill cục bộ. Với schema docs-kit, đối chiếu `../docs-kit/README.md`, phiên bản dependency và cấu hình thực tế của repo. Kiểm tra bằng `npm run build` và xem thử trang trên browser sau khi thay đổi diagram/component.

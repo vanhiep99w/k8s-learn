@@ -169,7 +169,7 @@ When repository evidence conflicts, use this order:
 1. **Current page content** for what a lesson actually teaches.
 2. **Category and root `meta.json`** for public navigation and learning order.
 3. **Runtime source** for routing, rendering, and component behavior.
-4. **`AGENTS.md` and `.agents/skills/write-docs/`** for contribution requirements and writing conventions.
+4. **`AGENTS.md` and the parent collection's `../.agents/skills/fumadocs-technical-writer/`** for contribution requirements and shared writing guidance; local skill copies have been removed.
 5. **Git history** for why important navigation or content transitions occurred.
 6. **`README.md` and root `content/docs/index.md`** for a high-level introduction only; their maturity statements are currently stale.
 
@@ -199,6 +199,6 @@ Every curriculum page must:
 - be registered in category metadata; and
 - pass `npm run build`.
 
-The repository-specific skill at `.agents/skills/write-docs/SKILL.md` and its references document the preferred structure and supported Fumadocs components. `source.config.ts` and `src/app/[[...slug]]/page.tsx` remain the authority on what the renderer actually supports.
+The shared skill at `../.agents/skills/fumadocs-technical-writer/SKILL.md` provides general writing guidance when this repo is opened within the `my-docs` collection. Its component examples must be checked against the host's actual registry and docs-kit dependency version. `source.config.ts` and `src/app/[[...slug]]/page.tsx` remain the authority on what the renderer actually supports.
 
 For the implementation checklist and validation strategy, continue with [Development and operations](development.md).
