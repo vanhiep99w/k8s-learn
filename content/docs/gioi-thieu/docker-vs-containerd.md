@@ -178,7 +178,33 @@ Image được tạo ra có format tương thích với Docker/OCI. Khi Pod đư
 
 Sơ đồ đầy đủ:
 
-```d2 title="Ví dụ từng bước"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="Ví dụ từng bước" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(K -> C)[0]"
+#         description: "kubelet → containerd: CRI: PullImage"
+#       - edge: "(C -> R)[0]"
+#         description: "containerd → Registry: Pull OCI-compatible image"
+#       - edge: "(R -> C)[0]"
+#         description: "Registry → containerd: Manifest và layers"
+#       - edge: "(K -> C)[1]"
+#         description: "kubelet → containerd: CRI: Create/Start Container"
+#       - edge: "(C -> O)[0]"
+#         description: "containerd → runc: OCI Runtime Spec"
+#       - edge: "(O -> L)[0]"
+#         description: "runc → Linux kernel: Tạo namespaces, cgroups và process"
+#       - edge: "(L -> O)[0]"
+#         description: "Linux kernel → runc: Process đang chạy"
+#       - edge: "(O -> C)[0]"
+#         description: "runc → containerd: Container started"
+#       - edge: "(C -> K)[0]"
+#         description: "containerd → kubelet: CRI status"
+# @endflow
 shape: sequence_diagram
 K: "kubelet"
 C: "containerd"

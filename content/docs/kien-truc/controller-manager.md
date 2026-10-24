@@ -266,7 +266,27 @@ User thường không nên sửa status để “đánh dấu healthy”. Contro
 
 Finalizer là key yêu cầu cleanup trước khi xóa object hoàn toàn.
 
-```d2 title="7. Finalizers và deletion"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="7. Finalizers và deletion" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(U -> API)[0]"
+#         description: "User → API Server: DELETE object"
+#       - edge: "(API -> API)[0]"
+#         description: "API Server → API Server: Set deletionTimestamp"
+#       - edge: "(API -> C)[0]"
+#         description: "API Server → Controller: Watch terminating object"
+#       - edge: "(C -> C)[0]"
+#         description: "Controller → Controller: Cleanup external/dependent state"
+#       - edge: "(C -> API)[0]"
+#         description: "Controller → API Server: Remove its finalizer"
+#       - edge: "(API -> API)[1]"
+#         description: "API Server → API Server: Delete object when finalizers empty"
+# @endflow
 shape: sequence_diagram
 U: "User"
 API: "API Server"

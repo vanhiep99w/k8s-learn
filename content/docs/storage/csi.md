@@ -152,7 +152,31 @@ spec:
 
 ## 5. Luồng provision, attach và mount
 
-```d2 title="5. Luồng provision, attach và mount"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="5. Luồng provision, attach và mount" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(PVC -> EP)[0]"
+#         description: "PVC → external-provisioner: Claim cần StorageClass"
+#       - edge: "(EP -> CP)[0]"
+#         description: "external-provisioner → CSI controller: CreateVolume"
+#       - edge: "(CP -> EP)[0]"
+#         description: "CSI controller → external-provisioner: volume_id + topology"
+#       - edge: "(EP -> PVC)[0]"
+#         description: "external-provisioner → PVC: Create PV và bind"
+#       - edge: "(EA -> CP)[0]"
+#         description: "external-attacher → CSI controller: ControllerPublishVolume(Node)"
+#       - edge: "(K -> NP)[0]"
+#         description: "kubelet → CSI node plugin: NodeStageVolume"
+#       - edge: "(K -> NP)[1]"
+#         description: "kubelet → CSI node plugin: NodePublishVolume(Pod path)"
+#       - edge: "(NP -> K)[0]"
+#         description: "CSI node plugin → kubelet: Mount/device ready"
+# @endflow
 shape: sequence_diagram
 PVC: "PVC"
 EP: "external-provisioner"

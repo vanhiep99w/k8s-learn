@@ -118,7 +118,37 @@ Component tùy chọn này tương tác với cloud API cho Node lifecycle, rout
 
 ### 3.1 Write path
 
-```d2 title="3.1 Write path"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="3.1 Write path" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(C -> LB)[0]"
+#         description: "Client → Load Balancer: HTTPS API request"
+#       - edge: "(LB -> API)[0]"
+#         description: "Load Balancer → kube-apiserver: Route request"
+#       - edge: "(API -> API)[0]"
+#         description: "kube-apiserver → kube-apiserver: Authenticate + authorize"
+#       - edge: "(API -> A)[0]"
+#         description: "kube-apiserver → Admission chain: Mutate + validate"
+#       - edge: "(A -> API)[0]"
+#         description: "Admission chain → kube-apiserver: Allowed object"
+#       - edge: "(API -> E)[0]"
+#         description: "kube-apiserver → etcd: Transactional write"
+#       - edge: "(E -> API)[0]"
+#         description: "etcd → kube-apiserver: Committed revision"
+#       - edge: "(API -> C)[0]"
+#         description: "kube-apiserver → Client: API response"
+#       - edge: "(E -> API)[1]"
+#         description: "etcd → kube-apiserver: Watch change"
+#       - edge: "(API -> Ctrl)[0]"
+#         description: "kube-apiserver → Controller: Watch event"
+#       - edge: "(Ctrl -> API)[0]"
+#         description: "Controller → kube-apiserver: Reconcile child/status"
+# @endflow
 shape: sequence_diagram
 C: "Client"
 LB: "Load Balancer"

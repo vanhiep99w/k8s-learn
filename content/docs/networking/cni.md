@@ -64,7 +64,34 @@ Kubernetes yêu cầu plugin tương thích CNI v0.4.0 trở lên và khuyến n
 
 Kubelet không trực tiếp chạy CNI ở Kubernetes hiện đại. Kubelet gọi runtime qua CRI; runtime quản lý CNI configuration và gọi plugin.
 
-```d2 title="2. CNI nằm ở đâu trong Pod lifecycle"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="2. CNI nằm ở đâu trong Pod lifecycle" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: create
+#     label: "Tạo Pod sandbox"
+#     steps:
+#       - edge: "(K -> R)[0]"
+#         description: "kubelet → CRI runtime: RunPodSandbox"
+#       - edge: "(R -> R)[0]"
+#         description: "CRI runtime → CRI runtime: Create netns"
+#       - edge: "(R -> C)[0]"
+#         description: "CRI runtime → CNI: ADD(containerID, netns, ifName)"
+#       - edge: "(C -> A)[0]"
+#         description: "CNI → CNI agent/controller: Allocate/program state nếu cần"
+#       - edge: "(C -> R)[0]"
+#         description: "CNI → CRI runtime: IPs, routes, DNS"
+#       - edge: "(R -> K)[0]"
+#         description: "CRI runtime → kubelet: Sandbox ready"
+#   - id: delete
+#     label: "Dọn Pod sandbox"
+#     steps:
+#       - edge: "(K -> R)[1]"
+#         description: "kubelet → CRI runtime: Stop/Remove sandbox"
+#       - edge: "(R -> C)[1]"
+#         description: "CRI runtime → CNI: DEL"
+# @endflow
 shape: sequence_diagram
 K: "kubelet"
 R: "CRI runtime"
@@ -80,6 +107,8 @@ K."Containers start sau khi network\nsetup thành công"
 K -> R: "Stop/Remove sandbox"
 R -> C: "DEL"
 ```
+
+ADD thuộc lúc tạo sandbox; DEL thuộc lúc dọn sandbox. Playback tách hai giai đoạn, không ngụ ý Pod vừa tạo sẽ bị xóa ngay.
 
 Từ Kubernetes 1.24, các kubelet flag cũ như `--network-plugin` và `--cni-bin-dir` đã bị loại bỏ; runtime chịu trách nhiệm CNI integration.
 

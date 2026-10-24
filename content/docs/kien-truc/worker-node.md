@@ -120,7 +120,37 @@ Logging, metrics và runtime security agent thường chạy một Pod trên m�
 
 ## 3. Từ Pod được schedule đến Container Running
 
-```d2 title="3. Từ Pod được schedule đến Container Running"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="3. Từ Pod được schedule đến Container Running" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(API -> K)[0]"
+#         description: "API Server → kubelet: Pod bound to this Node"
+#       - edge: "(K -> K)[0]"
+#         description: "kubelet → kubelet: Validate PodSpec and dependencies"
+#       - edge: "(K -> CSI)[0]"
+#         description: "kubelet → CSI Node Plugin: Stage/publish required volumes"
+#       - edge: "(K -> CRI)[0]"
+#         description: "kubelet → Container Runtime: Create Pod sandbox"
+#       - edge: "(CRI -> CNI)[0]"
+#         description: "Container Runtime → CNI Plugin: Configure network namespace"
+#       - edge: "(CNI -> CRI)[0]"
+#         description: "CNI Plugin → Container Runtime: Pod IP/network ready"
+#       - edge: "(K -> CRI)[1]"
+#         description: "kubelet → Container Runtime: Pull images"
+#       - edge: "(K -> CRI)[2]"
+#         description: "kubelet → Container Runtime: Start init containers in order"
+#       - edge: "(K -> CRI)[3]"
+#         description: "kubelet → Container Runtime: Start app containers"
+#       - edge: "(K -> App)[0]"
+#         description: "kubelet → App Container: Run startup/readiness/liveness probes"
+#       - edge: "(K -> API)[0]"
+#         description: "kubelet → API Server: Update Pod status and conditions"
+# @endflow
 shape: sequence_diagram
 API: "API Server"
 K: "kubelet"

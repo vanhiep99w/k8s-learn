@@ -203,7 +203,25 @@ Control flow xảy ra khi resource hoặc endpoint thay đổi. API server khôn
 
 ### Traffic flow: vận chuyển connection
 
-```d2 title="Traffic flow: vận chuyển connection"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="Traffic flow: vận chuyển connection" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(C -> N)[0]"
+#         description: "Client Pod → Kernel trên Node client: TCP SYN tới 10.96.20.30:80"
+#       - edge: "(N -> N)[0]"
+#         description: "Kernel trên Node client → Kernel trên Node client: Chọn endpoint và DNAT"
+#       - edge: "(N -> P)[0]"
+#         description: "Kernel trên Node client → Backend Pod: TCP SYN tới 10.244.2.12:8080"
+#       - edge: "(P -> N)[0]"
+#         description: "Backend Pod → Kernel trên Node client: TCP response"
+#       - edge: "(N -> C)[0]"
+#         description: "Kernel trên Node client → Client Pod: Reverse NAT, client vẫn thấy Service IP"
+# @endflow
 shape: sequence_diagram
 C: "Client Pod"
 N: "Kernel trên Node client"
