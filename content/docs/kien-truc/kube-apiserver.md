@@ -81,39 +81,7 @@ Trong kiến trúc chuẩn, API Server là component duy nhất giao tiếp tr�
 
 ## 2. Luồng xử lý request
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="2. Luồng xử lý request" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(C -> API)[0]"
-#         description: "Client → kube-apiserver: HTTPS request"
-#       - edge: "(API -> Authn)[0]"
-#         description: "kube-apiserver → Authentication: Xác định user/groups"
-#       - edge: "(Authn -> API)[0]"
-#         description: "Authentication → kube-apiserver: Identity hoặc 401"
-#       - edge: "(API -> Authz)[0]"
-#         description: "kube-apiserver → Authorization: Verb + resource + namespace"
-#       - edge: "(Authz -> API)[0]"
-#         description: "Authorization → kube-apiserver: Allow/Deny/NoOpinion"
-#       - edge: "(API -> Mut)[0]"
-#         description: "kube-apiserver → Mutating Admission: Default hoặc mutate object"
-#       - edge: "(Mut -> API)[0]"
-#         description: "Mutating Admission → kube-apiserver: Mutated object"
-#       - edge: "(API -> Val)[0]"
-#         description: "kube-apiserver → Validation + Validating Admission: Validate schema và policy"
-#       - edge: "(Val -> API)[0]"
-#         description: "Validation + Validating Admission → kube-apiserver: Allowed object"
-#       - edge: "(API -> E)[0]"
-#         description: "kube-apiserver → etcd: Read/write transaction"
-#       - edge: "(E -> API)[0]"
-#         description: "etcd → kube-apiserver: Revision/data"
-#       - edge: "(API -> C)[0]"
-#         description: "kube-apiserver → Client: Status hoặc object response"
-# @endflow
+```d2 title="2. Luồng xử lý request"
 shape: sequence_diagram
 C: "Client"
 API: "kube-apiserver"

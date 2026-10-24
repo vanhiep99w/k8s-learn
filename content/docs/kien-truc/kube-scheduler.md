@@ -72,31 +72,7 @@ Cluster Autoscaler có thể phản ứng khi Pod unschedulable bằng cách tă
 
 ## 2. Scheduling cycle từ đầu đến cuối
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="2. Scheduling cycle từ đầu đến cuối" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(API -> Q)[0]"
-#         description: "API Server → Scheduling Queue: Pod without nodeName"
-#       - edge: "(Q -> S)[0]"
-#         description: "Scheduling Queue → Scheduler: Next Pod"
-#       - edge: "(S -> N)[0]"
-#         description: "Scheduler → Node snapshot: Filter Nodes"
-#       - edge: "(N -> S)[0]"
-#         description: "Node snapshot → Scheduler: Feasible Nodes"
-#       - edge: "(S -> N)[1]"
-#         description: "Scheduler → Node snapshot: Score and normalize"
-#       - edge: "(S -> S)[0]"
-#         description: "Scheduler → Scheduler: Select highest score"
-#       - edge: "(S -> API)[0]"
-#         description: "Scheduler → API Server: Reserve/Permit/PreBind/Bind"
-#       - edge: "(API -> K)[0]"
-#         description: "API Server → kubelet: Pod assigned to this Node"
-# @endflow
+```d2 title="2. Scheduling cycle từ đầu đến cuối"
 shape: sequence_diagram
 API: "API Server"
 Q: "Scheduling Queue"

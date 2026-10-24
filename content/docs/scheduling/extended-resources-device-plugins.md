@@ -112,31 +112,7 @@ Các RPC tùy chọn như `GetPreferredAllocation` hoặc `PreStartContainer` h�
 
 ## 4. Scheduling và allocation flow
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="4. Scheduling và allocation flow" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(DP -> K)[0]"
-#         description: "Device Plugin → kubelet: Register + ListAndWatch devices"
-#       - edge: "(K -> API)[0]"
-#         description: "kubelet → API Server: Update Node capacity/allocatable"
-#       - edge: "(S -> API)[0]"
-#         description: "Scheduler → API Server: Watch Pod requesting resource"
-#       - edge: "(S -> S)[0]"
-#         description: "Scheduler → Scheduler: Filter Nodes by allocatable"
-#       - edge: "(S -> API)[1]"
-#         description: "Scheduler → API Server: Bind Pod to Node"
-#       - edge: "(K -> DP)[0]"
-#         description: "kubelet → Device Plugin: Allocate selected device IDs"
-#       - edge: "(DP -> K)[1]"
-#         description: "Device Plugin → kubelet: Device/runtime configuration"
-#       - edge: "(K -> R)[0]"
-#         description: "kubelet → Runtime: Create container"
-# @endflow
+```d2 title="4. Scheduling và allocation flow"
 shape: sequence_diagram
 DP: "Device Plugin"
 K: "kubelet"

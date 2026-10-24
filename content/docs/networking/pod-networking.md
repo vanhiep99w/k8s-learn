@@ -91,33 +91,7 @@ Service không sửa được application chỉ bind loopback.
 
 Flow tổng quát khi tạo Pod:
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="2. Pod sandbox và network namespace" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(K -> R)[0]"
-#         description: "kubelet → CRI runtime: RunPodSandbox"
-#       - edge: "(R -> R)[0]"
-#         description: "CRI runtime → CRI runtime: Create network namespace"
-#       - edge: "(R -> C)[0]"
-#         description: "CRI runtime → CNI plugin: CNI ADD + namespace path"
-#       - edge: "(C -> I)[0]"
-#         description: "CNI plugin → IPAM: Allocate Pod IP"
-#       - edge: "(I -> C)[0]"
-#         description: "IPAM → CNI plugin: IP, gateway, routes"
-#       - edge: "(C -> C)[0]"
-#         description: "CNI plugin → CNI plugin: Create interface + data-plane state"
-#       - edge: "(C -> R)[0]"
-#         description: "CNI plugin → CRI runtime: CNI result"
-#       - edge: "(R -> R)[1]"
-#         description: "CRI runtime → CRI runtime: Start containers in sandbox"
-#       - edge: "(R -> K)[0]"
-#         description: "CRI runtime → kubelet: Pod sandbox ready"
-# @endflow
+```d2 title="2. Pod sandbox và network namespace"
 shape: sequence_diagram
 K: "kubelet"
 R: "CRI runtime"

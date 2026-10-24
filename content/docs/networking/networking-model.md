@@ -220,23 +220,7 @@ Packet không cần rời physical NIC. NetworkPolicy có thể được enforce
 
 ### 4.2 Khác Node
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="4.2 Khác Node" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(A -> N1)[0]"
-#         description: "Pod A 10.244.1.10 → Node 1: dst 10.244.2.20"
-#       - edge: "(N1 -> N2)[0]"
-#         description: "Node 1 → Node 2: Route native hoặc encapsulate overlay"
-#       - edge: "(N2 -> B)[0]"
-#         description: "Node 2 → Pod B 10.244.2.20: Decapsulate/route tới veth"
-#       - edge: "(B -> A)[0]"
-#         description: "Pod B 10.244.2.20 → Pod A 10.244.1.10: Reply theo reverse route"
-# @endflow
+```d2 title="4.2 Khác Node"
 shape: sequence_diagram
 A: "Pod A 10.244.1.10"
 N1: "Node 1"

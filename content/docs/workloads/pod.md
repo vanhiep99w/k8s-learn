@@ -431,29 +431,7 @@ Restart policy áp dụng cho việc restart container trong **cùng Pod trên c
 
 Khi chạy `kubectl apply`, nhiều thành phần phối hợp để đưa Pod từ YAML thành container đang chạy.
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="Pod được tạo và chạy như thế nào?" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(U -> A)[0]"
-#         description: "kubectl → API Server: Gửi Pod manifest"
-#       - edge: "(A -> A)[0]"
-#         description: "API Server → API Server: Validate và lưu Pod"
-#       - edge: "(S -> A)[0]"
-#         description: "Scheduler → API Server: Quan sát Pod chưa có Node"
-#       - edge: "(S -> A)[1]"
-#         description: "Scheduler → API Server: Bind Pod vào một Node"
-#       - edge: "(K -> A)[0]"
-#         description: "kubelet → API Server: Quan sát Pod được giao"
-#       - edge: "(K -> R)[0]"
-#         description: "kubelet → Container runtime: Tạo sandbox, pull image, chạy container"
-#       - edge: "(K -> A)[1]"
-#         description: "kubelet → API Server: Cập nhật Pod status"
-# @endflow
+```d2 title="Pod được tạo và chạy như thế nào?"
 shape: sequence_diagram
 U: "kubectl"
 A: "API Server"

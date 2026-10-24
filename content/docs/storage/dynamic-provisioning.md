@@ -77,27 +77,7 @@ Xem kiến trúc chi tiết tại [Container Storage Interface](/storage/csi/).
 
 StorageClass mặc định dùng `Immediate` nếu không khai báo `volumeBindingMode`:
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="3. Luồng Immediate" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(U -> A)[0]"
-#         description: "User → API Server: Create PVC class=fast"
-#       - edge: "(P -> A)[0]"
-#         description: "CSI provisioner → API Server: Watch PVC"
-#       - edge: "(P -> B)[0]"
-#         description: "CSI provisioner → Storage backend: CreateVolume(parameters, size)"
-#       - edge: "(B -> P)[0]"
-#         description: "Storage backend → CSI provisioner: volumeHandle + topology"
-#       - edge: "(P -> A)[1]"
-#         description: "CSI provisioner → API Server: Create PV"
-#       - edge: "(C -> A)[0]"
-#         description: "Binder → API Server: Bind PV ↔ PVC"
-# @endflow
+```d2 title="3. Luồng Immediate"
 shape: sequence_diagram
 U: "User"
 A: "API Server"
@@ -133,27 +113,7 @@ allowVolumeExpansion: true
 
 PVC ở `Pending` cho đến khi Pod cần nó. Scheduler chọn candidate Node, provisioner nhận selected topology rồi tạo Volume đúng location.
 
-```d2 title="4. Luồng WaitForFirstConsumer" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(U -> S)[0]"
-#         description: "User → Scheduler: Pod cần PVC chưa bind"
-#       - edge: "(S -> S)[0]"
-#         description: "Scheduler → Scheduler: Filter CPU, taint, affinity, storage topology"
-#       - edge: "(S -> P)[0]"
-#         description: "Scheduler → Provisioner: Chọn topology khả thi"
-#       - edge: "(P -> B)[0]"
-#         description: "Provisioner → Backend: CreateVolume trong topology"
-#       - edge: "(B -> P)[0]"
-#         description: "Backend → Provisioner: volumeHandle"
-#       - edge: "(P -> S)[0]"
-#         description: "Provisioner → Scheduler: PV/PVC Bound"
-#       - edge: "(S -> U)[0]"
-#         description: "Scheduler → User: Pod bound tới Node"
-# @endflow
+```d2 title="4. Luồng WaitForFirstConsumer"
 shape: sequence_diagram
 U: "User"
 S: "Scheduler"

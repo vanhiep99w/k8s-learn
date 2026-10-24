@@ -85,29 +85,7 @@ Binding cycle áp dụng quyết định đã chọn. Nhiều binding cycle có 
 
 Scheduler dùng cơ chế **assume**: cập nhật cache nội bộ như thể Pod đã được bind trước khi API write hoàn tất. Cách này tăng throughput nhưng yêu cầu rollback qua `Unreserve` nếu các bước sau thất bại.
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="2.2 Binding cycle" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(Q -> S)[0]"
-#         description: "Queue → Scheduler: Pod tiếp theo"
-#       - edge: "(S -> S)[0]"
-#         description: "Scheduler → Scheduler: Filter và Score"
-#       - edge: "(S -> C)[0]"
-#         description: "Scheduler → Scheduler cache: Assume Pod trên Node"
-#       - edge: "(S -> S)[1]"
-#         description: "Scheduler → Scheduler: Reserve / Permit / PreBind"
-#       - edge: "(S -> A)[0]"
-#         description: "Scheduler → API Server: Bind Pod vào Node"
-#       - edge: "(A -> S)[0]"
-#         description: "API Server → Scheduler: Thành công"
-#       - edge: "(S -> C)[1]"
-#         description: "Scheduler → Scheduler cache: Hoàn tất cache state"
-# @endflow
+```d2 title="2.2 Binding cycle"
 shape: sequence_diagram
 Q: "Queue"
 S: "Scheduler"

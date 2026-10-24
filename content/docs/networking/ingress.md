@@ -134,29 +134,7 @@ https://shop.example.com/api/orders?id=42
 7. Service và EndpointSlice cho biết các backend ready, ví dụ Pod `10.244.2.15:8080`.
 8. Data plane forward request tới một backend rồi trả response về client.
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="Một request đi qua Ingress như thế nào?" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(C -> D)[0]"
-#         description: "Client → DNS: shop.example.com là địa chỉ nào?"
-#       - edge: "(D -> C)[0]"
-#         description: "DNS → Client: địa chỉ public của Ingress"
-#       - edge: "(C -> IC)[0]"
-#         description: "Client → Ingress data plane: HTTPS /api/orders, Host shop.example.com"
-#       - edge: "(IC -> IC)[0]"
-#         description: "Ingress data plane → Ingress data plane: match host + path, terminate TLS"
-#       - edge: "(IC -> S)[0]"
-#         description: "Ingress data plane → Service api:80: chọn backend Service api:80"
-#       - edge: "(S -> P)[0]"
-#         description: "Service api:80 → Pod api:8080: forward tới endpoint ready"
-#       - edge: "(P -> C)[0]"
-#         description: "Pod api:8080 → Client: HTTP response"
-# @endflow
+```d2 title="Một request đi qua Ingress như thế nào?"
 shape: sequence_diagram
 C: "Client"
 D: "DNS"

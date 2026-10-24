@@ -98,33 +98,7 @@ Node lỗi → Control Plane/controller tạo replacement trên Node khác
 
 ## 2. Pod lifecycle trên Node
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="2. Pod lifecycle trên Node" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(API -> K)[0]"
-#         description: "API Server → kubelet: Assigned PodSpec"
-#       - edge: "(K -> V)[0]"
-#         description: "kubelet → Volume Manager/CSI: Prepare volumes"
-#       - edge: "(K -> R)[0]"
-#         description: "kubelet → CRI Runtime: RunPodSandbox"
-#       - edge: "(R -> N)[0]"
-#         description: "CRI Runtime → CNI: ADD network"
-#       - edge: "(N -> R)[0]"
-#         description: "CNI → CRI Runtime: Pod IP configured"
-#       - edge: "(K -> R)[1]"
-#         description: "kubelet → CRI Runtime: PullImage"
-#       - edge: "(K -> R)[2]"
-#         description: "kubelet → CRI Runtime: Create/Start init containers"
-#       - edge: "(K -> R)[3]"
-#         description: "kubelet → CRI Runtime: Create/Start app containers"
-#       - edge: "(K -> API)[0]"
-#         description: "kubelet → API Server: PodIP, phase, conditions, containerStatuses"
-# @endflow
+```d2 title="2. Pod lifecycle trên Node"
 shape: sequence_diagram
 API: "API Server"
 K: "kubelet"

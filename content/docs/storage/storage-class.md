@@ -448,31 +448,7 @@ Behavior này đơn giản nếu storage có thể truy cập từ mọi Node ph
 
 `WaitForFirstConsumer` trì hoãn bind/provision đến khi có Pod thực sự dùng PVC:
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="WaitForFirstConsumer" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(U -> A)[0]"
-#         description: "User → API Server: Tạo PVC"
-#       - edge: "(A -> U)[0]"
-#         description: "API Server → User: PVC Pending, chờ consumer"
-#       - edge: "(U -> A)[1]"
-#         description: "User → API Server: Tạo Pod dùng PVC"
-#       - edge: "(S -> S)[0]"
-#         description: "Scheduler → Scheduler: Xét CPU, taint, affinity và topology"
-#       - edge: "(S -> C)[0]"
-#         description: "Scheduler → CSI provisioner: Chọn topology khả thi"
-#       - edge: "(C -> B)[0]"
-#         description: "CSI provisioner → Storage backend: Tạo volume trong topology đó"
-#       - edge: "(C -> A)[0]"
-#         description: "CSI provisioner → API Server: Tạo PV và bind PVC"
-#       - edge: "(S -> A)[0]"
-#         description: "Scheduler → API Server: Gán Pod vào Node"
-# @endflow
+```d2 title="WaitForFirstConsumer"
 shape: sequence_diagram
 U: "User"
 A: "API Server"

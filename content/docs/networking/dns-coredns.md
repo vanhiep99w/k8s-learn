@@ -29,36 +29,7 @@ description: "Kubernetes DNS deep-dive: Service/Pod records, search domain, ndot
 
 Kubernetes DNS cung cấp tên ổn định cho Service và một số Pod identity. CoreDNS thường chạy dưới dạng Deployment trong `kube-system`, đứng sau Service tên `kube-dns` để giữ compatibility.
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="Tổng quan" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: internal
-#     label: "Tên Service trong cluster"
-#     steps:
-#       - edge: "(P -> S)[0]"
-#         description: "Client Pod → kube-dns Service VIP:53: A api.production.svc.cluster.local"
-#       - edge: "(S -> C)[0]"
-#         description: "kube-dns Service VIP:53 → CoreDNS Pod: UDP/TCP 53"
-#       - edge: "(C -> A)[0]"
-#         description: "CoreDNS Pod → Kubernetes API cache: Service/EndpointSlice cache"
-#       - edge: "(C -> P)[0]"
-#         description: "CoreDNS Pod → Client Pod: ClusterIP hoặc endpoint IP"
-#   - id: external
-#     label: "Tên ngoài cluster"
-#     steps:
-#       - edge: "(P -> S)[1]"
-#         description: "Client Pod → kube-dns Service VIP:53: A example.com"
-#       - edge: "(S -> C)[1]"
-#         description: "kube-dns Service VIP:53 → CoreDNS Pod: Query external name"
-#       - edge: "(C -> U)[0]"
-#         description: "CoreDNS Pod → Upstream DNS: Forward query"
-#       - edge: "(U -> C)[0]"
-#         description: "Upstream DNS → CoreDNS Pod: Public/private answer"
-#       - edge: "(C -> P)[1]"
-#         description: "CoreDNS Pod → Client Pod: Cached answer"
-# @endflow
+```d2 title="Tổng quan"
 shape: sequence_diagram
 P: "Client Pod"
 S: "kube-dns Service VIP:53"
@@ -75,8 +46,6 @@ C -> U: "Forward query"
 U -> C: "Public/private answer" {style.stroke-dash: 4}
 C -> P: "Cached answer" {style.stroke-dash: 4}
 ```
-
-Tra tên Service và forward tên ngoài cluster là hai request DNS riêng. Kịch bản nội bộ không gọi upstream DNS.
 
 DNS failure có blast radius lớn: application thường báo database/API timeout dù network path tới IP vẫn hoạt động.
 
