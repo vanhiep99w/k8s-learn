@@ -12,6 +12,7 @@
     "pod-security-admission",
     "admission-controllers",
     "secret-security",
+    "hashicorp-vault",
     "encryption-at-rest",
     "pki-tls-certificates",
     "network-security",
